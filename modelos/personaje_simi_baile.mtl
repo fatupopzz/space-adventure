@@ -1,0 +1,90 @@
+# Materiales de simi (voxel)
+
+newmtl piel
+Kd 1.00 0.82 0.68
+Ks 0.1 0.1 0.1
+Ns 8
+
+newmtl canas
+Kd 0.95 0.95 0.97
+Ks 0.2 0.2 0.2
+Ns 16
+
+newmtl lentes
+Kd 0.12 0.12 0.16
+Ks 0.5 0.5 0.5
+Ns 48
+
+newmtl bata
+Kd 0.97 0.97 1.00
+Ks 0.2 0.2 0.2
+Ns 16
+
+newmtl bata_sombra
+Kd 0.80 0.82 0.90
+Ks 0.1 0.1 0.1
+Ns 8
+
+newmtl metal_gris
+Kd 0.55 0.58 0.65
+Ks 0.6 0.6 0.6
+Ns 48
+
+newmtl simi_azul
+Kd 0.16 0.34 0.75
+Ks 0.1 0.1 0.1
+Ns 8
+
+newmtl pantalon
+Kd 0.18 0.22 0.40
+Ks 0.1 0.1 0.1
+Ns 8
+
+newmtl zapato
+Kd 0.10 0.10 0.12
+Ks 0.1 0.1 0.1
+Ns 8
+
+newmtl asiento
+Kd 0.45 0.33 0.62
+Ks 0.1 0.1 0.1
+Ns 8
+
+newmtl volante
+Kd 0.72 0.58 0.92
+Ks 0.5 0.5 0.5
+Ns 48
+
+newmtl columna
+Kd 0.30 0.30 0.35
+Ks 0.6 0.6 0.6
+Ns 64
+
+
+newmtl ojo
+Kd 0.05 0.04 0.07
+Ks 0.3 0.3 0.3
+Ns 32
+
+newmtl boca
+Kd 0.62 0.16 0.28
+Ks 0 0 0
+Ns 1
+
+newmtl corazon
+Kd 1.00 0.30 0.55
+Ks 0 0 0
+Ns 1
+Ke 0.50 0.10 0.25
+
+newmtl rubor
+Kd 1.00 0.48 0.62
+Ks 0 0 0
+Ns 1
+d 0.60
+
+newmtl sudor
+Kd 0.40 0.78 1.00
+Ks 0.9 0.9 0.9
+Ns 96
+d 0.85

@@ -1,0 +1,104 @@
+# Materiales
+
+newmtl pasto
+Kd 0.35 0.72 0.38
+Ks 0.25 0.25 0.25
+Ns 32
+
+newmtl tierra
+Kd 0.55 0.40 0.28
+Ks 0.25 0.25 0.25
+Ns 32
+
+newmtl roca
+Kd 0.45 0.42 0.50
+Ks 0.25 0.25 0.25
+Ns 32
+
+newmtl roca_oscura
+Kd 0.32 0.30 0.40
+Ks 0.25 0.25 0.25
+Ns 32
+
+newmtl flor_rosa
+Kd 1.00 0.55 0.80
+Ks 0.25 0.25 0.25
+Ns 32
+Ke 0.25 0.10 0.20
+
+newmtl flor_blanca
+Kd 1.00 1.00 1.00
+Ks 0.25 0.25 0.25
+Ns 32
+Ke 0.20 0.20 0.20
+
+newmtl cristal
+Kd 0.75 0.55 1.00
+Ks 0.25 0.25 0.25
+Ns 32
+Ke 0.35 0.18 0.55
+
+newmtl agua_cascada
+Kd 0.60 0.85 1.00
+Ks 0.25 0.25 0.25
+Ns 32
+Ke 0.15 0.30 0.45
+d 0.70
+
+newmtl baldosa_a
+Kd 0.86 0.92 1.00
+Ks 0.25 0.25 0.25
+Ns 32
+
+newmtl baldosa_b
+Kd 0.72 0.82 0.98
+Ks 0.25 0.25 0.25
+Ns 32
+
+newmtl oro
+Kd 1.00 0.78 0.30
+Ks 0.25 0.25 0.25
+Ns 32
+Ke 0.12 0.08 0.00
+
+newmtl oro_luz
+Kd 1.00 0.90 0.50
+Ks 0.25 0.25 0.25
+Ns 32
+Ke 1.00 0.75 0.25
+
+newmtl fondo_piscina
+Kd 0.15 0.35 0.75
+Ks 0.25 0.25 0.25
+Ns 32
+Ke 0.02 0.06 0.15
+
+newmtl agua
+Kd 0.35 0.75 1.00
+Ks 0.25 0.25 0.25
+Ns 32
+Ke 0.08 0.22 0.40
+d 0.55
+
+newmtl loto
+Kd 1.00 0.60 0.85
+Ks 0.25 0.25 0.25
+Ns 32
+Ke 0.30 0.10 0.25
+
+newmtl obsidiana
+Kd 0.12 0.08 0.20
+Ks 0.25 0.25 0.25
+Ns 32
+Ke 0.10 0.05 0.20
+
+newmtl marmol_perla
+Kd 0.82 0.78 0.95
+Ks 0.25 0.25 0.25
+Ns 32
+
+newmtl fuego
+Kd 1.00 0.60 0.20
+Ks 0.25 0.25 0.25
+Ns 32
+Ke 1.00 0.50 0.12

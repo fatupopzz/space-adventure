@@ -1,0 +1,80 @@
+# Materiales
+
+newmtl pelo_canela
+Kd 1.00 0.80 0.28
+Ks 0.3 0.3 0.3
+Ns 24
+
+newmtl oreja_punta
+Kd 0.98 0.55 0.18
+Ks 0.3 0.3 0.3
+Ns 24
+
+newmtl hocico
+Kd 1.00 0.96 0.85
+Ks 0.3 0.3 0.3
+Ns 24
+
+newmtl nariz
+Kd 0.12 0.08 0.06
+Ks 0.3 0.3 0.3
+Ns 24
+
+newmtl chaleco
+Kd 0.45 0.62 0.40
+Ks 0.3 0.3 0.3
+Ns 24
+
+newmtl chaleco_claro
+Kd 0.62 0.78 0.55
+Ks 0.3 0.3 0.3
+Ns 24
+
+newmtl camisa
+Kd 0.97 0.97 0.97
+Ks 0.3 0.3 0.3
+Ns 24
+
+newmtl mono
+Kd 0.85 0.15 0.25
+Ks 0.3 0.3 0.3
+Ns 24
+
+newmtl falda
+Kd 0.18 0.24 0.35
+Ks 0.3 0.3 0.3
+Ns 24
+
+newmtl cascabel
+Kd 1.00 0.92 0.50
+Ks 0.3 0.3 0.3
+Ns 24
+Ke 0.20 0.15 0.05
+
+newmtl ojo
+Kd 0.05 0.04 0.07
+Ks 0.3 0.3 0.3
+Ns 32
+
+newmtl boca
+Kd 0.62 0.16 0.28
+Ks 0 0 0
+Ns 1
+
+newmtl corazon
+Kd 1.00 0.30 0.55
+Ks 0 0 0
+Ns 1
+Ke 0.50 0.10 0.25
+
+newmtl rubor
+Kd 1.00 0.48 0.62
+Ks 0 0 0
+Ns 1
+d 0.60
+
+newmtl sudor
+Kd 0.40 0.78 1.00
+Ks 0.9 0.9 0.9
+Ns 96
+d 0.85

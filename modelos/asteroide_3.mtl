@@ -1,0 +1,16 @@
+# Materiales del asteroide
+
+newmtl roca
+Kd 0.46 0.42 0.40
+Ks 0.08 0.08 0.08
+Ns 6
+
+newmtl roca_clara
+Kd 0.62 0.58 0.54
+Ks 0.08 0.08 0.08
+Ns 6
+
+newmtl crater
+Kd 0.28 0.25 0.24
+Ks 0.05 0.05 0.05
+Ns 4

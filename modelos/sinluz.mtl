@@ -1,0 +1,42 @@
+# Materiales
+
+newmtl metal
+Kd 0.72 0.74 0.80
+Ks 0.2 0.2 0.2
+Ns 24
+
+newmtl metal_oscuro
+Kd 0.38 0.40 0.46
+Ks 0.2 0.2 0.2
+Ns 24
+
+newmtl acero
+Kd 0.88 0.90 0.95
+Ks 0.2 0.2 0.2
+Ns 24
+
+newmtl tela_sinluz
+Kd 0.22 0.30 0.50
+Ks 0.2 0.2 0.2
+Ns 24
+
+newmtl oro_sinluz
+Kd 1.00 0.78 0.30
+Ks 0.2 0.2 0.2
+Ns 24
+Ke 0.12 0.08 0.00
+
+newmtl cuero
+Kd 0.35 0.22 0.12
+Ks 0.2 0.2 0.2
+Ns 24
+
+newmtl capa
+Kd 0.16 0.15 0.20
+Ks 0.2 0.2 0.2
+Ns 24
+
+newmtl negro
+Kd 0.03 0.03 0.05
+Ks 0.2 0.2 0.2
+Ns 24

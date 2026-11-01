@@ -1,0 +1,22 @@
+# Materiales del recuerdo
+
+newmtl piedra
+Kd 0.50 0.50 0.50
+Ks 0.4 0.4 0.4
+Ns 8
+
+newmtl piedra_clara
+Kd 0.62 0.62 0.62
+Ks 0.4 0.4 0.4
+Ns 8
+
+newmtl piedra_oscura
+Kd 0.36 0.36 0.38
+Ks 0.4 0.4 0.4
+Ns 8
+
+newmtl diamante
+Kd 0.35 0.95 0.90
+Ks 0.4 0.4 0.4
+Ns 90
+Ke 0.15 0.50 0.50

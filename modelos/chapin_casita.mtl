@@ -1,0 +1,31 @@
+# Materiales
+
+newmtl pared
+Kd 0.95 0.75 0.25
+Ks 0.06 0.06 0.06
+Ns 8
+
+newmtl zocalo
+Kd 0.55 0.20 0.15
+Ks 0.06 0.06 0.06
+Ns 8
+
+newmtl madera
+Kd 0.40 0.22 0.10
+Ks 0.06 0.06 0.06
+Ns 8
+
+newmtl vidrio
+Kd 0.20 0.30 0.38
+Ks 0.06 0.06 0.06
+Ns 8
+
+newmtl hierro
+Kd 0.10 0.10 0.12
+Ks 0.06 0.06 0.06
+Ns 8
+
+newmtl teja
+Kd 0.72 0.30 0.16
+Ks 0.06 0.06 0.06
+Ns 8

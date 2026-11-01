@@ -1,0 +1,23 @@
+# Materiales
+
+newmtl blanco
+Kd 0.88 0.88 0.86
+Ks 0.30 0.30 0.30
+Ns 24
+
+newmtl gris
+Kd 0.46 0.47 0.52
+Ks 0.30 0.30 0.30
+Ns 24
+
+newmtl panel_solar
+Kd 0.12 0.17 0.42
+Ks 0.80 0.80 0.80
+Ns 64
+Ke 0.02 0.03 0.08
+
+newmtl luz
+Kd 1.00 0.90 0.65
+Ks 0.15 0.15 0.15
+Ns 16
+Ke 0.90 0.80 0.55

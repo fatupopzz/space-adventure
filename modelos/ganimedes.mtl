@@ -1,0 +1,17 @@
+# Materiales de la luna
+
+newmtl gris
+Kd 0.58 0.56 0.54
+Ks 0.1 0.1 0.1
+Ns 8
+
+newmtl cafe
+Kd 0.40 0.33 0.28
+Ks 0.1 0.1 0.1
+Ns 8
+
+newmtl brillo
+Kd 0.80 0.80 0.78
+Ks 0.1 0.1 0.1
+Ns 8
+

@@ -1,0 +1,24 @@
+# Materiales del recuerdo
+
+newmtl oro
+Kd 0.95 0.72 0.25
+Ks 0.4 0.4 0.4
+Ns 64
+Ke 0.12 0.08 0.00
+
+newmtl oro_brillo
+Kd 1.00 0.90 0.55
+Ks 0.4 0.4 0.4
+Ns 64
+Ke 0.40 0.30 0.10
+
+newmtl saturno
+Kd 0.92 0.80 0.55
+Ks 0.4 0.4 0.4
+Ns 32
+
+newmtl hielo
+Kd 0.75 0.88 1.00
+Ks 0.4 0.4 0.4
+Ns 32
+Ke 0.15 0.20 0.30

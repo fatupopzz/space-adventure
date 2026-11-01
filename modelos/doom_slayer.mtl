@@ -1,0 +1,48 @@
+# Materiales
+
+newmtl verde
+Kd 0.28 0.48 0.22
+Ks 0.3 0.3 0.3
+Ns 24
+
+newmtl verde_oscuro
+Kd 0.16 0.30 0.14
+Ks 0.3 0.3 0.3
+Ns 24
+
+newmtl gris
+Kd 0.55 0.55 0.52
+Ks 0.3 0.3 0.3
+Ns 24
+
+newmtl cinturon
+Kd 0.42 0.28 0.15
+Ks 0.3 0.3 0.3
+Ns 24
+
+newmtl botas
+Kd 0.22 0.20 0.20
+Ks 0.3 0.3 0.3
+Ns 24
+
+newmtl visor
+Kd 0.20 0.12 0.04
+Ks 0.3 0.3 0.3
+Ns 24
+Ke 0.55 0.30 0.04
+
+newmtl visor_brillo
+Kd 1.00 0.90 0.60
+Ks 0.3 0.3 0.3
+Ns 24
+Ke 0.90 0.70 0.30
+
+newmtl arma
+Kd 0.28 0.28 0.32
+Ks 0.3 0.3 0.3
+Ns 24
+
+newmtl madera
+Kd 0.48 0.30 0.16
+Ks 0.3 0.3 0.3
+Ns 24

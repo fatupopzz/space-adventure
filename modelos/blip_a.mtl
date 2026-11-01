@@ -1,0 +1,29 @@
+# Materiales
+
+newmtl xenonita
+Kd 0.30 0.34 0.31
+Ks 0.35 0.35 0.35
+Ns 32
+
+newmtl xenonita_clara
+Kd 0.48 0.52 0.47
+Ks 0.35 0.35 0.35
+Ns 32
+
+newmtl astrofago
+Kd 0.55 0.06 0.08
+Ks 0.15 0.15 0.15
+Ns 16
+Ke 0.95 0.12 0.15
+
+newmtl tanque
+Kd 0.62 0.60 0.55
+Ks 0.15 0.15 0.15
+Ns 16
+
+newmtl vidrio_xenonita
+Kd 0.45 0.75 0.68
+Ks 0.50 0.50 0.50
+Ns 64
+Ke 0.02 0.05 0.04
+d 0.18

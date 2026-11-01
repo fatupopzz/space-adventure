@@ -1,0 +1,37 @@
+# Materiales
+
+newmtl madera
+Kd 0.62 0.38 0.20
+Ks 0.2 0.2 0.2
+Ns 24
+
+newmtl madera_clara
+Kd 0.72 0.47 0.26
+Ks 0.2 0.2 0.2
+Ns 24
+
+newmtl madera_oscura
+Kd 0.40 0.22 0.12
+Ks 0.2 0.2 0.2
+Ns 24
+
+newmtl alfombra_roja
+Kd 0.70 0.10 0.14
+Ks 0.2 0.2 0.2
+Ns 24
+
+newmtl pared
+Kd 0.78 0.68 0.54
+Ks 0.2 0.2 0.2
+Ns 24
+
+newmtl marmol
+Kd 0.86 0.83 0.77
+Ks 0.2 0.2 0.2
+Ns 24
+
+newmtl oro_juzgado
+Kd 1.00 0.78 0.30
+Ks 0.2 0.2 0.2
+Ns 24
+Ke 0.12 0.08 0.00

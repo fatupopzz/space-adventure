@@ -1,0 +1,6 @@
+# Materiales
+
+newmtl dimension_cielo
+Kd 1.0 1.0 1.0
+Ke 0.8 0.8 0.8
+map_Kd texturas/dimension.png

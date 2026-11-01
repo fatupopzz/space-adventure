@@ -1,0 +1,97 @@
+# Materiales
+
+newmtl roca_mercurio
+Kd 0.50 0.47 0.45
+Ks 0.2 0.2 0.2
+Ns 24
+
+newmtl roca_clara
+Kd 0.62 0.58 0.55
+Ks 0.2 0.2 0.2
+Ns 24
+
+newmtl roca_borde
+Kd 0.58 0.55 0.52
+Ks 0.2 0.2 0.2
+Ns 24
+
+newmtl roca_oscura
+Kd 0.30 0.28 0.28
+Ks 0.2 0.2 0.2
+Ns 24
+
+newmtl alfombra
+Kd 0.55 0.12 0.30
+Ks 0.2 0.2 0.2
+Ns 24
+
+newmtl alfombra_oro
+Kd 1.00 0.75 0.30
+Ks 0.2 0.2 0.2
+Ns 24
+
+newmtl piso_carpa
+Kd 0.30 0.18 0.30
+Ks 0.2 0.2 0.2
+Ns 24
+
+newmtl tela_morada
+Kd 0.42 0.18 0.62
+Ks 0.2 0.2 0.2
+Ns 24
+
+newmtl tela_azul
+Kd 0.16 0.14 0.42
+Ks 0.2 0.2 0.2
+Ns 24
+
+newmtl oro_carpa
+Kd 1.00 0.76 0.30
+Ks 0.2 0.2 0.2
+Ns 24
+Ke 0.10 0.07 0.00
+
+newmtl mantel
+Kd 0.30 0.10 0.45
+Ks 0.2 0.2 0.2
+Ns 24
+
+newmtl cojin_turquesa
+Kd 0.20 0.75 0.72
+Ks 0.2 0.2 0.2
+Ns 24
+
+newmtl cojin_rosa
+Kd 0.95 0.40 0.60
+Ks 0.2 0.2 0.2
+Ns 24
+
+newmtl hilo
+Kd 0.90 0.85 0.70
+Ks 0.2 0.2 0.2
+Ns 24
+
+newmtl estrella
+Kd 1.00 0.85 0.40
+Ks 0.2 0.2 0.2
+Ns 24
+Ke 0.45 0.35 0.10
+
+newmtl cristal
+Kd 0.70 0.55 1.00
+Ks 0.2 0.2 0.2
+Ns 24
+Ke 0.35 0.22 0.55
+d 0.62
+
+newmtl cera
+Kd 0.98 0.94 0.85
+Ks 0.2 0.2 0.2
+Ns 24
+Ke 0.10 0.08 0.05
+
+newmtl llama
+Kd 1.00 0.75 0.30
+Ks 0.2 0.2 0.2
+Ns 24
+Ke 1.00 0.60 0.20

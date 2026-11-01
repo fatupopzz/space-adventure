@@ -1,0 +1,24 @@
+# Materiales
+
+newmtl orilla
+Kd 0.05 0.30 0.30
+Ks 0.15 0.15 0.15
+Ns 12
+
+newmtl brillo
+Kd 0.85 1.00 1.00
+Ks 0.15 0.15 0.15
+Ns 12
+Ke 0.40 0.50 0.50
+
+newmtl gema
+Kd 0.35 0.92 0.88
+Ks 0.15 0.15 0.15
+Ns 12
+Ke 0.12 0.35 0.33
+
+newmtl sombra
+Kd 0.15 0.62 0.62
+Ks 0.15 0.15 0.15
+Ns 12
+Ke 0.04 0.15 0.15

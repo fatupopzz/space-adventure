@@ -1,0 +1,46 @@
+# Materiales del recuerdo
+
+newmtl vidrio
+Kd 0.55 0.70 0.80
+Ks 0.4 0.4 0.4
+Ns 90
+Ke 0.04 0.06 0.08
+
+newmtl vidrio_borde
+Kd 0.80 0.92 1.00
+Ks 0.4 0.4 0.4
+Ns 90
+Ke 0.10 0.12 0.15
+
+newmtl tapa
+Kd 0.75 0.55 0.30
+Ks 0.4 0.4 0.4
+Ns 32
+
+newmtl tela_roja
+Kd 0.85 0.15 0.15
+Ks 0.4 0.4 0.4
+Ns 32
+
+newmtl tela_blanca
+Kd 0.95 0.95 0.92
+Ks 0.4 0.4 0.4
+Ns 32
+
+newmtl tormenta
+Kd 0.95 0.35 0.15
+Ks 0.4 0.4 0.4
+Ns 32
+Ke 0.60 0.18 0.05
+
+newmtl tormenta_clara
+Kd 1.00 0.70 0.40
+Ks 0.4 0.4 0.4
+Ns 32
+Ke 0.60 0.35 0.15
+
+newmtl tormenta_ojo
+Kd 1.00 0.90 0.50
+Ks 0.4 0.4 0.4
+Ns 32
+Ke 0.90 0.70 0.30

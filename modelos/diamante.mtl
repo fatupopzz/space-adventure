@@ -1,0 +1,13 @@
+# Materiales
+
+newmtl diamante
+Kd 0.75 0.95 1.00
+Ks 0.3 0.3 0.3
+Ns 24
+Ke 0.25 0.45 0.60
+
+newmtl diamante_brillo
+Kd 1.00 1.00 1.00
+Ks 0.3 0.3 0.3
+Ns 24
+Ke 0.60 0.80 1.00

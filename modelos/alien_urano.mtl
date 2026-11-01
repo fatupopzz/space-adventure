@@ -1,0 +1,38 @@
+# Materiales
+
+newmtl piel
+Kd 0.45 0.85 0.55
+Ks 0.15 0.15 0.15
+Ns 24
+
+newmtl pata
+Kd 0.20 0.30 0.25
+Ks 0.15 0.15 0.15
+Ns 24
+
+newmtl bolita
+Kd 1.00 0.85 0.30
+Ks 0.15 0.15 0.15
+Ns 24
+Ke 0.60 0.45 0.10
+
+newmtl ojo
+Kd 0.05 0.04 0.07
+Ks 0.15 0.15 0.15
+Ns 24
+
+newmtl boca
+Kd 0.55 0.12 0.25
+Ks 0.15 0.15 0.15
+Ns 24
+
+newmtl sudor
+Kd 0.40 0.78 1.00
+Ks 0.15 0.15 0.15
+Ns 24
+Ke 0.10 0.20 0.30
+
+newmtl ceja
+Kd 0.10 0.06 0.06
+Ks 0.15 0.15 0.15
+Ns 24

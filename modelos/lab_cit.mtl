@@ -1,0 +1,295 @@
+# Materiales del lab
+
+newmtl piso_a
+Kd 0.55 0.55 0.55
+Ks 0.4 0.4 0.4
+Ns 30
+
+newmtl piso_b
+Kd 0.42 0.43 0.45
+Ks 0.4 0.4 0.4
+Ns 30
+
+newmtl techo
+Kd 0.75 0.75 0.72
+Ks 0.2 0.2 0.2
+Ns 16
+
+newmtl pared
+Kd 0.82 0.80 0.72
+Ks 0.2 0.2 0.2
+Ns 16
+
+newmtl pared_baja
+Kd 0.25 0.45 0.30
+Ks 0.2 0.2 0.2
+Ns 16
+
+newmtl franja
+Kd 0.90 0.75 0.25
+Ks 0.2 0.2 0.2
+Ns 16
+
+newmtl lampara
+Kd 1.00 1.00 0.95
+Ks 0.2 0.2 0.2
+Ns 16
+Ke 0.85 0.88 0.80
+
+newmtl lampara_apagada
+Kd 0.45 0.46 0.48
+Ks 0.2 0.2 0.2
+Ns 16
+
+newmtl salida_caja
+Kd 0.05 0.25 0.10
+Ks 0.2 0.2 0.2
+Ns 16
+Ke 0.02 0.15 0.05
+
+newmtl salida_luz
+Kd 0.30 1.00 0.45
+Ks 0.2 0.2 0.2
+Ns 16
+Ke 0.25 0.95 0.40
+
+newmtl cartel_blanco
+Kd 0.95 0.95 0.92
+Ks 0.2 0.2 0.2
+Ns 16
+
+newmtl cartel_rojo
+Kd 0.85 0.12 0.12
+Ks 0.2 0.2 0.2
+Ns 16
+
+newmtl pizza_queso
+Kd 0.98 0.80 0.30
+Ks 0.2 0.2 0.2
+Ns 16
+
+newmtl pizza_orilla
+Kd 0.80 0.50 0.20
+Ks 0.2 0.2 0.2
+Ns 16
+
+newmtl pepperoni
+Kd 0.70 0.12 0.08
+Ks 0.2 0.2 0.2
+Ns 16
+
+newmtl afiche
+Kd 0.12 0.10 0.30
+Ks 0.2 0.2 0.2
+Ns 16
+Ke 0.03 0.02 0.08
+
+newmtl afiche_linea
+Kd 0.40 0.95 0.95
+Ks 0.2 0.2 0.2
+Ns 16
+Ke 0.25 0.60 0.60
+
+newmtl mochila_roja
+Kd 0.75 0.15 0.18
+Ks 0.2 0.2 0.2
+Ns 16
+
+newmtl mochila_azul
+Kd 0.15 0.30 0.70
+Ks 0.2 0.2 0.2
+Ns 16
+
+newmtl mochila_negra
+Kd 0.12 0.12 0.14
+Ks 0.2 0.2 0.2
+Ns 16
+
+newmtl carton
+Kd 0.72 0.55 0.35
+Ks 0.2 0.2 0.2
+Ns 16
+
+newmtl aluminio
+Kd 0.70 0.72 0.75
+Ks 0.8 0.8 0.8
+Ns 64
+
+newmtl pizarron
+Kd 0.95 0.95 0.93
+Ks 0.6 0.6 0.6
+Ns 50
+
+newmtl marcador_rojo
+Kd 0.85 0.10 0.12
+Ks 0.2 0.2 0.2
+Ns 16
+Ke 0.15 0.00 0.00
+
+newmtl tela
+Kd 0.92 0.93 0.95
+Ks 0.2 0.2 0.2
+Ns 16
+Ke 0.05 0.05 0.06
+
+newmtl plastico_negro
+Kd 0.08 0.08 0.10
+Ks 0.5 0.5 0.5
+Ns 40
+
+newmtl lente
+Kd 0.30 0.50 0.90
+Ks 0.2 0.2 0.2
+Ns 16
+Ke 0.20 0.30 0.60
+
+newmtl reloj_cara
+Kd 0.97 0.97 0.95
+Ks 0.2 0.2 0.2
+Ns 16
+Ke 0.05 0.05 0.05
+
+newmtl reloj_borde
+Kd 0.15 0.15 0.18
+Ks 0.2 0.2 0.2
+Ns 16
+
+newmtl negro
+Kd 0.05 0.05 0.06
+Ks 0.2 0.2 0.2
+Ns 16
+
+newmtl rojo_reloj
+Kd 0.85 0.12 0.12
+Ks 0.2 0.2 0.2
+Ns 16
+
+newmtl verde_uvg
+Kd 0.10 0.50 0.25
+Ks 0.2 0.2 0.2
+Ns 16
+Ke 0.02 0.08 0.04
+
+newmtl blanco
+Kd 0.98 0.98 0.98
+Ks 0.2 0.2 0.2
+Ns 16
+Ke 0.10 0.10 0.10
+
+newmtl noche
+Kd 0.04 0.05 0.12
+Ks 0.2 0.2 0.2
+Ns 16
+Ke 0.02 0.03 0.07
+
+newmtl luz_lejos
+Kd 1.00 0.85 0.50
+Ks 0.2 0.2 0.2
+Ns 16
+Ke 0.90 0.70 0.35
+
+newmtl gota
+Kd 0.60 0.70 0.90
+Ks 0.2 0.2 0.2
+Ns 16
+Ke 0.15 0.18 0.25
+
+newmtl puerta
+Kd 0.50 0.33 0.18
+Ks 0.2 0.2 0.2
+Ns 16
+
+newmtl cafetera
+Kd 0.55 0.12 0.10
+Ks 0.5 0.5 0.5
+Ns 40
+
+newmtl cafetera_luz
+Kd 1.00 0.75 0.35
+Ks 0.2 0.2 0.2
+Ns 16
+Ke 0.90 0.60 0.20
+
+newmtl boton_verde
+Kd 0.20 0.90 0.30
+Ks 0.2 0.2 0.2
+Ns 16
+Ke 0.20 0.80 0.30
+
+newmtl boton_rojo
+Kd 0.90 0.20 0.20
+Ks 0.2 0.2 0.2
+Ns 16
+Ke 0.80 0.15 0.15
+
+newmtl basurero
+Kd 0.30 0.32 0.35
+Ks 0.2 0.2 0.2
+Ns 16
+
+newmtl mesa
+Kd 0.85 0.83 0.78
+Ks 0.3 0.3 0.3
+Ns 30
+
+newmtl plastico_gris
+Kd 0.35 0.36 0.40
+Ks 0.2 0.2 0.2
+Ns 16
+
+newmtl luz_cpu
+Kd 0.20 0.60 1.00
+Ks 0.2 0.2 0.2
+Ns 16
+Ke 0.20 0.60 1.00
+
+newmtl silla
+Kd 0.15 0.18 0.30
+Ks 0.2 0.2 0.2
+Ns 16
+
+newmtl lata
+Kd 0.20 0.75 0.30
+Ks 0.8 0.8 0.8
+Ns 60
+
+newmtl taza
+Kd 0.95 0.95 0.95
+Ks 0.2 0.2 0.2
+Ns 16
+
+newmtl pantalla_mia
+Kd 0.05 0.06 0.09
+Ks 0.2 0.2 0.2
+Ns 16
+Ke 0.07 0.08 0.12
+
+newmtl pantalla_codigo
+Kd 0.05 0.06 0.09
+Ks 0.2 0.2 0.2
+Ns 16
+Ke 0.07 0.09 0.14
+
+newmtl pantalla_azul
+Kd 0.10 0.30 0.85
+Ks 0.2 0.2 0.2
+Ns 16
+Ke 0.08 0.25 0.75
+
+newmtl pantalla_juego
+Kd 0.10 0.25 0.45
+Ks 0.2 0.2 0.2
+Ns 16
+Ke 0.10 0.22 0.42
+
+newmtl pantalla_negra
+Kd 0.02 0.02 0.02
+Ks 0.2 0.2 0.2
+Ns 16
+Ke 0.01 0.01 0.01
+
+newmtl pantalla_youtube
+Kd 0.08 0.08 0.08
+Ks 0.2 0.2 0.2
+Ns 16
+Ke 0.10 0.10 0.10

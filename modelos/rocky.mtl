@@ -1,0 +1,26 @@
+# Materiales
+
+newmtl roca
+Kd 0.50 0.44 0.40
+Ks 0.15 0.15 0.15
+Ns 16
+
+newmtl roca_oscura
+Kd 0.34 0.30 0.28
+Ks 0.15 0.15 0.15
+Ns 16
+
+newmtl respiradero
+Kd 0.15 0.12 0.12
+Ks 0.15 0.15 0.15
+Ns 16
+
+newmtl pata
+Kd 0.42 0.37 0.34
+Ks 0.15 0.15 0.15
+Ns 16
+
+newmtl mano
+Kd 0.30 0.27 0.25
+Ks 0.15 0.15 0.15
+Ns 16

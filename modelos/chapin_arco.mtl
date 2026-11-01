@@ -1,0 +1,22 @@
+# Materiales
+
+newmtl amarillo
+Kd 0.98 0.78 0.22
+Ks 0.06 0.06 0.06
+Ns 8
+
+newmtl blanco
+Kd 0.95 0.93 0.88
+Ks 0.06 0.06 0.06
+Ns 8
+
+newmtl reloj
+Kd 0.95 0.95 0.90
+Ks 0.06 0.06 0.06
+Ns 8
+Ke 0.25 0.25 0.22
+
+newmtl sombra
+Kd 0.10 0.08 0.08
+Ks 0.06 0.06 0.06
+Ns 8

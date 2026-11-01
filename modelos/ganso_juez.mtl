@@ -1,0 +1,26 @@
+# Materiales
+
+newmtl pluma
+Kd 0.97 0.97 0.95
+Ks 0.2 0.2 0.2
+Ns 24
+
+newmtl pluma_gris
+Kd 0.80 0.80 0.82
+Ks 0.2 0.2 0.2
+Ns 24
+
+newmtl naranja
+Kd 1.00 0.55 0.10
+Ks 0.2 0.2 0.2
+Ns 24
+
+newmtl negro
+Kd 0.04 0.04 0.05
+Ks 0.2 0.2 0.2
+Ns 24
+
+newmtl peluca
+Kd 0.90 0.88 0.82
+Ks 0.2 0.2 0.2
+Ns 24

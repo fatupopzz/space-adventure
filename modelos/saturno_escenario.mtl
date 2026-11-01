@@ -1,0 +1,72 @@
+# Materiales de Saturno Ritmo
+
+newmtl sat_a
+Kd 0.98 0.80 0.55
+Ks 0.3 0.3 0.3
+Ns 16
+
+newmtl sat_b
+Kd 0.90 0.60 0.55
+Ks 0.3 0.3 0.3
+Ns 16
+
+newmtl sat_c
+Kd 0.72 0.58 0.92
+Ks 0.3 0.3 0.3
+Ns 16
+
+newmtl vinil
+Kd 0.07 0.06 0.10
+Ks 0.9 0.9 0.9
+Ns 128
+
+newmtl surco
+Kd 0.55 0.25 0.95
+Ks 0.6 0.6 0.6
+Ns 64
+Ke 0.30 0.12 0.55
+
+newmtl metal
+Kd 0.62 0.64 0.72
+Ks 1.0 1.0 1.0
+Ns 96
+
+newmtl oscuro
+Kd 0.10 0.09 0.15
+Ks 0.5 0.5 0.5
+Ns 32
+
+newmtl escenario
+Kd 1.00 0.45 0.75
+Ks 0.6 0.6 0.6
+Ns 48
+
+newmtl brillo
+Kd 0.35 0.95 1.00
+Ks 0 0 0
+Ns 1
+Ke 0.35 0.95 1.00
+
+newmtl eq_cian
+Kd 0.30 0.95 1.00
+Ks 0 0 0
+Ns 1
+Ke 0.30 0.95 1.00
+
+newmtl eq_rosa
+Kd 1.00 0.40 0.80
+Ks 0 0 0
+Ns 1
+Ke 1.00 0.40 0.80
+
+newmtl eq_amarillo
+Kd 1.00 0.85 0.25
+Ks 0 0 0
+Ns 1
+Ke 1.00 0.85 0.25
+
+newmtl eq_lima
+Kd 0.60 1.00 0.35
+Ks 0 0 0
+Ns 1
+Ke 0.60 1.00 0.35

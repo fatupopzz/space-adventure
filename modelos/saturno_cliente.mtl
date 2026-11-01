@@ -1,0 +1,60 @@
+# Materiales
+
+newmtl banda_clara
+Kd 0.90 0.78 0.54
+Ks 0.2 0.2 0.2
+Ns 24
+
+newmtl banda
+Kd 0.82 0.66 0.42
+Ks 0.2 0.2 0.2
+Ns 24
+
+newmtl banda_oscura
+Kd 0.70 0.52 0.34
+Ks 0.2 0.2 0.2
+Ns 24
+
+newmtl anillo_oscuro
+Kd 0.55 0.48 0.42
+Ks 0.2 0.2 0.2
+Ns 24
+
+newmtl anillo_brillante
+Kd 1.00 0.94 0.78
+Ks 0.2 0.2 0.2
+Ns 24
+Ke 0.12 0.10 0.06
+
+newmtl anillo_medio
+Kd 0.86 0.78 0.60
+Ks 0.2 0.2 0.2
+Ns 24
+
+newmtl ojo
+Kd 0.05 0.04 0.07
+Ks 0.3 0.3 0.3
+Ns 32
+
+newmtl boca
+Kd 0.62 0.16 0.28
+Ks 0 0 0
+Ns 1
+
+newmtl corazon
+Kd 1.00 0.30 0.55
+Ks 0 0 0
+Ns 1
+Ke 0.50 0.10 0.25
+
+newmtl rubor
+Kd 1.00 0.48 0.62
+Ks 0 0 0
+Ns 1
+d 0.60
+
+newmtl sudor
+Kd 0.40 0.78 1.00
+Ks 0.9 0.9 0.9
+Ns 96
+d 0.85

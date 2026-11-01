@@ -1,0 +1,63 @@
+# Materiales
+
+newmtl suelo
+Kd 0.78 0.40 0.24
+Ks 0.3 0.3 0.3
+Ns 24
+
+newmtl suelo_oscuro
+Kd 0.62 0.30 0.18
+Ks 0.3 0.3 0.3
+Ns 24
+
+newmtl piedras
+Kd 0.45 0.25 0.18
+Ks 0.3 0.3 0.3
+Ns 24
+
+newmtl mantel_rojo
+Kd 0.92 0.25 0.32
+Ks 0.3 0.3 0.3
+Ns 24
+
+newmtl mantel_blanco
+Kd 0.97 0.94 0.94
+Ks 0.3 0.3 0.3
+Ns 24
+
+newmtl pastel
+Kd 0.98 0.80 0.86
+Ks 0.3 0.3 0.3
+Ns 24
+
+newmtl betun
+Kd 1.00 0.98 0.98
+Ks 0.3 0.3 0.3
+Ns 24
+
+newmtl vela
+Kd 0.60 0.85 1.00
+Ks 0.3 0.3 0.3
+Ns 24
+
+newmtl llama
+Kd 1.00 0.75 0.30
+Ks 0.3 0.3 0.3
+Ns 24
+Ke 1.00 0.60 0.15
+
+newmtl vasito
+Kd 0.70 0.90 1.00
+Ks 0.3 0.3 0.3
+Ns 24
+
+newmtl tallo
+Kd 0.30 0.70 0.30
+Ks 0.3 0.3 0.3
+Ns 24
+
+newmtl rosa
+Kd 0.95 0.15 0.30
+Ks 0.3 0.3 0.3
+Ns 24
+Ke 0.20 0.00 0.05

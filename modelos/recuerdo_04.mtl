@@ -1,0 +1,58 @@
+# Materiales del recuerdo
+
+newmtl papel
+Kd 0.96 0.95 0.90
+Ks 0.4 0.4 0.4
+Ns 8
+
+newmtl cielo_alto
+Kd 0.78 0.48 0.32
+Ks 0.4 0.4 0.4
+Ns 32
+
+newmtl cielo
+Kd 0.88 0.58 0.38
+Ks 0.4 0.4 0.4
+Ns 32
+
+newmtl suelo
+Kd 0.62 0.28 0.14
+Ks 0.4 0.4 0.4
+Ns 32
+
+newmtl piel
+Kd 0.95 0.78 0.62
+Ks 0.4 0.4 0.4
+Ns 32
+
+newmtl ropa_a
+Kd 0.20 0.80 0.80
+Ks 0.4 0.4 0.4
+Ns 32
+
+newmtl ropa_b
+Kd 0.90 0.30 0.55
+Ks 0.4 0.4 0.4
+Ns 32
+
+newmtl gris
+Kd 0.70 0.70 0.72
+Ks 0.4 0.4 0.4
+Ns 32
+
+newmtl gris_borroso
+Kd 0.62 0.48 0.42
+Ks 0.4 0.4 0.4
+Ns 32
+
+newmtl sol
+Kd 0.90 0.90 0.95
+Ks 0.4 0.4 0.4
+Ns 32
+Ke 0.60 0.60 0.65
+
+newmtl rosa
+Kd 1.00 0.35 0.60
+Ks 0.4 0.4 0.4
+Ns 32
+Ke 0.30 0.05 0.15

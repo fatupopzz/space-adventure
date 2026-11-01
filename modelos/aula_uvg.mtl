@@ -1,0 +1,147 @@
+# Materiales del salon
+
+newmtl pizarra_dibujo
+Kd 1.0 1.0 1.0
+Ke 0.25 0.25 0.25
+map_Kd texturas/pizarra.png
+
+newmtl piso_a
+Kd 0.82 0.80 0.76
+Ks 0.3 0.3 0.3
+Ns 32
+
+newmtl piso_b
+Kd 0.60 0.58 0.56
+Ks 0.3 0.3 0.3
+Ns 32
+
+newmtl pared
+Kd 0.82 0.80 0.72
+Ks 0.05 0.05 0.05
+Ns 4
+
+newmtl zocalo
+Kd 0.22 0.55 0.42
+Ks 0.2 0.2 0.2
+Ns 16
+
+newmtl techo
+Kd 0.80 0.80 0.80
+Ks 0 0 0
+Ns 1
+
+newmtl lampara
+Kd 1.00 1.00 0.95
+Ks 0 0 0
+Ns 1
+Ke 1.00 0.98 0.90
+
+newmtl pizarra
+Kd 0.97 0.98 1.00
+Ks 0.6 0.6 0.6
+Ns 64
+
+newmtl marco
+Kd 0.70 0.72 0.76
+Ks 0.8 0.8 0.8
+Ns 64
+
+newmtl marcador_azul
+Kd 0.10 0.22 0.70
+Ks 0 0 0
+Ns 1
+
+newmtl marcador_rojo
+Kd 0.80 0.12 0.18
+Ks 0 0 0
+Ns 1
+
+newmtl marcador_verde
+Kd 0.10 0.55 0.25
+Ks 0 0 0
+Ns 1
+
+newmtl letrero
+Kd 0.12 0.40 0.30
+Ks 0.2 0.2 0.2
+Ns 16
+
+newmtl madera
+Kd 0.70 0.50 0.32
+Ks 0.2 0.2 0.2
+Ns 16
+
+newmtl metal
+Kd 0.40 0.42 0.46
+Ks 0.8 0.8 0.8
+Ns 64
+
+newmtl silla
+Kd 0.25 0.62 0.55
+Ks 0.3 0.3 0.3
+Ns 24
+
+newmtl puerta
+Kd 0.50 0.32 0.20
+Ks 0.2 0.2 0.2
+Ns 16
+
+newmtl laptop
+Kd 0.25 0.25 0.28
+Ks 0.6 0.6 0.6
+Ns 48
+
+newmtl laptop_pantalla
+Kd 0.40 0.70 1.00
+Ks 0 0 0
+Ns 1
+Ke 0.25 0.45 0.70
+
+newmtl cartel
+Kd 1.00 1.00 0.96
+Ks 0 0 0
+Ns 1
+
+newmtl tinta
+Kd 0.08 0.08 0.10
+Ks 0 0 0
+Ns 1
+
+newmtl cuaderno_rosa
+Kd 0.95 0.40 0.62
+Ks 0.1 0.1 0.1
+Ns 8
+
+newmtl cuaderno_azul
+Kd 0.30 0.50 0.95
+Ks 0.1 0.1 0.1
+Ns 8
+
+newmtl cuaderno_amarillo
+Kd 0.98 0.82 0.25
+Ks 0.1 0.1 0.1
+Ns 8
+
+newmtl cielo_gt
+Kd 0.55 0.78 1.00
+Ks 0 0 0
+Ns 1
+Ke 0.40 0.62 0.90
+
+newmtl nube_gt
+Kd 1.00 1.00 1.00
+Ks 0 0 0
+Ns 1
+Ke 0.85 0.88 0.92
+
+newmtl volcan_gt
+Kd 0.35 0.45 0.55
+Ks 0 0 0
+Ns 1
+Ke 0.25 0.32 0.42
+
+newmtl cerro_gt
+Kd 0.30 0.62 0.30
+Ks 0 0 0
+Ns 1
+Ke 0.18 0.40 0.18

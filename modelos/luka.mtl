@@ -1,0 +1,51 @@
+# Materiales
+
+newmtl piel_luka
+Kd 1.00 0.86 0.78
+Ks 0.25 0.25 0.25
+Ns 32
+
+newmtl rosa_luka
+Kd 1.00 0.55 0.72
+Ks 0.25 0.25 0.25
+Ns 32
+Ke 0.12 0.03 0.06
+
+newmtl negro_luka
+Kd 0.14 0.12 0.16
+Ks 0.25 0.25 0.25
+Ns 32
+
+newmtl oro_luka
+Kd 1.00 0.80 0.35
+Ks 0.25 0.25 0.25
+Ns 32
+Ke 0.15 0.10 0.00
+
+newmtl ojo
+Kd 0.05 0.04 0.07
+Ks 0.3 0.3 0.3
+Ns 32
+
+newmtl boca
+Kd 0.62 0.16 0.28
+Ks 0 0 0
+Ns 1
+
+newmtl corazon
+Kd 1.00 0.30 0.55
+Ks 0 0 0
+Ns 1
+Ke 0.50 0.10 0.25
+
+newmtl rubor
+Kd 1.00 0.48 0.62
+Ks 0 0 0
+Ns 1
+d 0.60
+
+newmtl sudor
+Kd 0.40 0.78 1.00
+Ks 0.9 0.9 0.9
+Ns 96
+d 0.85

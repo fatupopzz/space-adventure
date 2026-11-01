@@ -1,0 +1,12 @@
+# Materiales de la luna
+
+newmtl hielo
+Kd 0.92 0.92 0.96
+Ks 0.1 0.1 0.1
+Ns 8
+
+newmtl grieta
+Kd 0.62 0.38 0.24
+Ks 0.1 0.1 0.1
+Ns 8
+

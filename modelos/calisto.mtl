@@ -1,0 +1,12 @@
+# Materiales de la luna
+
+newmtl oscuro
+Kd 0.26 0.23 0.21
+Ks 0.1 0.1 0.1
+Ns 8
+
+newmtl crater_claro
+Kd 0.72 0.70 0.66
+Ks 0.1 0.1 0.1
+Ns 8
+

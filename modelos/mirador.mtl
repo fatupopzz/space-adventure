@@ -1,0 +1,76 @@
+# Materiales
+
+newmtl madera_mirador
+Kd 0.55 0.36 0.22
+Ks 0.25 0.25 0.25
+Ns 32
+
+newmtl madera_clara_mirador
+Kd 0.68 0.48 0.30
+Ks 0.25 0.25 0.25
+Ns 32
+
+newmtl metal_mirador
+Kd 0.72 0.74 0.80
+Ks 0.25 0.25 0.25
+Ns 32
+
+newmtl metal_oscuro_mirador
+Kd 0.30 0.31 0.36
+Ks 0.25 0.25 0.25
+Ns 32
+
+newmtl luz_cian
+Kd 0.40 0.95 1.00
+Ks 0.25 0.25 0.25
+Ns 32
+Ke 0.30 0.80 0.90
+
+newmtl piedra
+Kd 0.45 0.43 0.42
+Ks 0.25 0.25 0.25
+Ns 32
+
+newmtl leno
+Kd 0.35 0.22 0.12
+Ks 0.25 0.25 0.25
+Ns 32
+
+newmtl acero_mirador
+Kd 0.85 0.87 0.92
+Ks 0.25 0.25 0.25
+Ns 32
+
+newmtl oro_mirador
+Kd 1.00 0.78 0.30
+Ks 0.25 0.25 0.25
+Ns 32
+Ke 0.10 0.07 0.00
+
+newmtl fuego_mirador
+Kd 1.00 0.60 0.20
+Ks 0.25 0.25 0.25
+Ns 32
+Ke 1.00 0.55 0.15
+
+newmtl blanco_mirador
+Kd 0.92 0.92 0.95
+Ks 0.25 0.25 0.25
+Ns 32
+
+newmtl luz_baliza
+Kd 1.00 0.40 0.70
+Ks 0.25 0.25 0.25
+Ns 32
+Ke 0.90 0.30 0.60
+
+newmtl panel_solar
+Kd 0.15 0.25 0.60
+Ks 0.25 0.25 0.25
+Ns 32
+Ke 0.02 0.04 0.10
+
+newmtl marco_panel
+Kd 0.80 0.82 0.88
+Ks 0.25 0.25 0.25
+Ns 32

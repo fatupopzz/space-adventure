@@ -1,0 +1,19 @@
+# Materiales
+
+newmtl luna
+Kd 1.00 0.92 0.55
+Ks 0.3 0.3 0.3
+Ns 24
+Ke 0.45 0.38 0.12
+
+newmtl cuerda
+Kd 1.00 0.55 0.85
+Ks 0.3 0.3 0.3
+Ns 24
+Ke 0.50 0.20 0.40
+
+newmtl estrellita
+Kd 1.00 0.95 0.50
+Ks 0.3 0.3 0.3
+Ns 24
+Ke 0.90 0.80 0.30

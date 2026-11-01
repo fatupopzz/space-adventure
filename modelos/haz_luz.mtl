@@ -1,0 +1,29 @@
+# Materiales
+
+newmtl haz_cian
+Kd 0.30 0.95 1.00
+Ks 0.3 0.3 0.3
+Ns 24
+Ke 0.30 0.95 1.00
+d 0.16
+
+newmtl haz_rosa
+Kd 1.00 0.40 0.80
+Ks 0.3 0.3 0.3
+Ns 24
+Ke 1.00 0.40 0.80
+d 0.16
+
+newmtl haz_amarillo
+Kd 1.00 0.85 0.30
+Ks 0.3 0.3 0.3
+Ns 24
+Ke 1.00 0.85 0.30
+d 0.16
+
+newmtl haz_lima
+Kd 0.60 1.00 0.35
+Ks 0.3 0.3 0.3
+Ns 24
+Ke 0.60 1.00 0.35
+d 0.16

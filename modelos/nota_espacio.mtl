@@ -1,0 +1,13 @@
+# Materiales
+
+newmtl nota_cian
+Kd 0.40 0.95 1.00
+Ks 0.3 0.3 0.3
+Ns 32
+Ke 0.25 0.70 0.80
+
+newmtl nota_rosa
+Kd 1.00 0.50 0.85
+Ks 0.3 0.3 0.3
+Ns 32
+Ke 0.80 0.30 0.60

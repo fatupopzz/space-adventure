@@ -1,0 +1,69 @@
+# Materiales
+
+newmtl visor
+Kd 0.55 0.85 0.96
+Ks 0.3 0.3 0.3
+Ns 24
+Ke 0.15 0.25 0.30
+
+newmtl visor_brillo
+Kd 1.00 1.00 1.00
+Ks 0.3 0.3 0.3
+Ns 24
+Ke 0.90 0.90 0.90
+
+newmtl brote
+Kd 0.35 0.85 0.35
+Ks 0.3 0.3 0.3
+Ns 24
+
+newmtl anillo_gorro
+Kd 1.00 0.50 0.80
+Ks 0.3 0.3 0.3
+Ns 24
+Ke 0.30 0.10 0.20
+
+newmtl mancha
+Kd 0.85 0.22 0.18
+Ks 0.3 0.3 0.3
+Ns 24
+
+newmtl traje_mercurio
+Kd 0.62 0.62 0.66
+Ks 0.3 0.3 0.3
+Ns 24
+
+newmtl traje_venus
+Kd 0.96 0.80 0.35
+Ks 0.3 0.3 0.3
+Ns 24
+
+newmtl traje_tierra
+Kd 0.22 0.46 0.95
+Ks 0.3 0.3 0.3
+Ns 24
+
+newmtl traje_marte
+Kd 0.90 0.32 0.20
+Ks 0.3 0.3 0.3
+Ns 24
+
+newmtl traje_jupiter
+Kd 0.93 0.62 0.32
+Ks 0.3 0.3 0.3
+Ns 24
+
+newmtl traje_saturno
+Kd 0.96 0.86 0.60
+Ks 0.3 0.3 0.3
+Ns 24
+
+newmtl traje_urano
+Kd 0.45 0.88 0.90
+Ks 0.3 0.3 0.3
+Ns 24
+
+newmtl traje_neptuno
+Kd 0.18 0.28 0.80
+Ks 0.3 0.3 0.3
+Ns 24

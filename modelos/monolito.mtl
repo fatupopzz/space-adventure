@@ -1,0 +1,6 @@
+# Materiales
+
+newmtl monolito
+Kd 0.02 0.02 0.03
+Ks 0.90 0.90 0.90
+Ns 160

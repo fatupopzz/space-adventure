@@ -1,0 +1,16 @@
+# Materiales
+
+newmtl tronco
+Kd 0.68 0.64 0.58
+Ks 0.06 0.06 0.06
+Ns 8
+
+newmtl hoja
+Kd 0.20 0.58 0.26
+Ks 0.06 0.06 0.06
+Ns 8
+
+newmtl hoja_clara
+Kd 0.40 0.78 0.32
+Ks 0.06 0.06 0.06
+Ns 8

@@ -1,0 +1,8 @@
+# Materiales
+
+newmtl portal_mascara
+Kd 0 0 0
+
+newmtl portal_borde
+Kd 0.9 0.6 1.0
+Ke 0.9 0.5 1.0

@@ -1,0 +1,7 @@
+/target
+__pycache__/
+*.ppm
+
+# La partida guardada de cada quien y basura del sistema
+partida.txt
+.DS_Store

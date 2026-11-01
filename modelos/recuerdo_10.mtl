@@ -1,0 +1,23 @@
+# Materiales del recuerdo
+
+newmtl roca
+Kd 0.22 0.20 0.22
+Ks 0.4 0.4 0.4
+Ns 8
+
+newmtl roca_clara
+Kd 0.36 0.34 0.36
+Ks 0.4 0.4 0.4
+Ns 8
+
+newmtl hielo
+Kd 0.55 0.85 1.00
+Ks 0.4 0.4 0.4
+Ns 90
+Ke 0.15 0.35 0.50
+
+newmtl hielo_claro
+Kd 0.90 0.98 1.00
+Ks 0.4 0.4 0.4
+Ns 90
+Ke 0.40 0.55 0.65

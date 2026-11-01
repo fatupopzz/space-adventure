@@ -1,0 +1,144 @@
+# Materiales
+
+newmtl azulejo
+Kd 0.88 0.90 0.93
+Ks 0.08 0.08 0.08
+Ns 24
+
+newmtl azulejo_celeste
+Kd 0.52 0.78 0.84
+Ks 0.08 0.08 0.08
+Ns 24
+
+newmtl pared
+Kd 0.85 0.88 0.92
+Ks 0.15 0.15 0.15
+Ns 24
+
+newmtl franja
+Kd 0.40 0.80 0.85
+Ks 0.15 0.15 0.15
+Ns 24
+
+newmtl zocalo
+Kd 0.25 0.35 0.45
+Ks 0.15 0.15 0.15
+Ns 24
+
+newmtl cubiculo
+Kd 0.45 0.62 0.80
+Ks 0.3 0.3 0.3
+Ns 24
+
+newmtl puerta
+Kd 0.55 0.72 0.90
+Ks 0.3 0.3 0.3
+Ns 24
+
+newmtl loza
+Kd 0.98 0.98 1.00
+Ks 0.8 0.8 0.8
+Ns 24
+
+newmtl asiento
+Kd 0.30 0.30 0.36
+Ks 0.15 0.15 0.15
+Ns 24
+
+newmtl numero
+Kd 1.00 0.95 0.60
+Ks 0.15 0.15 0.15
+Ns 24
+Ke 0.25 0.22 0.08
+
+newmtl marco
+Kd 0.30 0.30 0.36
+Ks 0.15 0.15 0.15
+Ns 24
+
+newmtl cielo
+Kd 0.02 0.02 0.07
+Ks 0.15 0.15 0.15
+Ns 24
+Ke 0.01 0.01 0.04
+
+newmtl urano
+Kd 0.55 0.88 0.92
+Ks 0.15 0.15 0.15
+Ns 24
+Ke 0.30 0.55 0.60
+
+newmtl anillo
+Kd 0.75 0.85 0.95
+Ks 0.15 0.15 0.15
+Ns 24
+Ke 0.35 0.40 0.45
+
+newmtl madera
+Kd 0.55 0.33 0.18
+Ks 0.15 0.15 0.15
+Ns 24
+
+newmtl madera_clara
+Kd 0.78 0.58 0.36
+Ks 0.15 0.15 0.15
+Ns 24
+
+newmtl alcancia
+Kd 0.95 0.45 0.65
+Ks 0.15 0.15 0.15
+Ns 24
+
+newmtl letrero_q1
+Kd 1.00 0.85 0.25
+Ks 0.15 0.15 0.15
+Ns 24
+Ke 0.35 0.28 0.05
+
+newmtl letrero
+Kd 0.40 0.90 0.95
+Ks 0.15 0.15 0.15
+Ns 24
+Ke 0.30 0.70 0.75
+
+newmtl sombra
+Kd 0.12 0.10 0.12
+Ks 0.15 0.15 0.15
+Ns 24
+
+newmtl papel
+Kd 0.98 0.98 0.94
+Ks 0.15 0.15 0.15
+Ns 24
+
+newmtl hule
+Kd 0.85 0.15 0.15
+Ks 0.15 0.15 0.15
+Ns 24
+
+newmtl mecha
+Kd 0.75 0.75 0.70
+Ks 0.15 0.15 0.15
+Ns 24
+
+newmtl cubeta
+Kd 0.25 0.45 0.95
+Ks 0.15 0.15 0.15
+Ns 24
+
+newmtl metal
+Kd 0.70 0.72 0.76
+Ks 0.8 0.8 0.8
+Ns 24
+
+newmtl espejo
+Kd 0.70 0.82 0.90
+Ks 1.0 1.0 1.0
+Ns 24
+Ke 0.12 0.15 0.18
+
+newmtl lampara
+Kd 1.00 1.00 0.95
+Ks 0.15 0.15 0.15
+Ns 24
+Ke 1.00 0.98 0.92

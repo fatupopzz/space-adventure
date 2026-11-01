@@ -1,0 +1,11 @@
+# Materiales
+
+newmtl basalto
+Kd 0.36 0.32 0.42
+Ks 0.06 0.06 0.06
+Ns 8
+
+newmtl pomez
+Kd 0.72 0.68 0.64
+Ks 0.06 0.06 0.06
+Ns 8
