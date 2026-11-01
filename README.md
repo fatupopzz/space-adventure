@@ -13,11 +13,13 @@ personaje escogido: el juego le cambia el nombre en todos los diálogos.)
 
 ## Para la entrega: requisitos y menú de puntos
 
-**Integrantes y contribuciones:** _(llenar: nombre, carné y qué hizo cada quien)._
+**Proyecto individual:** _(nombre y carné)_ ([@fatupopzz](https://github.com/fatupopzz)). Todo el
+proyecto (el pipeline, los planetas, la nave, los minijuegos, los modelos y la interfaz) es de una
+sola persona.
 
 **Uso de IA y recursos externos:** el proyecto se programó con ayuda de un asistente de IA
-(Claude Code, de Anthropic) para escribir, revisar y depurar código; los integrantes revisaron y
-pueden explicar todo lo que se entrega. Los recursos externos (fuentes, sprites de interfaz y de
+(Claude Code, de Anthropic) para escribir, revisar y depurar código; el autor revisó y
+puede explicar todo lo que se entrega. Los recursos externos (fuentes, sprites de interfaz y de
 iconos de controles) están en [Créditos](#créditos); todos los modelos 3D son
 propios (scripts de `herramientas/`).
 
