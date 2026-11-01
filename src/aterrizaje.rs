@@ -127,6 +127,7 @@ fn guion(planeta: usize) -> Guion {
         "neptuno" => g("NEPTUNO", "Noche de cartas. Vientos de 2,000 km/h.", [0.4, 0.6, 1.0], 0.7, 0.6),
         "pluton" => g("PLUTÓN", "Planeta. (En disputa.)", [0.95, 0.8, 0.65], -0.5, 0.4),
         "hada" => g("PLANETA HADA", "Proyecto 2: la Gran Fuente de las Hadas.", [1.0, 0.55, 0.9], 0.6, 0.7),
+        "chapin" => g("PLANETA CHAPÍN", "Terminal de buses. Destino: la capital. ¡Hay campo!", [0.55, 0.85, 1.0], 0.4, 0.6),
         _ => g("", "", [1.0, 0.6, 0.7], 0.5, 0.6),
     }
 }

@@ -71,7 +71,7 @@ la tabla `CUERPOS` de [src/escena.rs](src/escena.rs) y la gravedad en `GRAVEDAD`
 ## Personajes y pase espacial
 
 - **Personajes** (en el menú principal): un casillero como el de Fortnite con
-  los 18 pilotos. Cada tarjeta tiene el retrato 3D del personaje (pintado por
+  los 26 pilotos. Cada tarjeta tiene el retrato 3D del personaje (pintado por
   el rasterizador al arrancar); los que faltan salen oscuros, con el nivel en
   que se desbloquean. A la derecha, el escogido baila en una vitrina.
   Todos los modelos los arma `herramientas/generar_personajes.py` con el mismo
@@ -79,8 +79,14 @@ la tabla `CUERPOS` de [src/escena.rs](src/escena.rs) y la gravedad en `GRAVEDAD`
   `muslo_*`, `coleta_*`, `cara_*`...), así que cualquiera pilota, baila,
   aterriza y hace caras en todas las escenas. El Creeper, Steve y el gato que
   grita traen su propia cara fija.
-- **Pase espacial**: 30 niveles con premio cada uno (13 personajes, skins de
-  nave, estelas y notas). La XP sale de lo que se hace jugando: 5 por nota
+- **Pase espacial · Temporada 1: Odisea Brainrot**: 40 niveles con premio cada
+  uno: personajes, skins de nave, estelas, notas y **títulos** ("Piloto sin
+  licencia", "NPC con aura", "Delulu galáctico", "Aura farmer", "Main
+  character", "Sigma del espacio", "Rizz interestelar", "El GOAT del sistema
+  solar"), que se equipan en el pase y salen en el HUD debajo de donde anda uno.
+  Solo del pase: la estela **Six seven** (un 6 y un 7 de píxeles que se turnan),
+  la skin **Setup gamer RGB** y, de gran premio en el nivel 40, el piloto que no
+  se vende: **Chimpanzini Bananini**. La XP sale de lo que se hace jugando: 5 por nota
   recogida, 40 por logro, 120 por sello, 60 por encargo y 80 por cometa. Se
   calcula de la partida, así que una partida vieja ya trae su nivel. Al subir
   sale el aviso con el premio; una skin o estela que ya se tenía se cambia por
@@ -359,6 +365,25 @@ cuelga, los ojos amarillos). Cada vez que habla sale su retrato animado, que
 es **render to texture**: el mismo pipeline la dibuja en un framebuffer
 propio de 160×160 con su propia cámara, y esa imagen se pega en la interfaz.
 
+## El Planeta Chapín: «¡Hay campo!» (la camioneta)
+
+Al aterrizar en el Chapín se maneja una **camioneta extraurbana** (el bus escolar gringo pintado
+de azul, amarillo y rojo, con su parrilla llena de costales) por la carretera a la capital, entre
+ceibas y casitas de Antigua, con los volcanes al fondo y un **son de marimba** en 6/8 sintetizado
+para el juego ([src/camioneta.rs](src/camioneta.rs), `sintetizar_marimba` en
+[src/cancion.rs](src/cancion.rs)).
+
+- Tres carriles: **A / D** (o el stick) cambian de carril; **W** le pisa y **S** frena.
+- En las **paradas** (a la derecha) hay gente saludando: se sube si se va en el carril derecho y
+  despacio. Cada pasajero paga Q5 al llegar a la terminal. El bus dice 40, pero siempre hay
+  campo: caben 60.
+- **Tuc-tucs** más lentos, **perros** que van y vienen en su carril y **baches**: chocar abolla
+  la camioneta y se baja gente del susto; con tres abolladuras llega la grúa.
+- Los **túmulos** atraviesan la carretera: pasados rápido, la gente sale volando y alguien se
+  baja quejándose. Hay que frenar.
+- El ayudante grita ("¡Hay campo, hay campo!", "¡Atrás hay lugar!", "¡Túmulo, chofer!") y siempre
+  queda un carril libre (lo prueba un chofer automático con varias semillas).
+
 ## Las maravillas del sistema (homenajes)
 
 Volando se encuentran homenajes a películas y libros de ciencia ficción, cada uno donde tiene
@@ -402,8 +427,8 @@ Para que den ganas de volver a cada planeta:
   el reglazo del profe Koch, el Óscar de roca en la Luna, el ganso que se roba
   los anillos, todas las cartas invertidas en Mercurio, la nota S en DIFÍCIL,
   Canela en la partida de cartas...). Los que faltan salen como "???" con una
-  pista. Al conseguir uno nuevo baja un aviso con sonido de sello. Son 74 en
-  total, contando los doce sellos. Cuando una lista no cabe (el espacio tiene
+  pista. Al conseguir uno nuevo baja un aviso con sonido de sello. Son 90 en
+  total, contando los trece sellos. Cuando una lista no cabe (el espacio tiene
   muchos), se acomoda en un renglón por logro.
 - **Encargos de GLADAS**: siempre hay tres misiones cortas activas ("recoge
   20 notas", "haz un combo de 8", "aterriza en Neptuno", "atrapa un
@@ -424,6 +449,7 @@ Para que den ganas de volver a cada planeta:
   | Divorcio de Venus | 15 + 8 por cada veredicto para Saturno |
   | Junta de Plutón / Fuente del Hada / Tarot de Mercurio | 25 / 35 / 15 |
   | Servidor de Vegetta | 5 por partida, 15 por partida ganada (más los diamantes, ×2) |
+  | La camioneta (Planeta Chapín) | 5 por viaje, 1 por pasajero del mejor viaje, 15 si llegó a la terminal |
   | Júpiter Asteroids | 1 por cada 50 puntos (al terminar la partida) |
 
   Así todo lo que se juega sirve para juntar para la tienda, no solo volar.
@@ -435,7 +461,10 @@ Para que den ganas de volver a cada planeta:
   **personajes**. Solo se venden los **extras**: lo que es premio del pase
   se gana solo subiendo de nivel. En la pestaña de personajes están los
   pilotos secretos, para no esperar a su logro (el profe Koch 400 notas,
-  Vegetta777 y Willyrex 300), y **Rocky** (350), el ingeniero eridiano de
+  Vegetta777 y Willyrex 300), los pilotos de memes (**la capibara** con su
+  mandarina 220, **Moo Deng** 240, **Pedro** el mapache 260, **Chill Guy** 280,
+  **Tung Tung Tung Sahur** 300 y **Labubu** 320, cada uno con su forma de hablar
+  y sus líneas en las escenas de la historia), y **Rocky** (350), el ingeniero eridiano de
   *Project Hail Mary*, que solo se compra: sin ojos, cinco patas, y habla con
   acordes (GLADAS traduce). Se pueden poner ahí mismo. Si la lista no
   cabe, se desliza con el cursor. Una

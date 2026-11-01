@@ -611,3 +611,64 @@ pub fn sintetizar_lofi() -> Vec<f32> {
     }
     pista
 }
+
+/// La marimba (el Planeta Chapin, la camioneta): un son en 6/8 en sol mayor, como los de la
+/// marimba de feria. Cada tecla es un seno que se apaga rapido con su armonico de cuatro (el
+/// sonido de la madera con su tubo resonador); las notas largas van en tremolo (redoblando, como
+/// se toca la marimba de verdad). Abajo, el bajo en los graves del mismo instrumento.
+pub fn sintetizar_marimba() -> Vec<f32> {
+    // Los acordes por compas (raiz, tercera, quinta) y la melodia: (compas, corchea 0..5, nota, corcheas).
+    const ACORDES: [[i32; 3]; 8] = [[55, 59, 62], [55, 59, 62], [50, 54, 57], [50, 54, 57], [48, 52, 55], [55, 59, 62], [50, 54, 57], [55, 59, 62]];
+    const MELODIA: [(usize, usize, i32, usize); 26] = [
+        (0, 0, 74, 1), (0, 1, 76, 1), (0, 2, 79, 2), (0, 4, 78, 1), (0, 5, 76, 1),
+        (1, 0, 74, 3), (1, 3, 71, 1), (1, 4, 74, 1), (1, 5, 76, 1),
+        (2, 0, 78, 1), (2, 1, 76, 1), (2, 2, 74, 2), (2, 4, 72, 1), (2, 5, 69, 1),
+        (3, 0, 72, 3), (3, 3, 74, 3),
+        (4, 0, 76, 1), (4, 1, 76, 1), (4, 2, 76, 1), (4, 3, 79, 1), (4, 4, 77, 1), (4, 5, 76, 1),
+        (5, 0, 74, 3),
+        (6, 0, 72, 2), (6, 3, 78, 3),
+        (7, 0, 79, 6),
+    ];
+    let corchea = 60.0 / 168.0 / 2.0 * 1.5;
+    let compas = corchea * 6.0;
+    let total = compas * ACORDES.len() as f32 * 2.0;
+    let mut pista = vec![0.0f32; (total * FRECUENCIA as f32) as usize];
+    // Una tecla de marimba: el fundamental y el armonico de cuatro (que se apaga mas rapido).
+    let tecla = |f: f32, t: f32| ((TAU * f * t).sin() + 0.35 * (TAU * 4.0 * f * t).sin() * (-t * 18.0).exp()) * (-t * 7.0).exp() * (t / 0.002).min(1.0);
+    for vuelta in 0..2 {
+        let desde = vuelta as f32 * compas * ACORDES.len() as f32;
+        for (c, acorde) in ACORDES.iter().enumerate() {
+            let inicio = desde + c as f32 * compas;
+            // El bajo: la raiz en el 1 y la quinta en el 4 (el "tun... tun" del 6/8).
+            for (o, n) in [(0usize, acorde[0] - 12), (3, acorde[2] - 24)] {
+                let f = midi(n);
+                sumar(&mut pista, inicio + o as f32 * corchea, 0.6, |t| 0.28 * tecla(f, t));
+            }
+            // El acompanamiento: el acorde en las corcheas 2, 3, 5 y 6 (el "chun-chun").
+            for o in [1usize, 2, 4, 5] {
+                for &n in acorde {
+                    let f = midi(n);
+                    sumar(&mut pista, inicio + o as f32 * corchea, 0.35, |t| 0.06 * tecla(f, t));
+                }
+            }
+        }
+        for &(c, o, nota, dura) in &MELODIA {
+            let f = midi(nota);
+            let t0 = desde + c as f32 * compas + o as f32 * corchea;
+            if dura >= 2 {
+                // Las largas, en tremolo: golpecitos muy seguidos de la misma tecla.
+                let golpes = (dura as f32 * corchea / 0.055) as usize;
+                for g in 0..golpes {
+                    sumar(&mut pista, t0 + g as f32 * 0.055, 0.2, |t| 0.10 * tecla(f, t) * if g % 2 == 0 { 1.0 } else { 0.8 });
+                }
+            } else {
+                sumar(&mut pista, t0, 0.45, |t| 0.16 * tecla(f, t));
+            }
+        }
+    }
+    let pico = pista.iter().fold(0.0f32, |m, v| m.max(v.abs())).max(1e-6);
+    for m in &mut pista {
+        *m = *m / pico * 0.8;
+    }
+    pista
+}

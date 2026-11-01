@@ -87,6 +87,8 @@ pub enum Pista {
     Arcade,
     /// La noche de la entrega en el CIT: lo-fi para estudiar, con lluvia.
     Lofi,
+    /// El Planeta Chapin: un son de marimba en 6/8.
+    Marimba,
 }
 
 #[derive(Clone, Copy)]
@@ -529,7 +531,7 @@ impl<'a> Sonidos<'a> {
             .into_iter()
             .filter_map(|e| cargar(efecto(e)))
             .collect();
-        let pistas = [(Pista::Cancion, cancion::sintetizar()), (Pista::Espacio, cancion::sintetizar_espacio()), (Pista::Fuente, cancion::sintetizar_fuente()), (Pista::Tarot, cancion::sintetizar_tarot()), (Pista::TarotReves, cancion::sintetizar_tarot().into_iter().rev().collect()), (Pista::Juicio, cancion::sintetizar_juicio()), (Pista::Arcade, cancion::sintetizar_arcade()), (Pista::Lofi, cancion::sintetizar_lofi())]
+        let pistas = [(Pista::Cancion, cancion::sintetizar()), (Pista::Espacio, cancion::sintetizar_espacio()), (Pista::Fuente, cancion::sintetizar_fuente()), (Pista::Tarot, cancion::sintetizar_tarot()), (Pista::TarotReves, cancion::sintetizar_tarot().into_iter().rev().collect()), (Pista::Juicio, cancion::sintetizar_juicio()), (Pista::Arcade, cancion::sintetizar_arcade()), (Pista::Lofi, cancion::sintetizar_lofi()), (Pista::Marimba, cancion::sintetizar_marimba())]
             .into_iter()
             .filter_map(|(p, muestras)| cargar(muestras).map(|s| (p, s, Cell::new(0.0))))
             .collect();

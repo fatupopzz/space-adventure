@@ -166,6 +166,7 @@ pub fn dibujar(fb: &mut Framebuffer, vp: &Mat4, rastro: &[Vec3], estela: &str, r
         "adn" => Some([0.5, 0.5, 0.9]),
         "astrofago" => Some([1.0, 0.08, 0.16]),
         "teseracto" => Some([1.0, 0.75, 0.35]),
+        "seisiete" => Some([0.9, 0.7, 1.0]),
         _ => Some([0.2, 0.9, 0.85]),
     };
     if let Some(c) = hilo {
@@ -334,6 +335,24 @@ pub fn dibujar(fb: &mut Framebuffer, vp: &Mat4, rastro: &[Vec3], estela: &str, r
                     let (p, r) = (esquinas[0], esquinas[1]);
                     let (q0, q1) = ((p.0 + (esquinas[3].0 - p.0) * u, p.1 + (esquinas[3].1 - p.1) * u), (r.0 + (esquinas[2].0 - r.0) * u, r.1 + (esquinas[2].1 - r.1) * u));
                     fb.linea_de_luz((q0.0, q0.1, z), ((q0.0 + q1.0) * 0.5, (q0.1 + q1.1) * 0.5, z), color.map(|v| v * 0.5), [0.0; 3]);
+                }
+            }
+            // Six seven: un 6 y un 7 de pixeles que se van turnando y suben (el meme de 2025).
+            "seisiete" if k % 5 == 0 => {
+                const SEIS: [u8; 5] = [7, 4, 7, 5, 7];
+                const SIETE: [u8; 5] = [7, 1, 2, 2, 2];
+                let digito = if (k / 5) % 2 == 0 { SEIS } else { SIETE };
+                let p = rastro[k] + Vec3::new((azar(s) - 0.5) * 0.6, edad * 1.5, 0.0);
+                if let Some(c) = proyectar(p, vp, fb) {
+                    let px = (1.5 + 1.5 * vida) * esc;
+                    let color = if (k / 5) % 2 == 0 { [1.0, 0.5, 0.9] } else { [0.5, 0.85, 1.0] };
+                    for (fila, bits) in digito.iter().enumerate() {
+                        for col in 0..3 {
+                            if bits & (1 << (2 - col)) != 0 {
+                                cuadro(fb, c.0 + (col as f32 - 1.0) * px, c.1 + (fila as f32 - 2.0) * px, c.2, px, color.map(|v| v * vida));
+                            }
+                        }
+                    }
                 }
             }
             // Humo negro de camioneta extraurbana: bocanadas que crecen y oscurecen.

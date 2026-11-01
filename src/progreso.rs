@@ -47,8 +47,9 @@ const NEPTUNO: Option<usize> = Some(9);
 const PLUTON: Option<usize> = Some(10);
 const HADA: Option<usize> = Some(11);
 const VEGETTA: Option<usize> = Some(12);
+const CHAPIN: Option<usize> = Some(13);
 
-pub const LOGROS: [Logro; 74] = [
+pub const LOGROS: [Logro; 77] = [
     logro("tarot_lectura", MERCURIO, "Lectura completa", "Que Madame Mercurio le lea las tres cartas."),
     logro("tarot_invertidas", MERCURIO, "Todo al revés", "Que salgan las tres cartas invertidas."),
     logro("tarot_bendicion", MERCURIO, "Bendecida", "Que las tres cartas den BENDICIÓN."),
@@ -91,6 +92,9 @@ pub const LOGROS: [Logro; 74] = [
     logro("vegetta_mina", VEGETTA, "Roca madre", "Llegue primero a la roca madre en la minería."),
     logro("vegetta_triple", VEGETTA, "Dueño del servidor", "Gánele a Willyrex en los tres minijuegos."),
     logro("hada_luka", HADA, "La Fuente de Luka", "Toque la Canción de Miku completa."),
+    logro("camioneta_terminal", CHAPIN, "¡Capital, capital!", "Llegue a la terminal manejando la camioneta."),
+    logro("camioneta_llena", CHAPIN, "Siempre hay campo", "Llegue a la terminal con 40 pasajeros o más."),
+    logro("camioneta_tumulos", CHAPIN, "Chofer con cuidado", "Pase cinco túmulos frenando en un solo viaje."),
     // Las maravillas (homenajes; ver maravillas.rs).
     logro("gusano", SATURNO, "Atajo por el gusano", "Entre al agujero de gusano que está junto a Saturno."),
     logro("teseracto", None, "Más allá del horizonte", "Cruce el horizonte de Gargantúa (y salga del teseracto)."),
@@ -196,10 +200,10 @@ pub enum Hecho {
 }
 
 /// Los planetas con escena (para los encargos de aterrizar).
-const CON_ESCENA: [usize; 12] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+const CON_ESCENA: [usize; 13] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13];
 
 /// Las estelas de la nave: id, nombre y precio en notas.
-pub const ESTELAS: [(&str, &str, u32); 15] = [
+pub const ESTELAS: [(&str, &str, u32); 16] = [
     ("miku", "Audio de puerro", 40),
     ("fuego", "Dejen que cocine", 60),
     ("arcoiris", "RGB da más FPS", 90),
@@ -213,6 +217,7 @@ pub const ESTELAS: [(&str, &str, u32); 15] = [
     ("pixel", "Modo 8 bits", 70),
     ("confeti", "Fiesta en la nave", 100),
     ("adn", "ADN de campeón", 130),
+    ("seisiete", "Six seven", 150),
     ("astrofago", "Astrófago (no lo toque)", 140),
     ("teseracto", "Librero de 5 dimensiones", 180),
 ];
@@ -224,13 +229,35 @@ pub enum Premio {
     Skin(&'static str),
     Estela(&'static str),
     Notas(u32),
+    /// Un titulo para el piloto: sale en el HUD, debajo del lugar (se equipa en el pase).
+    Titulo(&'static str),
 }
 
-/// El pase espacial: el premio de cada nivel (el nivel 1 es `PASE[0]`). Como en Fortnite, se
-/// sube jugando: la XP sale de las notas recogidas, los logros, los sellos, los encargos y los cometas.
-pub const PASE: [Premio; 30] = [
+/// Los titulos del pase: id, lo que dice y de donde sale (para la vitrina).
+pub const TITULOS: [(&str, &str, &str); 8] = [
+    ("novato", "Piloto sin licencia", "Pasó el examen de manejo espacial a la tercera. Le regalaron el título por lástima."),
+    ("npc", "NPC con aura", "Sigue el mismo camino todos los días y dice las mismas tres frases. Pero con aura."),
+    ("delulu", "Delulu galáctico", "Está convencido de que Plutón es planeta y de que Saturno le va a escribir. Delulu es la solución."),
+    ("aura", "Aura farmer", "Hace barrel rolls frente a los asteroides aunque nadie lo esté viendo. +1000 de aura cada vez."),
+    ("main", "Main character", "La cámara siempre lo sigue a él. Los demás pilotos son extras. Ellos todavía no lo saben."),
+    ("sigma", "Sigma del espacio", "No sigue las reglas del sistema solar. Tampoco las de tránsito. GLADAS ya se rindió."),
+    ("rizz", "Rizz interestelar", "Le consiguió cita a Curiosity, le guiñó el ojo a Saturno y Neptuno le dejó ganar en cartas."),
+    ("goat", "El GOAT del sistema solar", "El mejor de todos los tiempos. Los planetas votaron. Plutón votó dos veces."),
+];
+
+/// Lo que dice el titulo con ese id.
+pub fn texto_titulo(id: &str) -> &'static str {
+    TITULOS.iter().find(|t| t.0 == id).map_or("", |t| t.1)
+}
+
+/// El pase espacial, TEMPORADA 1 · ODISEA BRAINROT: el premio de cada nivel (el nivel 1 es
+/// `PASE[0]`). Como en Fortnite, se sube jugando: la XP sale de las notas recogidas, los logros,
+/// los sellos, los encargos y los cometas. Cada pocos niveles toca un titulo; el gran premio, en
+/// el 40, es un piloto que no se vende: Chimpanzini Bananini.
+pub const NOMBRE_TEMPORADA: &str = "TEMPORADA 1 · ODISEA BRAINROT";
+pub const PASE: [Premio; 40] = [
     Premio::Personaje("simi"),
-    Premio::Notas(30),
+    Premio::Titulo("novato"),
     Premio::Personaje("shrek"),
     Premio::Skin("chapina"),
     Premio::Personaje("steve"),
@@ -238,7 +265,7 @@ pub const PASE: [Premio; 30] = [
     Premio::Personaje("chilindrina"),
     Premio::Estela("fuego"),
     Premio::Personaje("doge"),
-    Premio::Notas(50),
+    Premio::Titulo("npc"),
     Premio::Personaje("mario"),
     Premio::Skin("camioneta"),
     Premio::Personaje("patricio"),
@@ -248,7 +275,7 @@ pub const PASE: [Premio; 30] = [
     Premio::Personaje("kirby"),
     Premio::Skin("shuco"),
     Premio::Personaje("gato"),
-    Premio::Notas(80),
+    Premio::Titulo("delulu"),
     Premio::Personaje("pikachu"),
     Premio::Skin("quetzal"),
     Premio::Personaje("chapulin"),
@@ -256,9 +283,19 @@ pub const PASE: [Premio; 30] = [
     Premio::Personaje("knuckles"),
     Premio::Notas(100),
     Premio::Skin("sombra"),
-    Premio::Notas(120),
+    Premio::Titulo("aura"),
     Premio::Estela("notas"),
     Premio::Skin("oro"),
+    Premio::Notas(120),
+    Premio::Titulo("main"),
+    Premio::Estela("seisiete"),
+    Premio::Titulo("sigma"),
+    Premio::Skin("gamer"),
+    Premio::Notas(150),
+    Premio::Titulo("rizz"),
+    Premio::Titulo("goat"),
+    Premio::Notas(200),
+    Premio::Personaje("bananini"),
 ];
 
 /// La XP que pide el nivel `n` (para pasar de n-1 a n): cada nivel cuesta un poco mas.
@@ -273,11 +310,12 @@ pub fn nombre_del_premio(p: Premio) -> String {
         Premio::Skin(id) => crate::tienda::SKINS[crate::tienda::indice_skin(id)].nombre.to_string(),
         Premio::Estela(id) => ESTELAS.iter().find(|e| e.0 == id).map_or(id, |e| e.1).to_string(),
         Premio::Notas(n) => format!("{n} notas"),
+        Premio::Titulo(id) => texto_titulo(id).to_string(),
     }
 }
 
 /// Los cuerpos que tienen sello en el pasaporte (todos menos el Sol).
-pub const CON_SELLO: [usize; 12] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+pub const CON_SELLO: [usize; 13] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13];
 
 pub struct Progreso {
     pub logros: BTreeSet<String>,
@@ -301,6 +339,8 @@ pub struct Progreso {
     /// Las skins de la nave que se compraron en la tienda, y la que se lleva puesta.
     pub skins: BTreeSet<String>,
     pub skin: String,
+    /// El titulo que se lleva puesto (de los del pase), si hay.
+    pub titulo: Option<String>,
     /// El personaje escogido (id de `personajes::PERSONAJES`) y los que se compraron en la tienda.
     pub personaje: String,
     pub personajes: BTreeSet<String>,
@@ -346,6 +386,7 @@ impl Progreso {
             skin: crate::tienda::SKINS[0].id.to_string(),
             personaje: crate::personajes::GRATIS[0].to_string(),
             personajes: BTreeSet::new(),
+            titulo: None,
             pase_cobrado: 0,
             pase_visto: 0,
             personajes_visto: 0,
@@ -387,6 +428,7 @@ impl Progreso {
                     }
                     Some("personaje") if partes.len() > 1 => p.personaje = partes[1].to_string(),
                     Some("pase_cobrado") => p.pase_cobrado = num(1),
+                    Some("titulo") if partes.len() > 1 => p.titulo = Some(partes[1].to_string()),
                     Some("pase_visto") => p.pase_visto = num(1),
                     Some("personajes_visto") => p.personajes_visto = num(1),
                     Some("volumen") => p.ajustes.volumen = num(1).min(4) as u8,
@@ -602,7 +644,7 @@ impl Progreso {
                     self.estelas.insert(id.to_string());
                     String::new()
                 }
-                Premio::Personaje(_) => String::new(),
+                Premio::Personaje(_) | Premio::Titulo(_) => String::new(),
             };
             self.avisos.push((format!("¡NIVEL {n} DEL PASE! {}{extra} · véalo en el menú", nombre_del_premio(premio)), 0.0));
         }
@@ -689,6 +731,9 @@ impl Progreso {
                 s += &format!("personaje_tiene {k}\n");
             }
             s += &format!("skin_puesta {}\n", self.skin);
+            if let Some(t) = &self.titulo {
+                s += &format!("titulo {t}\n");
+            }
             s += &format!("personaje {}\npase_cobrado {}\n", self.personaje, self.pase_cobrado);
             s += &format!("pase_visto {}\npersonajes_visto {}\n", self.pase_visto, self.personajes_visto);
             for id in &self.logros {

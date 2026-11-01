@@ -40,6 +40,7 @@ mod fuente;
 mod intro;
 mod jupiter;
 mod junta;
+mod camioneta;
 mod luna;
 mod maravillas;
 mod matematica;
@@ -89,6 +90,7 @@ use fuente::{AccionFuente, Fuente};
 use mercurio::{AccionMercurio, Mercurio};
 use jupiter::{AccionJupiter, Jupiter};
 use divorcio::{AccionDivorcio, Divorcio};
+use camioneta::{AccionCamioneta, Camioneta};
 use luna::{AccionLuna, Luna};
 use notas::Coleccionables;
 use progreso::{sello, Hecho, Progreso};
@@ -223,6 +225,8 @@ struct Recursos {
     chepa: Modelo,
     items_urano: [Modelo; 3],
     charco: Modelo,
+    /// El Planeta Chapin: los modelos de la camioneta y de su carretera (ver camioneta.rs).
+    camioneta: camioneta::Modelos,
     /// Las maravillas (ver maravillas.rs): Rocky, la Blip-A, la Endurance, el monolito y el disco de
     /// acrecion de Gargantua.
     rocky: Modelo,
@@ -483,6 +487,7 @@ impl Recursos {
             grietas: std::array::from_fn(grieta),
             atlas_bloques,
             diamante_mc: cargar("modelos/diamante_mc.obj"),
+            camioneta: camioneta::modelos(),
             rocky: cargar("modelos/rocky.obj"),
             blip_a: cargar("modelos/blip_a.obj"),
             endurance: cargar("modelos/endurance.obj"),
@@ -1228,7 +1233,7 @@ fn semilla_del_reloj() -> u32 {
     std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(7, |d| d.subsec_nanos())
 }
 
-const CON_ATERRIZAJE: [usize; 12] = [MERCURIO, VENUS, TIERRA, LUNA, MARTE, JUPITER, SATURNO, URANO, NEPTUNO, PLUTON, HADA, VEGETTA];
+const CON_ATERRIZAJE: [usize; 13] = [MERCURIO, VENUS, TIERRA, LUNA, MARTE, JUPITER, SATURNO, URANO, NEPTUNO, PLUTON, HADA, VEGETTA, CHAPIN];
 
 /// En que planeta se puede aterrizar desde aqui, si en alguno. Si hay uno con
 /// aterrizaje en rango gana ese, aunque otro quede mas cerca: junto a la
@@ -3391,6 +3396,68 @@ fn dibujar_jupiter(fb: &mut Framebuffer, post: &mut Post, rec: &Recursos, j: &Ju
 }
 
 /// Un cuadro del set de filmacion de la Luna.
+/// Un cuadro de la camioneta: el cielo de la tarde, los volcanes al fondo, la carretera en
+/// tramos que pasan, las ceibas y casitas de la orilla, lo que viene en el camino y la camioneta.
+fn dibujar_camioneta(fb: &mut Framebuffer, post: &mut Post, rec: &Recursos, c: &Camioneta, opciones: &Opciones) -> Estadisticas {
+    let (ojo, mira) = c.camara();
+    let fov = 62f32.to_radians();
+    let (cerca, lejos) = (0.1, 600.0);
+    let vista = Mat4::look_at(ojo, mira, Vec3::new(0.0, 1.0, 0.0));
+    let proyeccion = Mat4::perspective(fov, fb.ancho as f32 / fb.alto as f32, cerca, lejos);
+    let vp = proyeccion * vista;
+    let cielo = [[1.0, 0.82, 0.62], [0.55, 0.75, 1.0], [0.25, 0.48, 0.92]];
+    cielo_degradado(fb, (mira - ojo).normalize(), fov, cielo);
+    // El sol de la tarde, bajito, detras de los volcanes.
+    if let Some((x, y, _)) = proyectar(ojo + Vec3::new(-0.35, 0.18, -1.0).normalize() * 300.0, &vp, fb) {
+        post::halo(fb, (x, y), 120.0, [0.5, 0.38, 0.18], 1.5);
+        post::halo(fb, (x, y), 22.0, [1.0, 0.95, 0.75], 0.8);
+    }
+    fb.limpiar_profundidad();
+    let base = base_uniforms(vista, proyeccion, Vec3::new(-60.0, 80.0, -40.0), ojo, (Vec3::new(0.42, 0.42, 0.50), Vec3::new(0.18, 0.15, 0.22)));
+    let m = &rec.camioneta;
+    let mut llamadas = vec![llamada(&m.volcanes, base)];
+    // La carretera: tramos que se repiten, corridos segun lo que se ha avanzado.
+    let corrido = c.recorrido.rem_euclid(camioneta::TRAMO);
+    for k in -1..30 {
+        let z = -(k as f32) * camioneta::TRAMO + corrido;
+        llamadas.push(llamada(&m.carretera, Uniforms { modelo: Mat4::translation(Vec3::new(0.0, 0.0, z)), ..base }));
+    }
+    for a in &c.adornos {
+        let (modelo, escala) = if a.casita { (&rec.objetos_chapin.casitas[a.color % rec.objetos_chapin.casitas.len()], 2.6) } else { (&rec.objetos_chapin.ceiba, 4.5) };
+        llamadas.push(llamada(modelo, Uniforms { modelo: Mat4::translation(Vec3::new(a.x, 0.0, a.z)) * Mat4::rotation_y(a.giro) * Mat4::scale(escala), ..base }));
+    }
+    for cosa in &c.cosas {
+        let donde = Mat4::translation(Vec3::new(cosa.x, 0.0, cosa.z));
+        match cosa.tipo {
+            camioneta::Tipo::TucTuc => llamadas.push(llamada(&m.tuctuc, Uniforms { modelo: donde, ..base })),
+            camioneta::Tipo::Perro => {
+                let trote = (c.total * 14.0).sin().abs() * 0.08;
+                let mira_a = if cosa.mov > 0.0 { -std::f32::consts::FRAC_PI_2 } else { std::f32::consts::FRAC_PI_2 };
+                llamadas.push(llamada(&m.perro, Uniforms { modelo: Mat4::translation(Vec3::new(cosa.x, trote, cosa.z)) * Mat4::rotation_y(mira_a), ..base }));
+            }
+            camioneta::Tipo::Bache => llamadas.push(llamada(&m.bache, Uniforms { modelo: donde, ..base })),
+            camioneta::Tipo::Tumulo => llamadas.push(llamada(&m.tumulo, Uniforms { modelo: Mat4::translation(Vec3::new(0.0, 0.0, cosa.z)), ..base })),
+            camioneta::Tipo::Parada(gente) => {
+                llamadas.push(llamada(&m.parada, Uniforms { modelo: Mat4::translation(Vec3::new(0.0, 0.0, cosa.z)), ..base }));
+                for p in 0..gente {
+                    let x = 4.5 + (p % 3) as f32 * 0.45;
+                    let z = cosa.z - 1.0 + (p / 3) as f32 * 0.7 + (p % 2) as f32 * 0.2;
+                    // Saludan (brinquitos) para que el chofer los vea.
+                    let brinco = ((c.total * 6.0 + p as f32).sin()).max(0.0) * 0.15;
+                    llamadas.push(llamada(&m.personas[p as usize % 3], Uniforms { modelo: Mat4::translation(Vec3::new(x, brinco, z)) * Mat4::rotation_y(std::f32::consts::FRAC_PI_2), ..base }));
+                }
+            }
+        }
+    }
+    llamadas.push(llamada(&m.camioneta, Uniforms { modelo: c.matriz(), ..base }));
+    let st = pipeline::render(fb, &llamadas, opciones);
+    // La neblina de la tarde de lejos (asi lo que aparece no sale de golpe).
+    post::niebla(fb, cerca, lejos, 110.0, 560.0, [0.62, 0.70, 0.88], true);
+    post.bloom(fb, BLOOM * 0.5);
+    post::terminar(fb, [1.0, 0.85, 0.6], 0.04, c.destello);
+    st
+}
+
 fn dibujar_luna(fb: &mut Framebuffer, post: &mut Post, rec: &Recursos, l: &Luna, opciones: &Opciones) -> Estadisticas {
     let (ojo, mira) = l.camara();
     let fov = FOV.to_radians();
@@ -3524,6 +3591,8 @@ enum Escena {
     Divorcio(Divorcio),
     Jupiter(Jupiter),
     Luna(Luna),
+    /// El Planeta Chapin: la camioneta extraurbana.
+    Camioneta(Box<Camioneta>),
     Mirador(Mirador),
     Historia(Historia),
     /// El menu principal (lo primero que se ve).
@@ -3840,6 +3909,17 @@ fn preparar(t: f32, resto: &[String]) -> (Juego, Escena) {
             juego.estela = Some("arcoiris");
             let atras = (desde - m).normalize();
             juego.rastro = (0..50).rev().map(|k| desde + atras * (k as f32 * 0.35) + Vec3::new(0.0, 0.6 * (k as f32 * 0.3).sin(), 0.0)).collect();
+        }
+        Some(modo) if modo.starts_with("camioneta") => {
+            // `camioneta`: la llegada. `camioneta_juego`: a media ruta, con gente.
+            let mut c = Camioneta::new(11);
+            c.preparar_captura(modo);
+            let mut ahora = 0.0;
+            while ahora < t {
+                c.actualizar(&nada, 1.0 / 60.0);
+                ahora += 1.0 / 60.0;
+            }
+            escena = Escena::Camioneta(Box::new(c));
         }
         Some(modo) if modo.starts_with("luna") => {
             // `luna`: deja correr `t` segundos. `luna:<fase>` juega solo hasta esa fase (con `_mal`, contestando
@@ -4223,6 +4303,17 @@ fn logros_de_escena(escena: &Escena) -> Vec<&'static str> {
             }
         }
         Escena::Mirador(_) => v.push("mirador"),
+        Escena::Camioneta(c) => {
+            if c.llegadas > 0 {
+                v.push("camioneta_terminal");
+            }
+            if c.mejor_pasajeros >= 40 {
+                v.push("camioneta_llena");
+            }
+            if c.mejor_tumulos >= 5 {
+                v.push("camioneta_tumulos");
+            }
+        }
         Escena::Luna(l) if l.calificada() => {
             match l.aciertos() {
                 6 => v.push("luna_oscar"),
@@ -4287,6 +4378,7 @@ fn pago_de_escena(escena: &Escena) -> Option<(u32, String)> {
         Escena::Mercurio(m) if m.terminada() => (15, "la lectura de Madame Mercurio".to_string()),
         Escena::Divorcio(d) if d.terminado() => (15 + 8 * d.cuantos(divorcio::Destino::Saturno) as u32, "el divorcio de Venus".to_string()),
         Escena::Luna(l) if l.calificada() => (l.aciertos() as u32 * 7, format!("el set de la Luna: {} de 6", l.aciertos())),
+        Escena::Camioneta(c) if c.partidas > 0 => (c.partidas * 5 + c.mejor_pasajeros + if c.llegadas > 0 { 15 } else { 0 }, format!("la camioneta: {} pasajeros a la capital", c.mejor_pasajeros)),
         Escena::Vegetta(v) if v.terminadas > 0 => (v.terminadas * 5 + v.ganadas * 15, format!("el servidor de Vegetta: {} de {} ganados", v.ganadas, v.terminadas)),
         _ => return None,
     };
@@ -4321,6 +4413,7 @@ fn dibujar_escena_sin_trazo(fb: &mut Framebuffer, post: &mut Post, rec: &Recurso
         Escena::Divorcio(d) => dibujar_divorcio(fb, post, rec, d, &juego.opciones),
         Escena::Jupiter(j) => dibujar_jupiter(fb, post, rec, j, &juego.opciones),
         Escena::Luna(l) => dibujar_luna(fb, post, rec, l, &juego.opciones),
+        Escena::Camioneta(c) => dibujar_camioneta(fb, post, rec, c, &juego.opciones),
         Escena::Mirador(m) => dibujar_mirador(fb, post, rec, m, &juego.opciones),
         Escena::Historia(h) => dibujar_historia(fb, post, rec, h, &juego.opciones),
         // Atras del menu principal, el sistema solar girando (con la camara dando vueltas a la Tierra).
@@ -5026,6 +5119,7 @@ fn main() {
                     }
                     Some(HADA) => cambio = Some(Escena::Fuente(Fuente::new())),
                     Some(LUNA) => cambio = Some(Escena::Luna(Luna::new(semilla_del_reloj() ^ (juego.t * 1000.0) as u32))),
+                    Some(CHAPIN) => cambio = Some(Escena::Camioneta(Box::new(Camioneta::new(semilla_del_reloj() ^ (juego.t * 1000.0) as u32)))),
                     Some(VENUS) => cambio = Some(Escena::Divorcio(Divorcio::new(semilla_del_reloj() ^ (juego.t * 1000.0) as u32))),
                     Some(JUPITER) => cambio = Some(Escena::Jupiter(Jupiter::new(semilla_del_reloj(), prog.record_jupiter))),
                     Some(MERCURIO) => cambio = Some(Escena::Mercurio(Mercurio::new(semilla_del_reloj() ^ (juego.t * 1000.0) as u32))),
@@ -5237,6 +5331,16 @@ fn main() {
                     }
                 }
                 for ev in h.eventos.drain(..) {
+                    tocar(ev);
+                }
+            }
+            Escena::Camioneta(c) => {
+                juego.t += dt;
+                if let AccionCamioneta::Despegar = c.actualizar(&e, dt) {
+                    juego.despegar_de(CHAPIN, c.despedida());
+                    cambio = Some(Escena::Espacio);
+                }
+                for ev in c.eventos.drain(..) {
                     tocar(ev);
                 }
             }
@@ -5505,6 +5609,7 @@ fn main() {
                 Escena::Mercurio(m) => (Some(if m.rebobinando() > 0.0 { Pista::TarotReves } else { Pista::Tarot }), true),
                 // El juicio, tenso; en el veredicto ya suena la fiesta.
                 Escena::Luna(_) => (Some(Pista::Espacio), true),
+                Escena::Camioneta(_) => (Some(Pista::Marimba), true),
                 // En el Mirador, el arpa tranquila (como junto a una fogata); la historia, con la musica del espacio.
                 Escena::Mirador(_) => (Some(Pista::Fuente), true),
                 Escena::Historia(_) => (Some(Pista::Espacio), true),
@@ -5691,6 +5796,11 @@ fn main() {
                     ui::caja_dialogo(&mut d, nombre, ui::LILA, visible, (ancho - w) / 2, alto - alto_caja - 20, w);
                 }
                 h.dibujar_ui(&mut d, &e, ancho, alto);
+            }
+            Escena::Camioneta(c) => {
+                let (texto, voz) = c.hablante().map_or((String::new(), Voz::Ia), |(_, t, v)| (t, v));
+                let visible = dialogo_ia.mostrar(&texto, voz, dt, son);
+                c.dibujar_ui(&mut d, &e, visible, ancho, alto);
             }
             Escena::Luna(l) => {
                 let (texto, voz) = l.hablante().map_or(("", Voz::Ia), |(_, t, v)| (t, v));
@@ -6241,6 +6351,10 @@ fn hud_espacio(d: &mut RaylibDrawHandle, juego: &Juego, e: &Entrada, st: &Estadi
     ui::titulo_de(d, &CUERPOS[cerca].nombre.to_uppercase(), 36, 46, 26, Color::new(240, 232, 255, 255));
     let km = format!("{:.0} km", dist.max(0.0) * 10.0);
     ui::subtitulo(d, &km, 36 + ui::medir_titulo(&CUERPOS[cerca].nombre.to_uppercase(), 26) + 14, 54, 18, ui::TENUE);
+    // El titulo del pase que se lleva puesto.
+    if let Some(t) = &prog.titulo {
+        ui::subtitulo(d, &format!("« {} »", progreso::texto_titulo(t)), 36, 80, 15, Color::new(140, 255, 235, 255));
+    }
 
     // Las notas recogidas (con el combo) y el pasaporte.
     // Tres renglones: el titulo (y el cometa), las notas con su combo al lado, y el pasaporte.

@@ -22,7 +22,7 @@ const fn ficha(id: &'static str, nombre: &'static str, ella: bool, archivo: &'st
     Ficha { id, nombre, texto, ella, archivo }
 }
 
-pub const PERSONAJES: [Ficha; 19] = [
+pub const PERSONAJES: [Ficha; 26] = [
     ficha("chavo", "El Chavo", false, "personaje_chavo", "Vive en un barril, pero ahora tiene nave. «Fue sin querer queriendo», dijo al despegar."),
     ficha("miku", "Miku", true, "miku", "La piloto original. Canta, baila y maneja; GLADAS dice que es la única que lee el manual."),
     ficha("simi", "Doctor Simi", false, "personaje_simi", "Lo mismo, pero en el espacio. Lleva botiquín, bigote y ganas de bailar en cualquier esquina."),
@@ -41,6 +41,13 @@ pub const PERSONAJES: [Ficha; 19] = [
     ficha("koch", "Profe Koch", false, "personaje_koch", "El de Teoría de la Computación. Trae su regla, sus lentes y un autómata para cada ocasión. Se gana entregándole los tres proyectos al cien la noche de la entrega."),
     ficha("vegetta", "Vegetta777", false, "personaje_vegetta", "El dueño de Planeta Vegetta. Construye una casa en cada planeta que toca. Se gana ganándole un minijuego a Willyrex en su servidor."),
     ficha("willyrex", "Willyrex", false, "personaje_willyrex", "El compa de Vegetta, con audífonos de gamer. Dice que él encontró los diamantes primero. Llega junto con Vegetta."),
+    ficha("capibara", "La capibara", true, "personaje_capibara", "Se lleva bien con todos: con los cocodrilos, con los pájaros y ahora con los asteroides. Trae una mandarina en la cabeza y cero preocupaciones."),
+    ficha("moodeng", "Moo Deng", true, "personaje_moodeng", "La hipopótamo bebé más famosa de internet. Muerde lo que se le acerca, incluido el volante. Brilla porque está mojada. Siempre está mojada."),
+    ficha("pedro", "Pedro", false, "personaje_pedro", "El mapache que baila. Pedro, Pedro, Pedro, Pedro, pe. Se metió a la nave buscando basura y se quedó porque había música."),
+    ficha("chillguy", "Chill Guy", false, "personaje_chillguy", "Un perrito tranquilo, de suéter y tenis rojos. Lo persigue un agujero negro y él como si nada. Es un chico chill y ya."),
+    ficha("labubu", "Labubu", true, "personaje_labubu", "El monstruito de peluche de la sonrisa de nueve dientes. Salió de una caja sorpresa. Nadie sabe si es tierna o si planea algo. Las dos."),
+    ficha("tungtung", "Tung Tung Tung Sahur", false, "personaje_tungtung", "Un tronco con ojos y su bate. Toca la puerta tres veces a la hora del desayuno. Si no le abren, toca tres veces más. Tung tung tung."),
+    ficha("bananini", "Chimpanzini Bananini", false, "personaje_bananini", "Un changuito adentro de una banana. Premio final de la Temporada 1 del pase: solo lo tiene quien llegó al nivel 40. Wa wa wa."),
     ficha("rocky", "Rocky", false, "personaje_rocky", "Ingeniero de Erid (Project Hail Mary). No tiene ojos: oye con todo el caparazón. Habla con acordes y arregla la nave a medio vuelo sin que nadie se lo pida. «¡Puño mi choque!»"),
 ];
 
@@ -59,6 +66,9 @@ pub fn voz(id: &str) -> Voz {
         "vegetta" | "willyrex" => Voz::Erizo,
         // Los eridianos hablan con acordes: una voz musical y aguda.
         "rocky" => Voz::Hada,
+        "capibara" | "moodeng" | "pedro" | "labubu" | "bananini" => Voz::Animalito,
+        "chillguy" => Voz::Planeta,
+        "tungtung" => Voz::Grunido,
         _ => Voz::Miku,
     }
 }
@@ -70,7 +80,8 @@ pub fn tono(id: &str) -> f32 {
         "steve" => 0.85, "chilindrina" => 1.22, "doge" => 0.78, "mario" => 1.18,
         "patricio" => 0.68, "creeper" => 0.80, "kirby" => 1.25, "gato" => 1.50,
         "pikachu" => 1.10, "chapulin" => 1.04, "knuckles" => 0.92, "koch" => 0.78,
-        "vegetta" => 1.0, "willyrex" => 0.94, "rocky" => 1.3, _ => 1.0,
+        "vegetta" => 1.0, "willyrex" => 0.94, "rocky" => 1.3,
+        "capibara" => 0.7, "moodeng" => 1.35, "pedro" => 1.15, "chillguy" => 0.85, "labubu" => 1.4, "tungtung" => 0.9, "bananini" => 1.2, _ => 1.0,
     }
 }
 
@@ -89,6 +100,7 @@ fn muletillas(id: &str) -> &'static [&'static str] {
         "koch" => &["Eso es un autómata finito. Todo es un autómata finito.", "Anótenlo, que viene en el examen.", "Muy bien. Ahora demuéstrelo por inducción."],
         "vegetta" => &["¡Muy buenas a todos, guapísimos!", "¡Esto lo construyo yo en un momentito!", "¡Willy, mira esto!"],
         "willyrex" => &["¡Vegetta, ven a ver esto!", "Yo lo vi primero, que conste.", "¡Qué épico, tío!"],
+        "chillguy" => &["Todo bien.", "Es que soy un chico chill.", "*se mete las manos a las bolsas*", "Relax."],
         _ => &[],
     }
 }
@@ -102,6 +114,12 @@ fn sonido_propio(id: &str) -> Option<&'static str> {
         "gato" => Some("¡AAAAAAAAAA!"),
         "doge" => Some("Wow. Such frase. Mucho decir."),
         "rocky" => Some("♪ ♫ ♪ ♫"),
+        "capibara" => Some("*masca una hojita en paz*"),
+        "moodeng" => Some("*ÑAM* (muerde el volante)"),
+        "pedro" => Some("Pedro, Pedro, Pedro, pe..."),
+        "labubu" => Some("Hi hi hi hi hi."),
+        "tungtung" => Some("Tung tung tung tung tung tung tung tung tung... ¡SAHUR!"),
+        "bananini" => Some("¡Wa wa wa! ¡Bananini!"),
         _ => None,
     }
 }
@@ -364,6 +382,98 @@ pub fn replica(id: &str, situacion: Replica) -> &'static str {
             "♫ (Traducción: «Vida empieza chiquita. Vida termina construyendo naves. Amaze.»)",
             "♪♪♫ (Traducción: «Si estrellas se apagan, Rocky y amigo las arreglan. Puño mi choque.»)",
         ],
+        // Cita, Boda, Cartas, Fuente, Luna, Juicio, Tarot, Golpe, Cosmos, Vida, Futuro.
+        "capibara" => [
+            "*masca su hojita* (Traducción: «Curiosity, relájate. El amor llega solo. Como el agua al río.»)",
+            "*se mete al charco de la boda* (Traducción: «Los declaro rover y esposa. Ahora todos a la poza.»)",
+            "*pone una carta y cierra los ojos* (Traducción: «Gane o pierda, igual voy a estar en paz.»)",
+            "*se pone el corazón en la cabeza, junto a la mandarina* (Traducción: «Ahora traigo dos cosas en la cabeza. Bueno, tres.»)",
+            "*bosteza* (Traducción: «¿La Luna es falsa? Igual se ve bonita. Me quedo.»)",
+            "*se sienta junto a Saturno* (Traducción: «Tranquilo, amigo. Todos le caemos bien a alguien. Yo le caigo bien a todos.»)",
+            "*se duerme durante la lectura* (Traducción: «El futuro llega igual. Mejor descansada.»)",
+            "*ni se inmuta* (Traducción: «¿Eso fue un reglazo? Estoy muy en paz para sentirlo.»)",
+            "*mira las estrellas, masticando* (Traducción: «Tanto universo y ni una poza. Le falta.»)",
+            "*asiente despacito* (Traducción: «De bacterias a capibaras. Lo mejor llegó al final, obvio.»)",
+            "*se acomoda la mandarina* (Traducción: «Si se apagan las estrellas, me echo una siesta.»)",
+        ],
+        "moodeng" => [
+            "*ÑAM* (Traducción: «Curiosity necesita cita. Yo le muerdo a los que no sirvan.»)",
+            "*ÑAM ÑAM* (Traducción: «¡Los declaro rover y esposa! ¿Hay pastel? Me lo como.»)",
+            "*muerde la baraja* (Traducción: «Ya no hay cartas. Gané.»)",
+            "*intenta morder el corazón* (Traducción: «No se deja. Lo respeto. Un poquito.»)",
+            "*muerde la escenografía* (Traducción: «Cartón. La Luna es de cartón. Sabe a cartón.»)",
+            "*se sienta encima del abogado* (Traducción: «Objeción denegada. Pesa más el hipopótamo.»)",
+            "*muerde las cartas del tarot* (Traducción: «Ahora el futuro tiene dientes.»)",
+            "*le muerde la regla al profe* (Traducción: «Empate.»)",
+            "*bufa al cielo* (Traducción: «Tantas estrellas y ninguna se deja morder.»)",
+            "*se revuelca en el lodo* (Traducción: «La vida empezó en el lodo. Aquí sigo, orgullosa.»)",
+            "*bosteza enorme* (Traducción: «Si se apaga el universo, yo sigo siendo famosa.»)",
+        ],
+        "pedro" => [
+            "Pedro, Pedro, Pe... (Traducción: «Curiosity, la clave es el baile. Nadie se resiste a dar vueltas.»)",
+            "*da vueltas en la boda* (Traducción: «Los declaro rover y esposa. Pista de baile abierta.»)",
+            "*baila sobre la mesa* (Traducción: «No sé las reglas, pero las bailo.»)",
+            "*se roba el corazón y lo esconde* (Traducción: «Era basura. Todo lo bonito es basura para un mapache.»)",
+            "*hurga en la utilería* (Traducción: «La Luna es de utilería. Hay muchas cosas buenas en esta basura.»)",
+            "*gira frente al jurado* (Traducción: «Saturno es inocente. Lo baila mi conciencia.»)",
+            "*se come una carta* (Traducción: «El futuro sabe a papel. Buen papel.»)",
+            "*sigue bailando con el chichón* (Traducción: «Pedro, Pedro, Pedro, ¡AY!, pe.»)",
+            "*da vueltas en gravedad cero* (Traducción: «Aquí se gira sin parar. Es mi casa.»)",
+            "*baila* (Traducción: «De células a mapaches que bailan. Valió la pena.»)",
+            "*sigue girando* (Traducción: «Cuando se apague todo, que me encuentren bailando.»)",
+        ],
+        "chillguy" => [
+            "Curiosity, relax. Si la cita sale mal, igual eres un rover con mucho aura. Todo bien.",
+            "Los declaro rover y esposa. Qué chill. Ojalá a todos les vaya así.",
+            "Juego tranquilo. Si gano, bien; si no, también. Es que soy un chico chill.",
+            "Un corazón. Lo guardo en la bolsa del suéter, junto con mis manos.",
+            "¿La Luna es falsa? Bueno. Sigue siendo una buena vista. Relax.",
+            "Saturno, tranquilo. Nadie se estresa en este tribunal. Bueno, el juez sí.",
+            "Mi futuro: seguir chill. Ya me lo sé, Madame.",
+            "Ay. Bueno. Pasa. Todo bien, profe.",
+            "Tantas galaxias y yo aquí, con las manos en las bolsas. Perfecto.",
+            "Millones de años de evolución para llegar a un perrito en suéter. Lo aceptamos.",
+            "Si se apagan las estrellas, me pongo otro suéter. Relax.",
+        ],
+        "labubu" => [
+            "Hi hi hi. (Traducción: «Curiosity, si la cita se porta mal, yo me encargo. Con mis nueve dientes.»)",
+            "Hi hi hi hi. (Traducción: «Rover y esposa. Qué tierno. Demasiado tierno. Sospechoso.»)",
+            "Hi hi. (Traducción: «Salí de una caja sorpresa. Las cartas son mi especialidad.»)",
+            "Hi hi hi. (Traducción: «Un corazón. Lo voy a guardar en mi caja. Junto con otras cosas.»)",
+            "Hi hi hi hi hi. (Traducción: «La Luna es falsa. Como la mitad de los Labubus. Yo soy original.»)",
+            "Hi. (Traducción: «Saturno, sonríe. Así. Más dientes.»)",
+            "Hi hi hi. (Traducción: «Mi futuro: agotarme en todas las tiendas.»)",
+            "...hi. (Traducción: «Eso dolió. No se me olvida, profe.»)",
+            "Hi hi hi. (Traducción: «Tantas estrellas. Todas en cajas sorpresa. Quiero abrirlas todas.»)",
+            "Hi hi. (Traducción: «De criaturas raras a coleccionables. La evolución tiene buen gusto.»)",
+            "Hi hi hi hi. (Traducción: «Cuando todo se apague, yo voy a seguir sonriendo.»)",
+        ],
+        "tungtung" => [
+            "Tung tung tung. (Traducción: «Curiosity. A la cita se llega temprano. Tres toques a la puerta.»)",
+            "TUNG. (Traducción: «Rover y esposa. Ya pueden desayunar.»)",
+            "Tung tung. (Traducción: «Barajo con el bate. Nadie hace trampa.»)",
+            "Tung. (Traducción: «Un corazón. Me lo pongo en el tronco. Ahora tengo sentimientos.»)",
+            "Tung tung tung tung. (Traducción: «Toqué la Luna tres veces. Suena hueca. Es de mentira.»)",
+            "TUNG TUNG TUNG. (Traducción: «Orden en la sala. Traigo mi propio mazo.»)",
+            "Tung tung. (Traducción: «Mi futuro: tocar puertas. Siempre.»)",
+            "...tung. (Traducción: «Usted me pega con una regla. Yo traigo bate. Pensémoslo bien, profe.»)",
+            "Tung tung tung. (Traducción: «Tantas estrellas. Tantas puertas por tocar.»)",
+            "Tung. (Traducción: «Antes era árbol. Ahora tengo ojos. Progreso.»)",
+            "Tung tung tung... ¡SAHUR! (Traducción: «Aunque se apague el Sol, alguien tiene que despertar a todos.»)",
+        ],
+        "bananini" => [
+            "¡Wa wa wa! (Traducción: «Curiosity, invítala a comer banana. Funciona siempre.»)",
+            "¡Bananini! (Traducción: «Los declaro rover y esposa. Arroz no tengo, tiro cáscaras.»)",
+            "¡Wa wa! (Traducción: «Gané el pase entero. Unas cartitas no me asustan.»)",
+            "¡Wa! (Traducción: «Un corazón. Más dulce que una banana. Casi.»)",
+            "¡Wa wa wa wa! (Traducción: «La Luna es falsa: no tiene ni una mata de banano.»)",
+            "¡Bananini! (Traducción: «Saturno, cuéntame todo. Pero pélalo despacito.»)",
+            "¡Wa wa! (Traducción: «Mi futuro: más bananas. El tarot lo confirma.»)",
+            "¡Wa...! (Traducción: «Ay. La cáscara amortiguó. Más o menos.»)",
+            "¡Wa wa wa! (Traducción: «Tanto espacio y ni un supermercado.»)",
+            "¡Bananini! (Traducción: «Primero fue la banana, luego el mono. O al revés. La ciencia no se decide.»)",
+            "¡Wa wa! (Traducción: «Si se apaga todo, yo tengo potasio para rato.»)",
+        ],
         _ => return replica("chavo", situacion),
     };
     lineas[situacion as usize]
@@ -411,6 +521,7 @@ pub fn como_se_gana(id: &str) -> Option<&'static str> {
         "koch" => Some("Entregue los tres proyectos de Koch al 100% a las 23:59 (en la Tierra), o cómprelo en la tienda."),
         "vegetta" | "willyrex" => Some("Gánele a Willyrex un minijuego del servidor de Planeta Vegetta (parkour, TNT Run o minería), o cómprelo en la tienda."),
         "rocky" => Some("Cómprelo en la tienda. (Antes vaya a saludarlo: está en la Blip-A, junto a Venus.)"),
+        "capibara" | "moodeng" | "pedro" | "chillguy" | "labubu" | "tungtung" => Some("Cómprelo en la tienda, en la pestaña de personajes."),
         _ => None,
     }
 }
@@ -422,6 +533,12 @@ pub fn precio(id: &str) -> Option<u32> {
         "koch" => Some(400),
         "vegetta" | "willyrex" => Some(300),
         "rocky" => Some(350),
+        "capibara" => Some(220),
+        "moodeng" => Some(240),
+        "pedro" => Some(260),
+        "chillguy" => Some(280),
+        "labubu" => Some(320),
+        "tungtung" => Some(300),
         _ => None,
     }
 }

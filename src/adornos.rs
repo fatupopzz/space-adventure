@@ -198,7 +198,7 @@ pub fn adornar(modelo: &mut Modelo, id: &str) {
         "platillo" => "OVNI", "cohete" => "NASA", "tiburon" => "MUERDE", "dragon" => "FUEGO", "tuktuk" => "TUK TUK", "patito" => "CUAC",
         "endurance" => "ENDURANCE", "blip" => "ASTROFAGO",
         "barrilete" => "SUMPANGO", "pinata" => "PINATA", "disco" => "DISCO", "tars" => "TARS",
-        "tralalero" => "TRALALA", "tungtung" => "TUNG TUNG", "bombardiro" => "BOMBARDIRO", "ballerina" => "CAPPUCCINA", _ => "NPC",
+        "tralalero" => "TRALALA", "tungtung" => "TUNG TUNG", "bombardiro" => "BOMBARDIRO", "ballerina" => "CAPPUCCINA", "gamer" => "GG EZ", _ => "NPC",
     };
     t.caja(negro, [0.0, 0.06, 1.03], [1.82, 0.42, 0.10]);
     t.letras(blanco, placa, 0.06, 1.095, 0.046);
@@ -495,6 +495,30 @@ pub fn adornar(modelo: &mut Modelo, id: &str) {
                 }
                 t.caja(pantalla, [lado * 1.15, 0.75, -0.24], [0.22, 0.26, 0.03]);
                 t.caja(negro, [lado * 1.15, 0.75, -0.25], [0.04, 0.2, 0.03]);
+            }
+        }
+        "gamer" => {
+            // Audifonos con su diadema y el microfono, y tiras RGB (los siete colores) alrededor.
+            let negro_mate = t.color("negro_mate", [0.06, 0.06, 0.07], 0.0);
+            let rgb = [[1.0, 0.1, 0.2], [1.0, 0.55, 0.0], [1.0, 0.95, 0.1], [0.1, 1.0, 0.3], [0.1, 0.8, 1.0], [0.3, 0.3, 1.0], [0.85, 0.2, 1.0]].map(|c| c);
+            let tiras: Vec<usize> = rgb.iter().enumerate().map(|(k, c)| t.color(&format!("rgb_{k}"), *c, 1.0)).collect();
+            for lado in [-1.0f32, 1.0] {
+                t.cono(negro_mate, Vec3::new(lado * 1.02, 0.25, -0.1), Vec3::new(lado, 0.0, 0.0), 0.28, 0.5, 0.5, 14);
+                t.cono(tiras[if lado < 0.0 { 2 } else { 5 }], Vec3::new(lado * 1.3, 0.25, -0.1), Vec3::new(lado, 0.0, 0.0), 0.03, 0.42, 0.42, 14);
+            }
+            // La diadema: un arco por arriba.
+            for k in 0..10 {
+                let (a0, a1) = (k as f32 / 10.0 * std::f32::consts::PI, (k + 1) as f32 / 10.0 * std::f32::consts::PI);
+                let p0 = Vec3::new(a0.cos() * 1.1, 0.5 + a0.sin() * 0.75, -0.1);
+                let p1 = Vec3::new(a1.cos() * 1.1, 0.5 + a1.sin() * 0.75, -0.1);
+                t.cono(negro_mate, p0, p1 - p0, (p1 - p0).length(), 0.07, 0.07, 6);
+            }
+            t.cono(negro_mate, Vec3::new(-1.2, 0.05, -0.15), Vec3::new(0.35, -0.35, -1.0), 0.75, 0.04, 0.04, 6);
+            t.esfera(tiras[3], Vec3::new(-0.9, -0.2, -0.85), 0.09, Vec3::new(1.0, 1.0, 1.0));
+            // La tira RGB alrededor de la cintura.
+            for k in 0..21 {
+                let a = k as f32 / 21.0 * std::f32::consts::TAU;
+                t.caja(tiras[k % 7], [a.cos() * 1.05, -0.45, a.sin() * 1.05], [0.2, 0.06, 0.2]);
             }
         }
         "tralalero" => {

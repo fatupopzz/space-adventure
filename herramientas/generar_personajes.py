@@ -765,6 +765,198 @@ personaje("rocky",
           {}, None, cuerpo=rocky_cuerpo, caras=cara_fija([]), cara=(-7, 4.0, 12.0), hombro=(4.0, 11.0), cadera=(3.5, 11.0))
 
 
+# ======================== Pilotos de memes (se compran en la tienda) ========================
+
+# --- La capibara: cafe, hocico ancho, orejitas y su mandarina en la cabeza. Siempre en paz. ---
+CARA_CAPIBARA = cara_fija([
+    ("ojos", "ojo", espejo(rects(["####"], 2, 8))),
+    ("nariz", "capi_nariz", espejo(rects(["##"], 1, 3))),
+])
+
+def capibara_pinta(i, j, k):
+    return "cabeza", "piel"
+
+def capibara_extras(vx, dj, sentado):
+    vx.box("hocico", "capi_oscuro", -5, 4, 10 + dj, 14 + dj, -9, -8)
+    vx.box("hocico", "capi_oscuro", -4, 3, 10 + dj, 13 + dj, -10, -10)
+    for i0 in (-7, 5):
+        vx.box("orejas", "capi_oscuro", i0, i0 + 1, 21 + dj, 22 + dj, -1, 0)
+    # La mandarina con su hojita.
+    vx.box("mandarina", "mandarina", -2, 1, 22 + dj, 24 + dj, -2, 1, si=lambda i, j, k: not (i in (-2, 1) and k in (-2, 1) and j in (22 + dj, 24 + dj)))
+    vx.box("hojita", "hojita", 0, 1, 25 + dj, 25 + dj, -1, -1)
+
+personaje("capibara",
+          mat("piel", (0.62, 0.44, 0.28)) + mat("capi_oscuro", (0.45, 0.30, 0.18)) + mat("capi_nariz", (0.18, 0.12, 0.08))
+          + mat("mandarina", (1.0, 0.58, 0.10), 0.3, 24) + mat("hojita", (0.25, 0.70, 0.25)) + mat("toalla", (0.95, 0.80, 0.45)),
+          dict(torso="piel", manga="piel", falda="toalla", muslo="piel", bota="capi_oscuro", suela="capi_oscuro", cuello="piel"),
+          capibara_pinta, capibara_extras, caras=CARA_CAPIBARA, forma=lambda i, j, k: True)
+
+
+# --- Moo Deng: la hipopotamo bebe, gris y brillosa, cachetes rosas y la boca abierta. ---
+CARA_MOODENG = cara_fija([
+    ("ojos", "ojo", espejo(rects(["###", "###"], 3, 11))),
+    ("boca", "moo_boca", rects(["..######..", ".########.", "##########", ".########."], -5, 6)),
+    ("rubor", "rubor_moo", espejo(rects(["###"], 6, 6))),
+])
+
+def moodeng_pinta(i, j, k):
+    return "cabeza", "piel"
+
+def moodeng_extras(vx, dj, sentado):
+    vx.box("hocico", "piel", -5, 4, 10 + dj, 14 + dj, -9, -8)
+    vx.box("nariz", "moo_boca", -3, -2, 14 + dj, 14 + dj, -10, -10)
+    vx.box("nariz", "moo_boca", 1, 2, 14 + dj, 14 + dj, -10, -10)
+    for i0 in (-6, 4):
+        vx.box("orejas", "rubor_moo", i0, i0 + 1, 22 + dj, 22 + dj, -1, 0)
+    t = 4 if sentado else 10
+    vx.box("torso_panza", "rubor_moo", -2, 1, t, t + 3, -3, -3)
+
+personaje("moodeng",
+          mat("piel", (0.42, 0.40, 0.46), 0.6, 48) + mat("moo_boca", (0.55, 0.15, 0.22)) + mat("rubor_moo", (1.0, 0.55, 0.62)),
+          dict(torso="piel", manga="piel", falda="piel", muslo="piel", bota="piel", suela="moo_boca", cuello="piel"),
+          moodeng_pinta, moodeng_extras, caras=CARA_MOODENG, w=1)
+
+
+# --- Pedro, el mapache que baila: gris, antifaz negro, hocico blanco y la cola a rayas. ---
+def pedro_pinta(i, j, k):
+    if k <= HK0 + 1 and j in (14, 15, 16) and -6 <= i <= 5:
+        return "antifaz", "antifaz"
+    if k <= HK0 + 1 and j <= 12 and -3 <= i <= 2:
+        return "hocico", "blanco_mapache"
+    return "cabeza", "piel"
+
+def pedro_extras(vx, dj, sentado):
+    vx.box("nariz", "antifaz", -1, 0, 12 + dj, 12 + dj, -8, -8)
+    for i0 in (-6, 3):
+        vx.box("orejas", "piel", i0, i0 + 2, 22 + dj, 23 + dj, -1, 0)
+        vx.box("orejas_dentro", "blanco_mapache", i0 + 1, i0 + 1, 22 + dj, 22 + dj, -2, -2)
+    t = 4 if sentado else 10
+    vx.box("torso_panza", "blanco_mapache", -2, 1, t, t + 3, -3, -3)
+    for n in range(7):
+        m_ = "antifaz" if n % 2 == 0 else "piel"
+        vx.box("torso_cola" + ("" if m_ == "piel" else "_raya"), m_, -1, 0, t + n // 2, t + n // 2 + 1, 2 + n, 2 + n)
+
+CARA_PEDRO = {emo: [(p_, "ojo_mapache" if p_ == "ojos" else m_, r) for (p_, m_, r) in piezas] for emo, piezas in CARAS.items()}
+
+personaje("pedro",
+          mat("piel", (0.58, 0.58, 0.62)) + mat("antifaz", (0.12, 0.12, 0.14)) + mat("blanco_mapache", (0.95, 0.95, 0.95))
+          + mat("ojo_mapache", (0.95, 0.95, 1.0), 0.6, 48),
+          dict(torso="piel", manga="piel", mano="antifaz", falda="piel", muslo="piel", bota="antifaz", suela="antifaz", cuello="piel"),
+          pedro_pinta, pedro_extras, caras=CARA_PEDRO)
+
+
+# --- Chill Guy: el perrito tranquilo, sueter gris, jeans arremangados y tenis rojos. ---
+CARA_CHILL = cara_fija([
+    ("ojos", "ojo", espejo(rects(["####", ".##."], 2, 10))),
+    ("sonrisa", "ojo", rects(["......##", "######.."], -4, 5)),
+])
+
+def chill_pinta(i, j, k):
+    if k <= HK0 + 1 and j <= 12 and -4 <= i <= 3:
+        return "hocico", "chill_claro"
+    return "cabeza", "piel"
+
+def chill_extras(vx, dj, sentado):
+    vx.box("nariz", "ojo", -1, 0, 12 + dj, 12 + dj, -8, -8)
+    # Las orejas largas y caidas a los lados.
+    for i0 in (-8, 7):
+        vx.box("orejas", "chill_oreja", i0, i0, 13 + dj, 20 + dj, -3, 1)
+    t = 4 if sentado else 10
+    vx.box("torso_cuello", "sueter_oscuro", -3, 2, t + 4, t + 4, -2, 1)
+
+personaje("chillguy",
+          mat("piel", (0.90, 0.84, 0.76)) + mat("chill_claro", (0.98, 0.95, 0.90)) + mat("chill_oreja", (0.72, 0.60, 0.50))
+          + mat("sueter", (0.55, 0.57, 0.62)) + mat("sueter_oscuro", (0.40, 0.42, 0.47)) + mat("jeans", (0.25, 0.40, 0.72))
+          + mat("tenis_rojos", (0.90, 0.15, 0.15), 0.3, 24) + mat("suela_blanca", (0.97, 0.97, 0.97)),
+          dict(torso="sueter", manga="sueter", mano="piel", falda="jeans", muslo="jeans", bota="tenis_rojos", suela="suela_blanca",
+               cuello="sueter", manga_borde="sueter_oscuro", bota_borde="jeans"),
+          chill_pinta, chill_extras, caras=CARA_CHILL)
+
+
+# --- Labubu: el monstruito de peluche, orejas de conejo, carita crema y la sonrisa de nueve dientes. ---
+CARA_LABUBU = cara_fija([
+    ("ojos", "ojo", espejo(rects([".##.", "####", "####", ".##."], 2, 12))),
+    ("brillo", "steve_blanco", espejo(rects(["#"], 3, 11))),
+    ("boca", "labubu_boca", rects(["##########", ".########."], -5, 6)),
+    ("dientes", "steve_blanco", rects(["#.#.#.#.#.", "#.#.#.#.#."], -5, 6)),
+])
+
+def labubu_pinta(i, j, k):
+    # La carita crema, ovalada, al frente; lo demas es peluche cafe.
+    if k <= HK0 + 1 and ((i + 0.5) / 6.5) ** 2 + ((j - 14.5) / 5.0) ** 2 <= 1.0:
+        return "cabeza", "piel"
+    return "pelo", "peluche"
+
+def labubu_extras(vx, dj, sentado):
+    for i0 in (-6, 3):
+        vx.box("orejas", "peluche", i0, i0 + 2, 22 + dj, 28 + dj, -1, 0)
+        vx.box("orejas_dentro", "rosa_labubu", i0 + 1, i0 + 1, 23 + dj, 27 + dj, -2, -2)
+    t = 4 if sentado else 10
+    vx.box("torso_panza", "piel", -2, 1, t, t + 3, -3, -3)
+
+personaje("labubu",
+          mat("piel", (0.98, 0.90, 0.80)) + mat("peluche", (0.62, 0.42, 0.28)) + mat("rosa_labubu", (1.0, 0.62, 0.70))
+          + mat("labubu_boca", (0.25, 0.08, 0.10)) + mat("steve_blanco", (1.0, 1.0, 1.0)),
+          dict(torso="peluche", manga="peluche", mano="peluche", falda="peluche", muslo="peluche", bota="peluche", suela="rosa_labubu", cuello="peluche"),
+          labubu_pinta, labubu_extras, caras=CARA_LABUBU, forma=lambda i, j, k: True)
+
+
+# --- Tung Tung Tung Sahur: la cabeza es un tronco (con anillos arriba), ojos grandes y su bate. ---
+CARA_TUNG = cara_fija([
+    ("ojos", "steve_blanco", espejo(rects(["####", "####", "####", "####"], 1, 12))),
+    ("pupilas", "ojo", espejo(rects(["##", "##"], 2, 11))),
+    ("cejas", "ojo", espejo(rects(["####"], 1, 14))),
+    ("boca", "ojo", rects(["########"], -4, 4)),
+])
+
+def tung_pinta(i, j, k):
+    if j == HJ1:
+        return ("anillos", "anillos") if (abs(i + 0.5) + abs(k + 0.5)) % 4 < 2 else ("anillos_claro", "madera_clara")
+    if (i * 3 + j * 7 + k * 5) % 11 == 0:
+        return "cabeza_veta", "madera_oscura"
+    return "cabeza", "piel"
+
+def tung_extras(vx, dj, sentado):
+    # El bate, en la mano derecha (+X): parado junto al cuerpo.
+    if sentado:
+        for n in range(12):
+            vx.box("bate", "bate", 6, 6, 4 + n, 4 + n, -2 - n // 3, -2 - n // 3)
+    else:
+        for n in range(14):
+            vx.box("bate", "bate", 5, 5, 7 + n, 7 + n, -2 + n // 5, -2 + n // 5)
+
+personaje("tungtung",
+          mat("piel", (0.72, 0.50, 0.30)) + mat("madera_oscura", (0.48, 0.32, 0.18)) + mat("madera_clara", (0.88, 0.70, 0.45))
+          + mat("anillos", (0.80, 0.60, 0.36)) + mat("bate", (0.85, 0.70, 0.45), 0.3, 24) + mat("steve_blanco", (1.0, 1.0, 1.0)),
+          dict(torso="piel", manga="piel", mano="madera_oscura", falda="madera_oscura", muslo="piel", bota="madera_oscura", suela="madera_oscura", cuello="piel"),
+          tung_pinta, tung_extras, caras=CARA_TUNG, forma=lambda i, j, k: True)
+
+
+# --- Chimpanzini Bananini (premio del nivel 40 del pase): un changuito adentro de una banana
+#     pelada, con los petalos de cascara alrededor. ---
+def bananini_pinta(i, j, k):
+    if k <= HK0 + 1 and j <= 16 and -5 <= i <= 4:
+        return "cabeza", "piel"
+    return "pelo", "mono"
+
+def bananini_extras(vx, dj, sentado):
+    for i0 in (-8, 7):
+        vx.box("orejas", "piel", i0, i0, 14 + dj, 16 + dj, -1, 0)
+    # Los petalos de la cascara: suben desde la cintura alrededor del cuerpo, con la puntita verde.
+    t = 4 if sentado else 10
+    for (i0, k0) in ((-5, -4), (4, -4), (-5, 3), (4, 3), (-1, -5), (0, 4)):
+        alto = 9
+        vx.box("torso_cascara", "banana", i0, i0, t - 2, t + alto, k0, k0)
+        vx.box("torso_cascara_punta", "banana_verde", i0, i0, t + alto + 1, t + alto + 1, k0, k0)
+    vx.box("torso_cascara", "banana", -5, 4, t - 2, t - 1, -4, 3, si=lambda i, j, k: i in (-5, 4) or k in (-4, 3))
+
+personaje("bananini",
+          mat("piel", (0.95, 0.80, 0.62)) + mat("mono", (0.45, 0.28, 0.15)) + mat("banana", (1.0, 0.86, 0.20), 0.3, 24)
+          + mat("banana_verde", (0.45, 0.70, 0.20)),
+          dict(torso="mono", manga="mono", mano="piel", falda="banana", muslo="mono", bota="mono", suela="piel", cuello="mono"),
+          bananini_pinta, bananini_extras, forma=lambda i, j, k: True)
+
+
 # ---------- escribir ----------
 PIERNAS_Y_BRAZOS = {"brazo_der", "brazo_izq", "manga_der", "manga_izq", "manga_der_borde", "manga_izq_borde", "mano_der", "mano_izq",
                     "muslo_der", "muslo_izq", "bota_der", "bota_izq", "bota_der_borde", "bota_izq_borde", "suela_der", "suela_izq"}

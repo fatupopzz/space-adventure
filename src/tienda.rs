@@ -29,7 +29,7 @@ pub struct Skin {
     pub brillante: bool,
 }
 
-pub const SKINS: [Skin; 29] = [
+pub const SKINS: [Skin; 30] = [
     Skin {
         id: "lila",
         nombre: "NPC con licencia",
@@ -416,6 +416,23 @@ pub const SKINS: [Skin; 29] = [
             ("rojo", [0.35, 0.37, 0.40], None),
             ("rojo_oscuro", [0.15, 0.16, 0.18], None),
             ("rosa", [0.85, 0.95, 1.0], Some([0.6, 0.75, 0.9])),
+        ],
+        brillante: true,
+    },
+    // Del pase (Temporada 1): no se vende.
+    Skin {
+        id: "gamer",
+        nombre: "Setup gamer RGB",
+        precio: 260,
+        texto: "Audífonos con micrófono, tiras RGB por todos lados y la nave en negro mate. Da +10 FPS. GLADAS dice que eso no existe. GLADAS no es gamer.",
+        colores: &[
+            ("piel_lila", [0.08, 0.08, 0.10], None),
+            ("pelo_violeta", [0.15, 0.15, 0.18], None),
+            ("rojo", [0.12, 0.12, 0.14], None),
+            ("rojo_oscuro", [0.05, 0.05, 0.06], None),
+            ("rosa", [0.3, 1.0, 0.5], Some([0.2, 0.9, 0.4])),
+            ("llama", [0.6, 0.3, 1.0], Some([0.55, 0.25, 1.0])),
+            ("tobera_luz", [0.6, 0.3, 1.0], Some([0.55, 0.25, 1.0])),
         ],
         brillante: true,
     },
@@ -912,7 +929,7 @@ mod pruebas {
             t.actualizar(&Entrada { abajo: true, ..Default::default() }, &mut p, 0.1);
         }
         vistos.sort();
-        assert_eq!(vistos, ["koch", "rocky", "vegetta", "willyrex"]);
+        assert_eq!(vistos, ["capibara", "chillguy", "koch", "labubu", "moodeng", "pedro", "rocky", "tungtung", "vegetta", "willyrex"]);
     }
 
     #[test]

@@ -204,7 +204,13 @@ impl Casillero {
             if puesto {
                 ui::texto(d, "PUESTO", x as i32 + 6, y as i32 + 4, tam * 3 / 4, Color::new(120, 235, 160, a));
             } else if !tiene {
-                let s = if crate::personajes::por_logro(f.id).is_some() { "SECRETO".to_string() } else { format!("Nv. {}", Progreso::nivel_del_personaje(f.id)) };
+                let s = if crate::personajes::por_logro(f.id).is_some() {
+                    "SECRETO".to_string()
+                } else if let (0, Some(precio)) = (Progreso::nivel_del_personaje(f.id), crate::personajes::precio(f.id)) {
+                    format!("Tienda · {precio}")
+                } else {
+                    format!("Nv. {}", Progreso::nivel_del_personaje(f.id))
+                };
                 ui::texto(d, &s, x as i32 + 6, y as i32 + 4, tam * 3 / 4, Color::new(230, 140, 160, a));
             }
         }
@@ -255,7 +261,7 @@ impl Pase {
             Premio::Personaje(id) => Muestra::Personaje(crate::personajes::indice(id)),
             Premio::Skin(id) => Muestra::Nave { skin: indice_skin(id), estela: None },
             Premio::Estela(id) => Muestra::Nave { skin: indice_skin(&p.skin), estela: Some(ESTELAS.iter().find(|e| e.0 == id).map_or("", |e| e.0)) },
-            Premio::Notas(_) => Muestra::Nave { skin: indice_skin(&p.skin), estela: None },
+            Premio::Notas(_) | Premio::Titulo(_) => Muestra::Nave { skin: indice_skin(&p.skin), estela: None },
         }
     }
 
@@ -286,16 +292,25 @@ impl Pase {
                 Premio::Personaje(id) => p.tiene_personaje(id),
                 Premio::Skin(id) => p.tiene_skin(id),
                 Premio::Estela(id) => p.estelas.contains(id),
-                Premio::Notas(_) => self.cursor < p.pase_cobrado as usize,
+                Premio::Notas(_) | Premio::Titulo(_) => self.cursor < p.pase_cobrado as usize,
             };
             if disponible {
                 match premio {
                     Premio::Personaje(id) => { p.personaje = id.to_string(); p.guardar(); }
                     Premio::Skin(id) => { p.skin_escogida(id); }
                     Premio::Estela(id) if p.estela.as_deref() != Some(id) => { p.estela_escogida(id); }
+                    // Los titulos: se ponen y, si ya se lleva puesto, se quita.
+                    Premio::Titulo(id) => {
+                        p.titulo = if p.titulo.as_deref() == Some(id) { None } else { Some(id.to_string()) };
+                        p.guardar();
+                    }
                     _ => {}
                 }
-                self.aviso = Some(if matches!(premio, Premio::Notas(_)) { "Estas notas ya se entregaron.".into() } else { format!("Equipado: {}", nombre_del_premio(premio)) });
+                self.aviso = Some(match premio {
+                    Premio::Notas(_) => "Estas notas ya se entregaron.".into(),
+                    Premio::Titulo(_) if p.titulo.is_none() => "Título quitado.".into(),
+                    _ => format!("Equipado: {}", nombre_del_premio(premio)),
+                });
                 self.eventos.push(Efecto::Acierto);
             } else {
                 self.aviso = Some(format!("Se desbloquea en el nivel {} del pase.", self.cursor + 1));
@@ -328,7 +343,12 @@ impl Pase {
         let barra = if nivel as usize >= PASE.len() { "¡Pase completo!".to_string() } else { format!("{xp} / {siguiente} XP para el nivel {}", nivel + 1) };
         ui::texto(d, &barra, x0 as i32, (yb + alto_b + 8.0) as i32, tb, ui::TEXTO);
         let como = "XP: 5 por nota, 40 por logro, 120 por sello, 60 por encargo y 80 por cometa.";
-        ui::parrafo(d, como, x0 as i32, (yb + alto_b + 8.0) as i32 + tb + 10, tb * 4 / 5, ancho_izq as i32, ui::TENUE);
+        let y_como = (yb + alto_b + 8.0) as i32 + tb + 10;
+        ui::parrafo(d, como, x0 as i32, y_como, tb * 4 / 5, ancho_izq as i32, ui::TENUE);
+        // La temporada y su gran premio.
+        let y_temporada = y_como + tb * 2 + 18;
+        ui::texto(d, crate::progreso::NOMBRE_TEMPORADA, x0 as i32, y_temporada, tb, ROSA);
+        ui::texto(d, "Gran premio en el nivel 40: Chimpanzini Bananini, el piloto que no se vende.", x0 as i32, y_temporada + tb + 6, tb * 4 / 5, Color::new(255, 220, 140, 255));
 
         // La vitrina del premio escogido, a la derecha.
         let premio = PASE[self.cursor];
@@ -337,6 +357,7 @@ impl Pase {
             Premio::Skin(id) => ("SKIN DE NAVE", crate::tienda::SKINS[indice_skin(id)].texto.to_string()),
             Premio::Estela(id) => ("ESTELA", crate::tienda::texto_estela(id).to_string()),
             Premio::Notas(n) => ("NOTAS", format!("{n} notas. Fondo de emergencia para caprichos: la tienda acepta música, el casero todavía no.")),
+            Premio::Titulo(id) => ("TÍTULO", format!("{} Sale en el HUD, debajo de donde anda.", crate::progreso::TITULOS.iter().find(|t| t.0 == id).map_or("", |t| t.2))),
         };
         let xv = x0 + ancho_izq + w * 0.04;
         let wv = w - xv - w * 0.04;
@@ -364,6 +385,7 @@ impl Pase {
                 Premio::Skin(_) => Color::new(40, 110, 190, a),
                 Premio::Estela(_) => Color::new(200, 80, 150, a),
                 Premio::Notas(_) => Color::new(170, 130, 40, a),
+                Premio::Titulo(_) => Color::new(30, 150, 140, a),
             };
             let fondo = if obtenido { color } else { Color::new(color.r / 3, color.g / 3, color.b / 3 + 20, a) };
             d.draw_rectangle_gradient_v(x as i32, y as i32, ancho_c as i32, alto_c as i32, fondo, Color::new(10, 8, 30, a));
@@ -392,6 +414,14 @@ impl Pase {
                     }
                 }
                 Premio::Notas(_) => icono_de_notas(d, xi + lado / 2.0, yi + lado / 2.0, lado, if obtenido { a } else { (a as f32 * 0.7) as u8 }),
+                Premio::Titulo(_) => {
+                    // Una placa con comillas latinas.
+                    let (cx, cy) = (xi + lado / 2.0, yi + lado / 2.0);
+                    d.draw_rectangle_rounded(Rectangle::new(cx - lado * 0.42, cy - lado * 0.2, lado * 0.84, lado * 0.4), 0.4, 8, Color::new(20, 60, 70, a));
+                    d.draw_rectangle_rounded_lines(Rectangle::new(cx - lado * 0.42, cy - lado * 0.2, lado * 0.84, lado * 0.4), 0.4, 8, Color::new(140, 255, 235, a));
+                    let tam = (lado * 0.28) as i32;
+                    ui::titulo_de(d, "«»", (cx - ui::medir_titulo("«»", tam) as f32 / 2.0) as i32, (cy - tam as f32 / 2.0) as i32, tam, Color::new(200, 255, 245, a));
+                }
             }
             // El numero del nivel, en una esquina, encima de la imagen.
             d.draw_rectangle(x as i32, y as i32, tc * 2 + 6, tc + 10, Color::new(10, 8, 30, a / 2 + 60));
@@ -401,6 +431,7 @@ impl Pase {
                 Premio::Skin(_) => "skin",
                 Premio::Estela(_) => "estela",
                 Premio::Notas(_) => "notas",
+                Premio::Titulo(_) => "título",
             };
             let y_texto = y + alto_c * 0.60;
             ui::texto(d, tipo, x as i32 + 8, y_texto as i32, tc * 3 / 4, Color::new(220, 210, 255, a));
@@ -551,6 +582,7 @@ mod pruebas_pase {
                 Premio::Skin(id) => assert_eq!(&p.skin, id),
                 Premio::Estela(id) => assert_eq!(p.estela.as_deref(), Some(*id)),
                 Premio::Personaje(id) => assert_eq!(&p.personaje, id),
+                Premio::Titulo(id) => assert_eq!(p.titulo.as_deref(), Some(*id)),
                 Premio::Notas(_) => {}
             }
             assert_eq!(p.notas, notas);
