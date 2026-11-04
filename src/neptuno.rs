@@ -6,11 +6,16 @@
 //! Neptuno es el anfitrion: flota gigante detras de la mesa, comenta todo y
 //! controla el viento.
 //!
-//! Reglas: color con color o simbolo con simbolo; los comodines van sobre
-//! lo que sea. Salta, Reversa, +2, Comodin y +4 como en el clasico. Al
-//! quedarse con una carta hay que gritar "¡NEPTUNO!" o se roban dos. Y lo de
-//! Neptuno: cada tantas jugadas sopla una rafaga de 2,000 km/h que le vuela
-//! una carta a alguien y se la lleva al siguiente.
+//! Reglas: las del UNO de mesa. Color con color o simbolo con simbolo; el Comodin va sobre lo
+//! que sea. El +4 solo es legal sin cartas del color que manda: el siguiente puede aceptarlo
+//! (roba 4 y pierde el turno) o RETARLO (si era ilegal, el que lo tiro roba 4; si era legal, el
+//! que reto roba 6 y pierde el turno). La carta que se voltea al repartir tambien cuenta. Si un
+//! jugador se queda sin cartas con un +2 o un +4, el siguiente igual roba. Al quedarse con una
+//! hay que gritar "¡NEPTUNO!" o se roban dos.
+//!
+//! Dos cosas de la casa: sin jugada se roba HASTA que salga una que se pueda jugar (el usuario lo
+//! pidio asi; el reglamento de Mattel dice robar una sola), y las rafagas de 2,000 km/h ya solo
+//! sacuden la mesa: no le quitan cartas a nadie.
 //!
 //! Y a veces llegan visitas que interrumpen la partida: Canela (de Animal
 //! Crossing) llega corriendo a decirle al Doom Slayer que Tom Nook lo busca
@@ -158,6 +163,8 @@ const ESCALA_EN_JUEGO: f32 = 1.3;
 const MAZO: Vec3 = Vec3::new(-0.45, ALTO_MESA + 0.01, 0.05);
 /// Segundos que piensa cada bot antes de jugar.
 const PIENSA: f32 = 1.1;
+/// Segundos entre carta y carta al robar varias.
+const ROBO_PASO: f32 = 0.2;
 /// Segundos para gritar ¡NEPTUNO! despues de quedarse con una.
 const PARA_GRITAR: f32 = 1.8;
 
@@ -248,6 +255,15 @@ struct Vuelo {
     a_la_pila: bool,
 }
 
+/// Un +4 recien jugado: quien lo tiro, a quien le toca y si era ilegal (tenia del color).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+struct Reto {
+    de: usize,
+    a: usize,
+    ilegal: bool,
+    color_anterior: Tinte,
+}
+
 pub struct Neptuno {
     fase: Fase,
     t: f32,
@@ -262,8 +278,19 @@ pub struct Neptuno {
     /// Segundos en el turno actual.
     t_turno: f32,
     cursor: usize,
-    /// Si Miku ya robo en este turno.
-    robo: bool,
+    /// La carta que Miku robo en este turno (despues de robar, solo esa se puede jugar).
+    robo: Option<Carta>,
+    /// Miku no tiene jugada: va robando sola hasta que salga una.
+    robando: bool,
+    /// Un +4 esperando respuesta de Miku (aceptar o retar), y lo que tiene escogido.
+    reto: Option<Reto>,
+    cursor_reto: usize,
+    /// El Comodin que se volteo al repartir: el primero en jugar escoge el color.
+    color_libre: bool,
+    /// El letrero grande de la jugada (+4, SALTA, etc.): texto, color y segundos que lleva.
+    anuncio: Option<(String, Color, f32)>,
+    /// Apagarlo en pruebas: los bots nunca retan.
+    pub bots_retan: bool,
     /// La carta comodin que Miku esta por jugar, mientras elige el color.
     eligiendo: Option<usize>,
     cursor_color: usize,
@@ -320,7 +347,13 @@ impl Neptuno {
             sentido: 1,
             t_turno: 0.0,
             cursor: 0,
-            robo: false,
+            robo: None,
+            robando: false,
+            reto: None,
+            cursor_reto: 0,
+            color_libre: false,
+            anuncio: None,
+            bots_retan: true,
             eligiendo: None,
             cursor_color: 0,
             grito: false,
@@ -365,7 +398,8 @@ impl Neptuno {
         }
     }
 
-    /// Baraja todo y da siete a cada uno. La primera carta de la pila es un numero.
+    /// Baraja todo y da siete a cada uno. La primera carta de la pila vale como en el juego de
+    /// mesa: un +4 regresa al mazo; las demas hacen efecto sobre el primero en jugar.
     fn repartir(&mut self) {
         let mut mazo = mazo_completo();
         self.barajar(&mut mazo);
@@ -377,7 +411,7 @@ impl Neptuno {
                 self.manos[j].push(c);
             }
         }
-        while !matches!(self.mazo.last().map(|c| c.valor), Some(Valor::Numero(_))) {
+        while self.mazo.last().map(|c| c.valor) == Some(Valor::Mas4) {
             let c = self.mazo.pop().unwrap();
             self.mazo.insert(0, c);
         }
@@ -388,7 +422,11 @@ impl Neptuno {
         self.sentido = 1;
         self.t_turno = 0.0;
         self.cursor = 0;
-        self.robo = false;
+        self.robo = None;
+        self.robando = false;
+        self.reto = None;
+        self.color_libre = false;
+        self.anuncio = None;
         self.eligiendo = None;
         self.grito = false;
         self.pendiente = None;
@@ -406,6 +444,34 @@ impl Neptuno {
         self.proxima_visita = 12 + (self.azar() * 10.0) as u32;
         self.visita_de_la_partida = self.escoger_visita();
         self.ordenar_mano();
+        self.carta_inicial(primera);
+    }
+
+    /// Lo que hace la carta que se volteo. Reparte Cloud, asi que Miku juega primero y, con una
+    /// Reversa, empieza el que reparte.
+    fn carta_inicial(&mut self, primera: Carta) {
+        match primera.valor {
+            Valor::Salta => {
+                self.turno = self.siguiente(MIKU, 0);
+                self.anunciar("SALTA A MIKU", Color::new(255, 220, 120, 255));
+            }
+            Valor::Reversa => {
+                self.sentido = -1;
+                self.turno = CLOUD;
+                self.anunciar("EMPIEZA CLOUD", Color::new(255, 220, 120, 255));
+            }
+            Valor::Mas2 => {
+                self.robar(MIKU, 2);
+                self.turno = self.siguiente(MIKU, 0);
+                self.anunciar("+2 PARA MIKU", Color::new(255, 110, 130, 255));
+            }
+            Valor::Comodin => self.color_libre = true,
+            _ => {}
+        }
+    }
+
+    fn anunciar(&mut self, texto: impl Into<String>, color: Color) {
+        self.anuncio = Some((texto.into(), color, 0.0));
     }
 
     /// La mano de Miku ordenada por color y numero, para que sea facil de leer.
@@ -445,7 +511,7 @@ impl Neptuno {
     }
 
     fn robar(&mut self, j: usize, n: usize) {
-        for _ in 0..n {
+        for k in 0..n {
             if self.mazo.is_empty() {
                 // Se rebaraja la pila (menos la de arriba).
                 let arriba = self.pila.pop().unwrap();
@@ -457,7 +523,8 @@ impl Neptuno {
             if let Some(c) = self.mazo.pop() {
                 self.manos[j].push(c);
                 let hasta = self.lugar_mano(j);
-                self.vuelos.push(Vuelo { carta: None, desde: MAZO, hasta, t: 0.0, dura: 0.35, vueltas: 0.0, a_la_pila: false });
+                // Una por una, para que se vean y se puedan contar (cada una suena al salir).
+                self.vuelos.push(Vuelo { carta: None, desde: MAZO, hasta, t: -(k as f32) * ROBO_PASO, dura: 0.35, vueltas: 0.0, a_la_pila: false });
             }
         }
         self.eventos.push(Efecto::Carta);
@@ -469,7 +536,8 @@ impl Neptuno {
     fn pasar_turno(&mut self, saltar: usize) {
         self.turno = self.siguiente(self.turno, saltar);
         self.t_turno = 0.0;
-        self.robo = false;
+        self.robo = None;
+        self.robando = false;
         if self.turno == MIKU {
             self.grito = false;
         }
@@ -478,6 +546,9 @@ impl Neptuno {
     /// El jugador `j` juega la carta `i` de su mano (con el color elegido, si es comodin).
     fn jugar(&mut self, j: usize, i: usize, color: Option<Tinte>) {
         let c = self.manos[j].remove(i);
+        let color_anterior = self.color;
+        // El +4 es ilegal si en la mano queda alguna carta del color que mandaba.
+        let ilegal = self.manos[j].iter().any(|k| k.tinte == Some(color_anterior));
         let desde = self.lugar_mano(j);
         self.pila.push(c);
         self.ultimo = Some(j);
@@ -488,6 +559,13 @@ impl Neptuno {
             self.cursor = self.cursor.min(self.manos[MIKU].len().saturating_sub(1));
         }
         if self.manos[j].is_empty() {
+            // Se acabo la partida, pero el +2 o +4 de la ultima carta igual se roba.
+            let victima = self.siguiente(j, 0);
+            match c.valor {
+                Valor::Mas2 => self.robar(victima, 2),
+                Valor::Mas4 => self.robar(victima, 4),
+                _ => {}
+            }
             self.terminar(j);
             return;
         }
@@ -499,23 +577,40 @@ impl Neptuno {
         match c.valor {
             Valor::Salta => {
                 saltar = 1;
+                self.anunciar(format!("¡SALTA A {}!", self.nombre(victima)), Color::new(255, 220, 120, 255));
                 if victima == MIKU {
                     self.decir(NEPTUNO, "Salta. Usted descanse, Miku. Se ve cansada de tanto ganar. Bueno, de tanto jugar.", Voz::Neptuno);
                 }
             }
             Valor::Reversa => {
                 self.sentido = -self.sentido;
+                self.anunciar("¡REVERSA!", Color::new(120, 230, 255, 255));
                 if j == CHIEF {
                     self.decir("MASTER CHIEF", "Reversa. Cambiando el flanco. Mi IA lo recomendó.", Voz::Radio);
                 } else {
                     self.decir(NEPTUNO, "¡Reversa! Ahora giramos al revés. Como mi luna Tritón. Que no está invitada.", Voz::Neptuno);
                 }
             }
-            Valor::Mas2 | Valor::Mas4 => {
-                let n = if c.valor == Valor::Mas2 { 2 } else { 4 };
-                self.robar(victima, n);
+            Valor::Mas2 => {
+                self.robar(victima, 2);
                 saltar = 1;
-                self.comentar_ataque(j, victima, n);
+                self.comentar_ataque(j, victima, 2);
+                self.anunciar(format!("+2 PARA {}", self.nombre(victima)), Color::new(255, 110, 130, 255));
+            }
+            Valor::Mas4 => {
+                // No se roba todavia: primero se puede retar.
+                let reto = Reto { de: j, a: victima, ilegal, color_anterior };
+                self.anunciar("+4", Color::new(255, 110, 130, 255));
+                self.jugadas += 1;
+                if victima == MIKU && !self.miku_automatica {
+                    self.reto = Some(reto);
+                    self.cursor_reto = 0;
+                    self.decir(NEPTUNO, format!("¡+4 de {}! Pide {}. Puede aceptarlo o retarlo, Miku.", nombre_corto(j), self.color.nombre()), Voz::Neptuno);
+                } else {
+                    let retar = self.bots_retan && self.bot_reta(victima);
+                    self.resolver_reto(reto, retar);
+                }
+                return;
             }
             _ => {}
         }
@@ -527,12 +622,59 @@ impl Neptuno {
             }
         }
         self.jugadas += 1;
+        self.tras_la_jugada();
+        // El que roba no juega hasta que le lleguen todas.
+        let robadas = if c.valor == Valor::Mas2 { 2 } else { 0 };
+        self.pasar_turno(saltar);
+        self.t_turno = -(robadas as f32) * ROBO_PASO;
+    }
+
+    fn tras_la_jugada(&mut self) {
         self.quizas_visita();
         if self.jugadas >= self.proxima_rafaga {
             self.rafaga();
             self.proxima_rafaga = self.jugadas + 6 + (self.azar() * 4.0) as u32;
         }
-        self.pasar_turno(saltar);
+    }
+
+    /// Si un bot reta el +4 que le tiraron (Canela no, porque le da pena; el Slayer, seguido).
+    fn bot_reta(&mut self, j: usize) -> bool {
+        let ganas = match j {
+            _ if self.es_canela(j) => 0.0,
+            SLAYER => 0.4,
+            CHIEF => 0.2,
+            _ => 0.25,
+        };
+        self.azar() < ganas
+    }
+
+    /// El final del +4: se acepta, o se reta y alguien paga.
+    fn resolver_reto(&mut self, r: Reto, retar: bool) {
+        self.reto = None;
+        self.turno = r.de;
+        let robadas = if !retar {
+            self.robar(r.a, 4);
+            self.comentar_ataque(r.de, r.a, 4);
+            self.anunciar(format!("+4 PARA {}", self.nombre(r.a)), Color::new(255, 110, 130, 255));
+            self.pasar_turno(1);
+            4
+        } else if r.ilegal {
+            self.robar(r.de, 4);
+            self.eventos.push(Efecto::Perfecto);
+            self.decir(NEPTUNO, format!("¡RETO GANADO! {} tenía {} en la mano. Roba 4 por tramposo.", nombre_corto(r.de), r.color_anterior.nombre()), Voz::Neptuno);
+            self.anunciar(format!("¡{} ROBA 4!", self.nombre(r.de)), Color::new(120, 235, 160, 255));
+            self.pasar_turno(0);
+            4
+        } else {
+            self.robar(r.a, 6);
+            self.eventos.push(Efecto::Fallo);
+            self.decir(NEPTUNO, format!("Reto perdido: {} no tenía {}. {} se lleva seis.", nombre_corto(r.de), r.color_anterior.nombre(), nombre_corto(r.a)), Voz::Neptuno);
+            self.anunciar(format!("+6 PARA {}", self.nombre(r.a)), Color::new(255, 110, 130, 255));
+            self.pasar_turno(1);
+            6
+        };
+        self.t_turno = -(robadas as f32) * ROBO_PASO;
+        self.tras_la_jugada();
     }
 
     fn comentar_ataque(&mut self, j: usize, victima: usize, n: usize) {
@@ -577,23 +719,16 @@ impl Neptuno {
         self.decir(self.nombre(j), que, voz);
     }
 
-    /// La rafaga: una carta vuela de la mano de alguien a la del siguiente.
+    /// La rafaga: sacude la mesa y unas cartas dan la vuelta sobre el mazo, pero nadie pierde
+    /// ninguna (si no, un +4 parecia dar tres).
     fn rafaga(&mut self) {
-        let candidatos: Vec<usize> = (0..JUGADORES).filter(|&j| self.manos[j].len() >= 2).collect();
-        if candidatos.is_empty() {
-            return;
+        for k in 0..5 {
+            let hasta = MAZO + Vec3::new(0.3 * k as f32 - 0.6, 0.5, 0.2);
+            self.vuelos.push(Vuelo { carta: None, desde: MAZO, hasta, t: -(k as f32) * 0.08, dura: 0.9, vueltas: 4.0, a_la_pila: false });
         }
-        let de = candidatos[((self.azar() * candidatos.len() as f32) as usize).min(candidatos.len() - 1)];
-        let a = self.siguiente(de, 0);
-        let i = ((self.azar() * self.manos[de].len() as f32) as usize).min(self.manos[de].len() - 1);
-        let c = self.manos[de].remove(i);
-        self.manos[a].push(c);
-        let (desde, hasta) = (self.lugar_mano(de), self.lugar_mano(a));
-        self.vuelos.push(Vuelo { carta: None, desde, hasta, t: 0.0, dura: 0.9, vueltas: 4.0, a_la_pila: false });
-        self.ordenar_mano();
         self.desde_rafaga = 0.0;
         self.eventos.push(Efecto::Salto);
-        self.decir(NEPTUNO, format!("¡RÁFAGA DE 2,000 KM/H! Una carta de {} voló hasta {}. Yo no fui. Bueno, sí fui.", nombre_corto(de), nombre_corto(a)), Voz::Neptuno);
+        self.decir(NEPTUNO, "¡RÁFAGA DE 2,000 KM/H! Agarren sus cartas. Yo no fui. Bueno, sí fui.", Voz::Neptuno);
     }
 
     fn terminar(&mut self, j: usize) {
@@ -615,19 +750,29 @@ impl Neptuno {
 
     /// Un bot (o Miku en automatico) decide que jugar.
     fn decidir(&mut self, j: usize) {
-        let (arriba, color) = (self.arriba(), self.color);
-        let jugables: Vec<usize> = (0..self.manos[j].len()).filter(|&i| se_puede(self.manos[j][i], arriba, color)).collect();
+        let arriba = self.arriba();
+        if self.color_libre {
+            self.color_libre = false;
+            self.color = self.color_favorito(j);
+            self.decir(NEPTUNO, format!("Salió un Comodín al repartir. {} pide {}.", nombre_corto(j), self.color.nombre()), Voz::Neptuno);
+        }
+        let color = self.color;
+        let tiene_color = self.manos[j].iter().any(|k| k.tinte == Some(color));
+        // El +4 con cartas del color es trampa: el Chief nunca, Canela tampoco; los otros, a veces.
+        let farolea = tiene_color && !self.es_canela(j) && j != CHIEF && self.azar() < 0.12;
+        let jugables: Vec<usize> = (0..self.manos[j].len())
+            .filter(|&i| se_puede(self.manos[j][i], arriba, color))
+            .filter(|&i| self.manos[j][i].valor != Valor::Mas4 || !tiene_color || farolea)
+            .collect();
         if jugables.is_empty() {
+            // Sin jugada: roba una por una hasta que salga algo.
+            let antes = self.manos[j].len();
             self.robar(j, 1);
-            let nueva = self.manos[j].len() - 1;
-            // En la mano de Miku las cartas se reordenan: se busca la que se acaba de robar.
-            let robada = if j == MIKU { None } else { Some(nueva) };
-            match robada.filter(|&i| se_puede(self.manos[j][i], arriba, color)) {
-                Some(i) => {
-                    let elegido = self.color_favorito(j);
-                    self.jugar(j, i, Some(elegido));
-                }
-                None => self.pasar_turno(0),
+            if self.manos[j].len() == antes {
+                // No queda ni una carta en el mazo ni en la pila: se pasa.
+                self.pasar_turno(0);
+            } else {
+                self.t_turno = PIENSA - 0.32;
             }
             return;
         }
@@ -678,10 +823,27 @@ impl Neptuno {
         self.desde_grito += dt;
         self.desde_rafaga += dt;
         self.desde_visita += dt;
+        let mut salieron = 0;
         for v in &mut self.vuelos {
+            if v.t < 0.0 && v.t + dt >= 0.0 {
+                salieron += 1;
+            }
             v.t += dt;
         }
+        for _ in 0..salieron.min(1) {
+            self.eventos.push(Efecto::Carta);
+        }
         self.vuelos.retain(|v| v.t < v.dura);
+        if let Some(a) = &mut self.anuncio {
+            a.2 += dt;
+            if a.2 > 1.5 {
+                self.anuncio = None;
+            }
+        }
+        // Si ya no le queda una sola (le tiraron un +2), ya no hay nada que gritar.
+        if self.manos[MIKU].len() != 1 {
+            self.pendiente = None;
+        }
         if e.aterrizar {
             return AccionNeptuno::Despegar;
         }
@@ -696,6 +858,14 @@ impl Neptuno {
                         self.fase = Fase::Juego;
                         self.t_turno = 0.0;
                         self.decir("MIKU", "¡Yo voy a ganar! Tengo 39 razones. Mi-ku, tres-nueve. ¿Entienden? ...¿No?", Voz::Miku);
+                        // Lo que hizo la carta volteada se dijo durante la intro: se repite ahora.
+                        match self.arriba().valor {
+                            Valor::Salta => self.anunciar("SALTA A MIKU", Color::new(255, 220, 120, 255)),
+                            Valor::Reversa => self.anunciar("EMPIEZA CLOUD", Color::new(255, 220, 120, 255)),
+                            Valor::Mas2 => self.anunciar("+2 PARA MIKU", Color::new(255, 110, 130, 255)),
+                            Valor::Comodin => self.anunciar("COMODÍN: ESCOJA COLOR", Color::new(190, 140, 255, 255)),
+                            _ => {}
+                        }
                     }
                 }
             }
@@ -717,7 +887,9 @@ impl Neptuno {
                         self.decir(NEPTUNO, "¡No gritó NEPTUNO! Dos cartas. Las reglas son las reglas. Las inventé yo hace cinco minutos.", Voz::Neptuno);
                     }
                 }
-                if self.turno == MIKU && !self.miku_automatica {
+                if let Some(r) = self.reto {
+                    self.responder_reto(r, e);
+                } else if self.turno == MIKU && !self.miku_automatica {
                     self.turno_miku(e);
                 } else if self.t_turno > PIENSA {
                     let j = self.turno;
@@ -735,8 +907,43 @@ impl Neptuno {
         AccionNeptuno::Nada
     }
 
+    /// Le tiraron un +4 a Miku: aceptar (roba 4) o retar.
+    fn responder_reto(&mut self, r: Reto, e: &Entrada) {
+        if e.izquierda || e.derecha {
+            self.cursor_reto = 1 - self.cursor_reto;
+            self.eventos.push(Efecto::Carta);
+        }
+        if e.aceptar && self.t_turno > 0.3 {
+            self.resolver_reto(r, self.cursor_reto == 1);
+        }
+    }
+
     fn turno_miku(&mut self, e: &Entrada) {
         let n = self.manos[MIKU].len();
+        // El Comodin que se volteo al repartir: Miku escoge el color antes de jugar.
+        if self.color_libre {
+            if e.izquierda {
+                self.cursor_color = (self.cursor_color + 3) % 4;
+            }
+            if e.derecha {
+                self.cursor_color = (self.cursor_color + 1) % 4;
+            }
+            let elegido = e.respuesta.filter(|&r| r < 4).or(if e.aceptar { Some(self.cursor_color) } else { None });
+            if let Some(k) = elegido {
+                self.color = TINTES[k];
+                self.color_libre = false;
+                self.t_turno = 0.0;
+            }
+            return;
+        }
+        // Robando sola hasta que salga algo: una carta cada tantito.
+        if self.robando {
+            if self.t_turno > 0.32 {
+                self.t_turno = 0.0;
+                self.robar_una_miku();
+            }
+            return;
+        }
         if let Some(i) = self.eligiendo {
             if e.izquierda {
                 self.cursor_color = (self.cursor_color + 3) % 4;
@@ -768,7 +975,10 @@ impl Neptuno {
         }
         if e.aceptar && self.t_turno > 0.2 && n > 0 {
             let c = self.manos[MIKU][self.cursor];
-            if se_puede(c, self.arriba(), self.color) {
+            if self.robo.is_some_and(|r| r != c) {
+                self.eventos.push(Efecto::Fallo);
+                self.decir(NEPTUNO, "Después de robar solo se puede jugar la que robó. O pasar, abajo.", Voz::Neptuno);
+            } else if se_puede(c, self.arriba(), self.color) {
                 if c.comodin() {
                     self.eligiendo = Some(self.cursor);
                     self.cursor_color = 0;
@@ -781,20 +991,49 @@ impl Neptuno {
             }
         }
         if e.abajo && self.t_turno > 0.2 {
-            if self.robo {
+            if self.robo.is_some() {
                 self.pasar_turno(0);
+            } else if self.manos[MIKU].iter().any(|&c| se_puede(c, self.arriba(), self.color)) {
+                // Tiene jugada y quiere robar igual: es valido, pero roba una sola.
+                self.robar_una_miku();
             } else {
-                self.robo = true;
-                let antes = self.manos[MIKU].clone();
-                self.robar(MIKU, 1);
-                // Pone el cursor en la que robo (la mano se reordena).
-                let nueva = self.manos[MIKU].iter().enumerate().position(|(k, c)| antes.get(k) != Some(c)).unwrap_or(0);
-                self.cursor = nueva;
-                if !se_puede(self.manos[MIKU][nueva], self.arriba(), self.color) {
-                    self.pasar_turno(0);
-                }
+                self.robando = true;
+                self.t_turno = 0.0;
+                self.robar_una_miku();
             }
         }
+    }
+
+    /// Miku roba una y el cursor se va a esa. Si se puede jugar, deja de robar y escoge.
+    fn robar_una_miku(&mut self) {
+        let antes = self.manos[MIKU].clone();
+        self.robar(MIKU, 1);
+        if self.manos[MIKU].len() == antes.len() {
+            // No queda de donde robar.
+            self.pasar_turno(0);
+            return;
+        }
+        let nueva = self.manos[MIKU].iter().enumerate().position(|(k, c)| antes.get(k) != Some(c)).unwrap_or(0);
+        self.cursor = nueva;
+        let c = self.manos[MIKU][nueva];
+        if se_puede(c, self.arriba(), self.color) {
+            self.robando = false;
+            self.robo = Some(c);
+            self.t_turno = 0.0;
+        } else if !self.robando {
+            // Tenia jugada, robo una que no sirve: se le acaba el turno.
+            self.pasar_turno(0);
+        }
+    }
+
+    /// Para las capturas: `neptuno_reto` deja a Miku respondiendo un +4 de Cloud.
+    pub fn preparar_reto(&mut self) {
+        self.fase = Fase::Juego;
+        self.visita = None;
+        self.turno = CLOUD;
+        self.manos[CLOUD].insert(0, Carta { tinte: None, valor: Valor::Mas4 });
+        self.jugar(CLOUD, 0, Some(Tinte::Azul));
+        self.anuncio = None;
     }
 
     /// Si en esta partida ya vinieron Canela y Pluton.
@@ -935,13 +1174,13 @@ impl Neptuno {
         for (k, c) in self.manos[MIKU].iter().enumerate() {
             let u = k as f32 - (n as f32 - 1.0) * 0.5;
             let elegida = su_turno && k == self.cursor;
-            let jugable = su_turno && se_puede(*c, self.arriba(), self.color);
+            let jugable = su_turno && self.robo.is_none_or(|r| r == *c) && se_puede(*c, self.arriba(), self.color);
             let alto = if elegida { 0.13 } else if jugable { 0.04 } else { 0.0 };
             let pos = centro + derecha * (u * paso) + arriba * (alto - (u * paso).powi(2) * 0.12) - (centro - self.camara().0).normalize() * (k as f32 * 0.004);
             v.push((self.de_frente(pos, 0.5, true, -u * paso * 0.25), c.ocultar()));
         }
         // Las que van volando.
-        for w in &self.vuelos {
+        for w in self.vuelos.iter().filter(|w| w.t >= 0.0) {
             let k = w.t / w.dura;
             let s = k * k * (3.0 - 2.0 * k);
             let pos = w.desde.lerp(w.hasta, s) + Vec3::new(0.0, (k * PI).sin() * 0.4, 0.0);
@@ -1135,9 +1374,37 @@ impl Neptuno {
         if self.desde_rafaga < 1.6 {
             centrado(d, "¡RÁFAGA!", alto / 2 - 40, 64, Color::new(200, 235, 255, 255));
         }
+        // El letrero de la jugada: entra grande y se va apagando.
+        if let Some((s, c, t)) = &self.anuncio {
+            let entra = (*t / 0.12).min(1.0);
+            let a = ((1.5 - *t) / 0.4).clamp(0.0, 1.0);
+            let tam = (64.0 + 44.0 * (1.0 - entra)) as i32;
+            let color = Color::new(c.r, c.g, c.b, (a * 255.0) as u8);
+            ui::titulo_de(d, s, (ancho - ui::medir_titulo(s, tam)) / 2, alto / 2 - 150, tam, color);
+        }
+        // El mazo y la mano de Miku, para contar.
+        let cuenta = format!("MAZO {}   ·   TU MANO {}", self.mazo.len(), self.manos[MIKU].len());
+        ui::subtitulo(d, &cuenta, 20, alto / 2 + 92, 16, ui::TENUE);
+        // Le tiraron un +4: aceptar o retar.
+        if let (Some(r), Fase::Juego, None) = (self.reto, self.fase, self.visita) {
+            let (w, h) = (640.min(ancho - 40), 190);
+            let (x, y) = ((ancho - w) / 2, alto / 2 - 110);
+            ui::panel(d, x, y, w, h);
+            let titulo = format!("+4 DE {}", self.nombre(r.de));
+            ui::texto(d, &titulo, x + 24, y + 14, 26, Color::new(255, 130, 150, 255));
+            let opciones = [("ACEPTAR", "Robas 4 y pierdes el turno.".to_string()), ("RETAR", format!("Si tenía {}, roba 4 él. Si no, tú robas 6.", r.color_anterior.nombre()))];
+            for (k, (n, ayuda)) in opciones.iter().enumerate() {
+                let cx = x + 24 + k as i32 * (w - 48) / 2;
+                let cw = (w - 48) / 2 - 10;
+                let fondo = if k == self.cursor_reto { Color::new(190, 90, 255, 255) } else { Color::new(50, 36, 90, 255) };
+                d.draw_rectangle_rounded(Rectangle::new(cx as f32, (y + 54) as f32, cw as f32, 118.0), 0.12, 6, fondo);
+                ui::texto(d, n, cx + 14, y + 64, 24, Color::WHITE);
+                ui::parrafo(d, ayuda, cx + 14, y + 98, 18, cw - 28, ui::TEXTO);
+            }
+        }
         // El turno de Miku: ayuda abajo, y el selector de color si jugo un comodin.
         if self.fase == Fase::Juego && self.turno == MIKU && !self.miku_automatica && self.visita.is_none() {
-            if self.eligiendo.is_some() {
+            if self.eligiendo.is_some() || self.color_libre {
                 let (w, h) = (520, 130);
                 let (x, y) = ((ancho - w) / 2, alto / 2 - 100);
                 ui::panel(d, x, y, w, h);
@@ -1151,8 +1418,9 @@ impl Neptuno {
                     ui::texto(d, &format!("{}", k + 1), cx + 38, y + 66, 26, Color::WHITE);
                 }
             } else {
-                centrado(d, "TU TURNO", alto - 330, 30, Color::new(255, 220, 120, 255));
-                let ayuda = if self.robo {
+                let llamado = if self.robando { "ROBANDO HASTA QUE SALGA ALGO..." } else { "TU TURNO" };
+                centrado(d, llamado, alto - 330, 30, Color::new(255, 220, 120, 255));
+                let ayuda = if self.robo.is_some() {
                     format!("{}: elegir   {aceptar}: jugar   {}: pasar   {gritar}: ¡NEPTUNO!", ui::boton("\u{E00A} \u{E00B}"), ui::boton("abajo"))
                 } else {
                     format!("{}: elegir   {aceptar}: jugar   {}: robar   {gritar}: ¡NEPTUNO!", ui::boton("\u{E00A} \u{E00B}"), ui::boton("abajo"))
@@ -1290,7 +1558,8 @@ mod pruebas {
         assert_eq!(mazo_completo().len(), 108);
         let n = Neptuno::new(7);
         assert_eq!(n.total_cartas(), 108);
-        assert!(n.manos.iter().all(|m| m.len() == 7));
+        assert_eq!(n.manos.iter().map(Vec::len).sum::<usize>() % 2, 0);
+        assert!(n.manos[SLAYER].len() == 7 && n.manos[CHIEF].len() == 7 && n.manos[CLOUD].len() == 7);
     }
 
     #[test]
@@ -1354,11 +1623,28 @@ mod pruebas {
         assert!(regreso, "el Slayer tiene que regresar alguna vez");
     }
 
-    #[test]
-    fn mas4_hace_robar_y_saltar() {
-        let mut n = Neptuno::new(3);
+    fn mesa(semilla: u32) -> Neptuno {
+        let mut n = Neptuno::new(semilla);
         n.fase = Fase::Juego;
-        n.manos[MIKU] = vec![Carta { tinte: None, valor: Valor::Mas4 }, Carta { tinte: Some(Tinte::Rojo), valor: Valor::Numero(1) }, Carta { tinte: Some(Tinte::Rojo), valor: Valor::Numero(2) }];
+        n.bots_retan = false;
+        n.turno = MIKU;
+        n.sentido = 1;
+        n.color_libre = false;
+        n.proxima_rafaga = u32::MAX;
+        n.proxima_visita = u32::MAX;
+        n
+    }
+
+    fn c(t: Tinte, v: Valor) -> Carta {
+        Carta { tinte: Some(t), valor: v }
+    }
+    const MAS4: Carta = Carta { tinte: None, valor: Valor::Mas4 };
+
+    #[test]
+    fn mas4_hace_robar_cuatro_y_saltar() {
+        let mut n = mesa(3);
+        n.color = Tinte::Rojo;
+        n.manos[MIKU] = vec![MAS4, c(Tinte::Azul, Valor::Numero(1)), c(Tinte::Azul, Valor::Numero(2))];
         let antes = n.manos[SLAYER].len();
         n.jugar(MIKU, 0, Some(Tinte::Azul));
         assert_eq!(n.manos[SLAYER].len(), antes + 4);
@@ -1366,12 +1652,128 @@ mod pruebas {
         assert_eq!(n.turno, CHIEF, "el Slayer pierde el turno");
     }
 
+    /// El +4 a Miku espera su respuesta; aceptar da exactamente cuatro y le quita el turno.
+    #[test]
+    fn miku_acepta_el_mas4_y_roba_cuatro() {
+        let mut n = mesa(9);
+        n.color = Tinte::Rojo;
+        n.turno = CLOUD;
+        n.manos[CLOUD] = vec![MAS4, c(Tinte::Azul, Valor::Numero(1)), c(Tinte::Azul, Valor::Numero(2))];
+        let antes = n.manos[MIKU].len();
+        n.jugar(CLOUD, 0, Some(Tinte::Azul));
+        assert!(n.reto.is_some());
+        assert_eq!(n.manos[MIKU].len(), antes, "todavia no roba");
+        n.t_turno = 1.0;
+        n.actualizar(&Entrada { aceptar: true, ..Default::default() }, 0.01);
+        assert_eq!(n.manos[MIKU].len(), antes + 4);
+        assert_eq!(n.turno, SLAYER, "Miku pierde el turno");
+    }
+
+    /// Reto ganado: el +4 era ilegal y roba el que lo tiro. Reto perdido: roba seis el que reto.
+    #[test]
+    fn retar_el_mas4() {
+        for (tenia, cloud_roba, miku_roba, turno) in [(true, 4, 0, MIKU), (false, 0, 6, SLAYER)] {
+            let mut n = mesa(9);
+            n.color = Tinte::Rojo;
+            n.turno = CLOUD;
+            let otra = if tenia { Tinte::Rojo } else { Tinte::Azul };
+            n.manos[CLOUD] = vec![MAS4, c(otra, Valor::Numero(1)), c(otra, Valor::Numero(2))];
+            let (mano_miku, mano_cloud) = (n.manos[MIKU].len(), 2);
+            n.jugar(CLOUD, 0, Some(Tinte::Azul));
+            n.t_turno = 1.0;
+            n.actualizar(&Entrada { derecha: true, ..Default::default() }, 0.01);
+            n.actualizar(&Entrada { aceptar: true, ..Default::default() }, 0.01);
+            assert_eq!(n.manos[CLOUD].len(), mano_cloud + cloud_roba);
+            assert_eq!(n.manos[MIKU].len(), mano_miku + miku_roba);
+            assert_eq!(n.turno, turno);
+        }
+    }
+
+    /// Sin jugada se roba hasta que salga una que se pueda jugar, y entonces se puede jugar.
+    #[test]
+    fn se_roba_hasta_que_salga_algo() {
+        let mut n = mesa(21);
+        n.color = Tinte::Rojo;
+        n.pila = vec![c(Tinte::Rojo, Valor::Numero(5))];
+        n.manos[MIKU] = vec![c(Tinte::Azul, Valor::Numero(1))];
+        n.mazo = vec![c(Tinte::Rojo, Valor::Numero(9)), c(Tinte::Verde, Valor::Numero(2)), c(Tinte::Azul, Valor::Numero(3)), c(Tinte::Verde, Valor::Numero(7))];
+        n.t_turno = 1.0;
+        n.actualizar(&Entrada { abajo: true, ..Default::default() }, 0.01);
+        for _ in 0..200 {
+            n.actualizar(&Entrada::default(), 0.05);
+        }
+        assert_eq!(n.manos[MIKU].len(), 5, "robo las cuatro: hasta el 9 rojo");
+        assert_eq!(n.robo, Some(c(Tinte::Rojo, Valor::Numero(9))));
+        assert_eq!(n.turno, MIKU, "le sigue tocando: puede jugarla");
+        n.t_turno = 1.0;
+        n.actualizar(&Entrada { aceptar: true, ..Default::default() }, 0.01);
+        assert_eq!(n.arriba(), c(Tinte::Rojo, Valor::Numero(9)));
+    }
+
+    /// Los bots tambien roban hasta que salga algo: nunca pasan si queda con que robar.
+    #[test]
+    fn los_bots_roban_hasta_que_salga_algo() {
+        let mut n = mesa(33);
+        n.color = Tinte::Rojo;
+        n.pila = vec![c(Tinte::Rojo, Valor::Numero(5))];
+        n.turno = CHIEF;
+        n.manos[CHIEF] = vec![c(Tinte::Azul, Valor::Numero(1)), c(Tinte::Azul, Valor::Numero(2))];
+        n.mazo = vec![c(Tinte::Rojo, Valor::Numero(9)), c(Tinte::Verde, Valor::Numero(2)), c(Tinte::Azul, Valor::Numero(3))];
+        for _ in 0..100 {
+            n.actualizar(&Entrada::default(), 0.05);
+            if n.turno != CHIEF {
+                break;
+            }
+        }
+        assert_eq!(n.arriba(), c(Tinte::Rojo, Valor::Numero(9)));
+        assert_eq!(n.manos[CHIEF].len(), 4);
+    }
+
+    /// La rafaga ya no le quita cartas a nadie.
+    #[test]
+    fn la_rafaga_no_mueve_cartas() {
+        let mut n = mesa(5);
+        let antes: Vec<usize> = n.manos.iter().map(Vec::len).collect();
+        n.rafaga();
+        assert_eq!(n.manos.iter().map(Vec::len).collect::<Vec<_>>(), antes);
+    }
+
+    /// La carta volteada al repartir hace efecto, y nunca es un +4.
+    #[test]
+    fn la_carta_inicial_cuenta() {
+        let mut vistos = [false; 4];
+        for semilla in 1..400 {
+            let n = Neptuno::new(semilla * 31);
+            let primera = n.arriba();
+            assert_ne!(primera.valor, Valor::Mas4);
+            match primera.valor {
+                Valor::Salta => { assert_eq!(n.turno, SLAYER); vistos[0] = true; }
+                Valor::Reversa => { assert_eq!((n.turno, n.sentido), (CLOUD, -1)); vistos[1] = true; }
+                Valor::Mas2 => { assert_eq!((n.turno, n.manos[MIKU].len()), (SLAYER, 9)); vistos[2] = true; }
+                Valor::Comodin => { assert!(n.color_libre); vistos[3] = true; }
+                _ => assert_eq!(n.turno, MIKU),
+            }
+        }
+        assert_eq!(vistos, [true; 4]);
+    }
+
+    /// La ultima carta, si es +2, igual se la come el siguiente.
+    #[test]
+    fn la_ultima_carta_igual_hace_robar() {
+        let mut n = mesa(4);
+        n.color = Tinte::Rojo;
+        n.manos[MIKU] = vec![c(Tinte::Rojo, Valor::Mas2)];
+        let antes = n.manos[SLAYER].len();
+        n.jugar(MIKU, 0, None);
+        assert_eq!(n.ganador, Some(MIKU));
+        assert_eq!(n.manos[SLAYER].len(), antes + 2);
+    }
+
     #[test]
     fn reversa_cambia_el_sentido() {
-        let mut n = Neptuno::new(5);
-        n.fase = Fase::Juego;
-        let rojo = n.color;
-        n.manos[MIKU] = vec![Carta { tinte: Some(rojo), valor: Valor::Reversa }, Carta { tinte: Some(rojo), valor: Valor::Numero(1) }, Carta { tinte: Some(rojo), valor: Valor::Numero(2) }];
+        let mut n = mesa(5);
+        n.color = Tinte::Rojo;
+        n.manos[MIKU] = vec![c(Tinte::Rojo, Valor::Reversa), c(Tinte::Rojo, Valor::Numero(1)), c(Tinte::Rojo, Valor::Numero(2))];
         n.jugar(MIKU, 0, None);
         assert_eq!(n.sentido, -1);
         assert_eq!(n.turno, CLOUD);
@@ -1379,8 +1781,7 @@ mod pruebas {
 
     #[test]
     fn sin_gritar_se_roban_dos() {
-        let mut n = Neptuno::new(11);
-        n.fase = Fase::Juego;
+        let mut n = mesa(11);
         let c = n.color;
         n.manos[MIKU] = vec![Carta { tinte: Some(c), valor: Valor::Numero(3) }, Carta { tinte: Some(c), valor: Valor::Numero(4) }];
         n.jugar(MIKU, 0, None);
@@ -1390,8 +1791,7 @@ mod pruebas {
         n.actualizar(&Entrada::default(), PARA_GRITAR + 0.1);
         assert!(n.manos[MIKU].len() >= antes + 2, "tenia que robar dos");
         // Y gritando a tiempo no pasa nada.
-        let mut n = Neptuno::new(11);
-        n.fase = Fase::Juego;
+        let mut n = mesa(11);
         n.manos[MIKU] = vec![Carta { tinte: Some(c), valor: Valor::Numero(3) }, Carta { tinte: Some(c), valor: Valor::Numero(4) }];
         n.jugar(MIKU, 0, None);
         n.actualizar(&Entrada { barrel: true, ..Default::default() }, 0.1);

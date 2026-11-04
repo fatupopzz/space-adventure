@@ -276,9 +276,11 @@ planeta. Todos tienen escena (los once planetas, la Luna y el Planeta Vegetta):
   viento): Miku contra el Doom Slayer, el Master Chief y Cloud Strife en
   versión chibi, con Neptuno de anfitrión gigante flotando detrás de la mesa.
   Reglas completas (108 cartas, Salta, Reversa, +2, Comodín, +4), y si te
-  queda una hay que gritar "¡NEPTUNO!" o robas dos. Lo de Neptuno: cada
-  tantas jugadas sopla una ráfaga de 2,000 km/h que le vuela una carta a
-  alguien y se la lleva al siguiente. Y a veces llegan visitas: Canela (de
+  queda una hay que gritar "¡NEPTUNO!" o robas dos. El +4 solo es legal sin
+  cartas del color que manda y se puede retar (como en el juego de mesa), la
+  carta volteada al repartir hace efecto, y sin jugada se roba hasta que salga
+  algo. Lo de Neptuno: cada tantas jugadas sopla una ráfaga de 2,000 km/h que
+  sacude la mesa. Y a veces llegan visitas: Canela (de
   Animal Crossing) entra corriendo a decirle al Doom Slayer que Tom Nook lo
   busca por la hipoteca; el Slayer se va y Canela juega por él (muy amable:
   casi nunca tira +2) hasta que regresa. O Plutón llega rodando a pedir que

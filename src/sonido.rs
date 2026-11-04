@@ -506,19 +506,109 @@ fn efecto(e: Efecto) -> Vec<f32> {
     }
 }
 
+/// Un sonido cargado en raylib y su numero en la mezcla de la grabacion.
+struct Canal<'a> {
+    sonido: Sound<'a>,
+    id: usize,
+}
+
+/// La mezcla de la grabacion (`--grabar`): en vez de sonar por las bocinas, cada sonido se suma
+/// aqui, cuadro por cuadro, al mismo paso fijo que el video. Asi el audio queda clavado con la
+/// imagen aunque cada cuadro tarde lo que tarde en dibujarse. Cada canal es una sola voz, como un
+/// `Sound` de raylib: si se vuelve a tocar mientras suena, empieza de nuevo.
+pub struct Mezcla {
+    muestras: Vec<Vec<f32>>,
+    voces: Vec<VozMezcla>,
+    salida: Vec<f32>,
+    /// Lo mismo sin la musica (los canales desde `primera_pista` son las pistas), para editar el
+    /// video con otra musica encima.
+    efectos: Vec<f32>,
+    primera_pista: usize,
+    /// Los segundos que ya van (la salida se llena hasta aqui).
+    reloj: f64,
+}
+
+#[derive(Clone, Copy)]
+struct VozMezcla {
+    pos: f64,
+    paso: f64,
+    volumen: f32,
+    sonando: bool,
+}
+
+impl Mezcla {
+    fn tocar(&mut self, id: usize, volumen: f32) {
+        let v = &mut self.voces[id];
+        (v.pos, v.volumen, v.sonando) = (0.0, volumen, true);
+    }
+
+    /// Llena la salida hasta `segundos` mas: lo que suena en ese rato.
+    fn avanzar(&mut self, segundos: f32) {
+        self.reloj += segundos as f64;
+        let hasta = (self.reloj * FRECUENCIA as f64) as usize;
+        while self.salida.len() < hasta {
+            let (mut m, mut e) = (0.0, 0.0);
+            for (id, (v, muestras)) in self.voces.iter_mut().zip(&self.muestras).enumerate() {
+                if !v.sonando {
+                    continue;
+                }
+                let k = v.pos as usize;
+                if k + 1 >= muestras.len() {
+                    v.sonando = false;
+                    continue;
+                }
+                let f = (v.pos - k as f64) as f32;
+                let x = (muestras[k] * (1.0 - f) + muestras[k + 1] * f) * v.volumen;
+                m += x;
+                if id < self.primera_pista {
+                    e += x;
+                }
+                v.pos += v.paso;
+            }
+            self.salida.push(m);
+            self.efectos.push(e);
+        }
+    }
+
+    /// El `.wav` de todo lo grabado, con un limitador suave (la musica y los efectos juntos
+    /// pasan de 1 de vez en cuando).
+    pub fn wav(&self) -> Vec<u8> {
+        wav(&limitar(&self.salida))
+    }
+
+    /// El `.wav` de los efectos y las voces, sin la musica.
+    pub fn wav_efectos(&self) -> Vec<u8> {
+        wav(&limitar(&self.efectos))
+    }
+}
+
+/// Un limitador suave: lo que pasa de 0.7 se aplasta hacia 1.
+fn limitar(muestras: &[f32]) -> Vec<f32> {
+    muestras.iter().map(|&m| if m.abs() < 0.7 { m } else { m.signum() * (0.7 + 0.3 * ((m.abs() - 0.7) / 0.3).tanh()) }).collect()
+}
+
 /// Los sonidos ya cargados. Vive mientras viva el dispositivo de audio.
 pub struct Sonidos<'a> {
-    blips: Vec<(Voz, Vec<Sound<'a>>)>,
-    efectos: Vec<Sound<'a>>,
+    blips: Vec<(Voz, Vec<Canal<'a>>)>,
+    efectos: Vec<Canal<'a>>,
     /// Cada pista con su volumen actual (cambia de a poco: fundidos).
-    pistas: Vec<(Pista, Sound<'a>, Cell<f32>)>,
+    pistas: Vec<(Pista, Canal<'a>, Cell<f32>)>,
     vol_musica: Cell<f32>,
     vol_efectos: Cell<f32>,
+    /// Si se esta grabando: ahi va todo, y por las bocinas no suena nada.
+    mezcla: Option<std::cell::RefCell<Mezcla>>,
 }
 
 impl<'a> Sonidos<'a> {
-    pub fn cargar(audio: &'a RaylibAudio) -> Self {
-        let cargar = |muestras: Vec<f32>| audio.new_wave_from_memory(".wav", &wav(&muestras)).ok().and_then(|w| audio.new_sound_from_wave(&w).ok());
+    /// Con `grabando`, nada suena: todo se mezcla para el video (ver `Mezcla`).
+    pub fn cargar(audio: &'a RaylibAudio, grabando: bool) -> Self {
+        let banco = std::cell::RefCell::new(Vec::new());
+        let cargar = |muestras: Vec<f32>| {
+            let sonido = audio.new_wave_from_memory(".wav", &wav(&muestras)).ok().and_then(|w| audio.new_sound_from_wave(&w).ok())?;
+            let mut b = banco.borrow_mut();
+            b.push(if grabando { muestras } else { Vec::new() });
+            Some(Canal { sonido, id: b.len() - 1 })
+        };
         // Ocho alturas por voz, sobre una escala pentatonica: suena a que "habla".
         let escala = [0.0, 2.0, 4.0, 7.0, 9.0, 12.0, 14.0, 16.0];
         // GLADAS brinca menos de nota: casi monotona, como quien habla tranquilo.
@@ -531,11 +621,68 @@ impl<'a> Sonidos<'a> {
             .into_iter()
             .filter_map(|e| cargar(efecto(e)))
             .collect();
+        let primera_pista = banco.borrow().len();
         let pistas = [(Pista::Cancion, cancion::sintetizar()), (Pista::Espacio, cancion::sintetizar_espacio()), (Pista::Fuente, cancion::sintetizar_fuente()), (Pista::Tarot, cancion::sintetizar_tarot()), (Pista::TarotReves, cancion::sintetizar_tarot().into_iter().rev().collect()), (Pista::Juicio, cancion::sintetizar_juicio()), (Pista::Arcade, cancion::sintetizar_arcade()), (Pista::Lofi, cancion::sintetizar_lofi()), (Pista::Marimba, cancion::sintetizar_marimba())]
             .into_iter()
             .filter_map(|(p, muestras)| cargar(muestras).map(|s| (p, s, Cell::new(0.0))))
             .collect();
-        Sonidos { blips, efectos, pistas, vol_musica: Cell::new(1.0), vol_efectos: Cell::new(1.0) }
+        let muestras = banco.into_inner();
+        let mezcla = grabando.then(|| {
+            let voces = vec![VozMezcla { pos: 0.0, paso: 1.0, volumen: 1.0, sonando: false }; muestras.len()];
+            std::cell::RefCell::new(Mezcla { muestras, voces, salida: Vec::new(), efectos: Vec::new(), primera_pista, reloj: 0.0 })
+        });
+        Sonidos { blips, efectos, pistas, vol_musica: Cell::new(1.0), vol_efectos: Cell::new(1.0), mezcla }
+    }
+
+    /// Grabando: suma a la mezcla lo que suena en los siguientes `segundos` (un cuadro del video).
+    pub fn grabar(&self, segundos: f32) {
+        if let Some(m) = &self.mezcla {
+            m.borrow_mut().avanzar(segundos);
+        }
+    }
+
+    /// La mezcla de la grabacion, si se esta grabando.
+    pub fn mezcla(&self) -> Option<std::cell::Ref<'_, Mezcla>> {
+        self.mezcla.as_ref().map(|m| m.borrow())
+    }
+
+    /// Toca un canal (por las bocinas, o en la mezcla si se graba).
+    fn tocar(&self, c: &Canal, volumen: f32) {
+        match &self.mezcla {
+            Some(m) => m.borrow_mut().tocar(c.id, volumen),
+            None => {
+                c.sonido.set_volume(volumen);
+                c.sonido.play();
+            }
+        }
+    }
+
+    fn parar(&self, c: &Canal) {
+        match &self.mezcla {
+            Some(m) => m.borrow_mut().voces[c.id].sonando = false,
+            None => c.sonido.stop(),
+        }
+    }
+
+    fn sonando(&self, c: &Canal) -> bool {
+        match &self.mezcla {
+            Some(m) => m.borrow().voces[c.id].sonando,
+            None => c.sonido.is_playing(),
+        }
+    }
+
+    fn volumen(&self, c: &Canal, volumen: f32) {
+        match &self.mezcla {
+            Some(m) => m.borrow_mut().voces[c.id].volumen = volumen,
+            None => c.sonido.set_volume(volumen),
+        }
+    }
+
+    fn velocidad(&self, c: &Canal, paso: f32) {
+        match &self.mezcla {
+            Some(m) => m.borrow_mut().voces[c.id].paso = paso as f64,
+            None => c.sonido.set_pitch(paso),
+        }
     }
 
     /// El volumen de la musica y el de los efectos (y voces), de 0 a 1 (aparte del general).
@@ -551,8 +698,7 @@ impl<'a> Sonidos<'a> {
     /// Un efecto mas bajito (de 0 a 1): lo que suena lejos, como la regla de Koch.
     pub fn efecto_a(&self, e: Efecto, volumen: f32) {
         if let Some(s) = self.efectos.get(e as usize) {
-            s.set_volume(self.vol_efectos.get() * volumen.clamp(0.0, 1.0));
-            s.play();
+            self.tocar(s, self.vol_efectos.get() * volumen.clamp(0.0, 1.0));
         }
     }
 
@@ -565,9 +711,8 @@ impl<'a> Sonidos<'a> {
         if let Some((_, sonidos)) = self.blips.iter().find(|(v, _)| *v == voz) {
             if !sonidos.is_empty() {
                 let i = (letra.to_ascii_lowercase() as usize * 7) % sonidos.len();
-                sonidos[i].set_pitch(tono);
-                sonidos[i].set_volume(self.vol_efectos.get());
-                sonidos[i].play();
+                self.velocidad(&sonidos[i], tono);
+                self.tocar(&sonidos[i], self.vol_efectos.get());
             }
         }
     }
@@ -577,10 +722,9 @@ impl<'a> Sonidos<'a> {
     pub fn reiniciar(&self, pista: Pista) {
         for (p, s, v) in &self.pistas {
             if *p == pista {
-                s.stop();
-                s.set_volume(self.vol_musica.get());
+                self.parar(s);
                 v.set(1.0);
-                s.play();
+                self.tocar(s, self.vol_musica.get());
             }
         }
     }
@@ -589,7 +733,7 @@ impl<'a> Sonidos<'a> {
     pub fn ritmo(&self, pista: Pista, velocidad: f32) {
         for (p, s, _) in &self.pistas {
             if *p == pista {
-                s.set_pitch(velocidad);
+                self.velocidad(s, velocidad);
             }
         }
     }
@@ -602,12 +746,12 @@ impl<'a> Sonidos<'a> {
             let paso = dt / FUNDIDO_MUSICA;
             let nuevo = (v.get() + if sube { paso } else { -paso }).clamp(0.0, 1.0);
             v.set(nuevo);
-            s.set_volume(nuevo * self.vol_musica.get());
-            if sube && bucle && !s.is_playing() {
-                s.play();
+            self.volumen(s, nuevo * self.vol_musica.get());
+            if sube && bucle && !self.sonando(s) {
+                self.tocar(s, nuevo * self.vol_musica.get());
             }
-            if !sube && nuevo <= 0.0 && s.is_playing() {
-                s.stop();
+            if !sube && nuevo <= 0.0 && self.sonando(s) {
+                self.parar(s);
             }
         }
     }

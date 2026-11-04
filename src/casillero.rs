@@ -51,11 +51,12 @@ fn encabezado(d: &mut RaylibDrawHandle, titulo: &str, p: &Progreso, ancho: i32, 
     let (w, h) = (ancho as f32, alto as f32);
     d.draw_rectangle(0, 0, ancho, alto, Color::new(6, 4, 22, 235));
     ui::paralelogramo(d, -40.0, h * 0.085, w * 0.46, h * 0.072, 26.0, Color::new(18, 40, 120, 235));
-    let tam = (h * 0.055).clamp(26.0, 52.0);
+    // Tambien limitado por lo ancho: en una ventana alta chocaba con el nivel y las notas.
+    let tam = (h * 0.055).clamp(26.0, 52.0).min(w * 0.03);
     ui::titulo_menu(d, titulo, w * 0.04, h * 0.098, tam, -3.0);
     let t = (h * 0.032).clamp(18.0, 30.0) as i32;
     let (nivel, _, _) = p.nivel_del_pase();
-    let s = format!("Nivel {nivel} del pase  ·  {} notas", p.notas);
+    let s = format!("Nv. {nivel}  ·  {} notas", p.notas);
     ui::texto(d, &s, ancho - ui::medir(&s, t) - (w * 0.04) as i32, (h * 0.10) as i32, t, ORO);
 }
 
@@ -71,6 +72,11 @@ fn vitrina(d: &mut RaylibDrawHandle, textura: &Texture2D, x: f32, y: f32, w: f32
     let tam_t = (alto * 0.04).clamp(20.0, 34.0) as i32;
     let y_t = (y + th + 24.0) as i32;
     if crudo {
+        // Los nombres largos se achican para no salirse del panel.
+        let mut tam_t = tam_t;
+        while tam_t > 14 && ui::medir_crudo(titulo, tam_t) > w as i32 - 48 {
+            tam_t -= 1;
+        }
         ui::texto_crudo(d, titulo, x as i32 + 24, y_t, tam_t, CIAN);
     } else {
         ui::texto(d, titulo, x as i32 + 24, y_t, tam_t, CIAN);
@@ -348,13 +354,13 @@ impl Pase {
         // La temporada y su gran premio.
         let y_temporada = y_como + tb * 2 + 18;
         ui::texto(d, crate::progreso::NOMBRE_TEMPORADA, x0 as i32, y_temporada, tb, ROSA);
-        ui::texto(d, "Gran premio en el nivel 40: Chimpanzini Bananini, el piloto que no se vende.", x0 as i32, y_temporada + tb + 6, tb * 4 / 5, Color::new(255, 220, 140, 255));
+        ui::parrafo(d, "Gran premio en el nivel 40: Chimpanzini Bananini, el piloto que no se vende.", x0 as i32, y_temporada + tb + 6, tb * 4 / 5, ancho_izq as i32, Color::new(255, 220, 140, 255));
 
         // La vitrina del premio escogido, a la derecha.
         let premio = PASE[self.cursor];
         let (tipo, texto) = match premio {
             Premio::Personaje(id) => ("PERSONAJE", PERSONAJES[crate::personajes::indice(id)].texto.to_string()),
-            Premio::Skin(id) => ("SKIN DE NAVE", crate::tienda::SKINS[indice_skin(id)].texto.to_string()),
+            Premio::Skin(id) => ("SKIN MÍTICA", crate::tienda::SKINS[indice_skin(id)].texto.to_string()),
             Premio::Estela(id) => ("ESTELA", crate::tienda::texto_estela(id).to_string()),
             Premio::Notas(n) => ("NOTAS", format!("{n} notas. Fondo de emergencia para caprichos: la tienda acepta música, el casero todavía no.")),
             Premio::Titulo(id) => ("TÍTULO", format!("{} Sale en el HUD, debajo de donde anda.", crate::progreso::TITULOS.iter().find(|t| t.0 == id).map_or("", |t| t.2))),
@@ -382,7 +388,7 @@ impl Pase {
             let p_k = PASE[k];
             let color = match p_k {
                 Premio::Personaje(_) => Color::new(150, 70, 200, a),
-                Premio::Skin(_) => Color::new(40, 110, 190, a),
+                Premio::Skin(_) => Color::new(176, 118, 18, a),
                 Premio::Estela(_) => Color::new(200, 80, 150, a),
                 Premio::Notas(_) => Color::new(170, 130, 40, a),
                 Premio::Titulo(_) => Color::new(30, 150, 140, a),
@@ -428,7 +434,7 @@ impl Pase {
             ui::texto(d, &format!("{}", k + 1), x as i32 + 5, y as i32 + 5, tc, Color::new(255, 255, 255, a));
             let tipo = match p_k {
                 Premio::Personaje(_) => "personaje",
-                Premio::Skin(_) => "skin",
+                Premio::Skin(_) => "skin mítica",
                 Premio::Estela(_) => "estela",
                 Premio::Notas(_) => "notas",
                 Premio::Titulo(_) => "título",

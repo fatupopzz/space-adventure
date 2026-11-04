@@ -222,6 +222,9 @@ pub const ESTELAS: [(&str, &str, u32); 16] = [
     ("teseracto", "Librero de 5 dimensiones", 180),
 ];
 
+/// Lo que paga el pase si ya se tenia la skin del premio (de partidas de antes de que fuera exclusiva).
+const NOTAS_POR_SKIN_REPETIDA: u32 = 100;
+
 /// Un premio del pase espacial.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Premio {
@@ -613,7 +616,7 @@ impl Progreso {
     }
 
     /// Entrega los premios de los niveles nuevos del pase (con su aviso). Las skins y estelas
-    /// que ya se tenian se cambian por la mitad de su precio en notas.
+    /// que ya se tenian se cambian por notas.
     pub fn cobrar_pase(&mut self) {
         let nivel = self.nivel_del_pase().0;
         if nivel <= self.pase_cobrado {
@@ -627,7 +630,8 @@ impl Progreso {
                     String::new()
                 }
                 Premio::Skin(id) if self.skins.contains(id) => {
-                    let x = crate::tienda::SKINS[crate::tienda::indice_skin(id)].precio / 2;
+                    // Las del pase ya no tienen precio; las partidas viejas pudieron comprarlas.
+                    let x = NOTAS_POR_SKIN_REPETIDA;
                     self.notas += x;
                     format!(" (ya la tenía: +{x} notas)")
                 }

@@ -24,6 +24,7 @@ mod baile;
 mod cancion;
 mod casillero;
 mod chispas;
+mod decorado;
 mod cielo;
 mod cita;
 mod divorcio;
@@ -60,6 +61,7 @@ mod pipeline;
 mod polvo;
 mod post;
 mod progreso;
+mod grabacion;
 mod ritmo;
 mod salto;
 mod sonido;
@@ -127,6 +129,8 @@ const GRAVEDAD: f32 = 0.32;
 const EXPRESION: &str = "feliz";
 /// Fuerza del resplandor del bloom.
 const BLOOM: f32 = 0.9;
+/// El framebuffer de la grabacion (`--grabar`): mas pixeles que al jugar, para el video en 1080p.
+const GRABAR_RENDER: (usize, usize) = (1280, 720);
 /// Que tan cerca de la superficie hay que estar para aterrizar (mas un poco segun el tamano del planeta).
 const DISTANCIA_ATERRIZAJE: f32 = 10.0;
 /// Segundos del fundido a negro entre escenas (de ida y de vuelta).
@@ -227,6 +231,8 @@ struct Recursos {
     charco: Modelo,
     /// El Planeta Chapin: los modelos de la camioneta y de su carretera (ver camioneta.rs).
     camioneta: camioneta::Modelos,
+    /// Los fondos de bloques de los minijuegos (ver decorado.rs).
+    decorado: decorado::Decorado,
     /// Las maravillas (ver maravillas.rs): Rocky, la Blip-A, la Endurance, el monolito y el disco de
     /// acrecion de Gargantua.
     rocky: Modelo,
@@ -488,6 +494,7 @@ impl Recursos {
             atlas_bloques,
             diamante_mc: cargar("modelos/diamante_mc.obj"),
             camioneta: camioneta::modelos(),
+            decorado: decorado::armar(),
             rocky: cargar("modelos/rocky.obj"),
             blip_a: cargar("modelos/blip_a.obj"),
             endurance: cargar("modelos/endurance.obj"),
@@ -1815,7 +1822,7 @@ fn dibujar_aula(fb: &mut Framebuffer, post: &mut Post, rec: &Recursos, aula: &Au
     let vista = Mat4::look_at(ojo, mira, Vec3::new(0.0, 1.0, 0.0));
     let proyeccion = Mat4::perspective(FOV.to_radians(), fb.ancho as f32 / fb.alto as f32, CERCA, 60.0);
     // La luz sale de las lamparas del techo; el ambiente es el gris tibio del salon.
-    let base = base_uniforms(vista, proyeccion, Vec3::new(0.0, 2.8, 0.5), ojo, (Vec3::new(0.42, 0.40, 0.38), Vec3::new(0.05, 0.05, 0.06)));
+    let base = base_uniforms(vista, proyeccion, Vec3::new(0.0, 2.8, 0.5), ojo, (Vec3::new(0.30, 0.28, 0.28), Vec3::new(0.08, 0.06, 0.07)));
     let anim = EstadoAnim { t: aula.total, ..Default::default() };
     let (pos_profe, yaw_profe) = aula.profe();
     let brazo_regla: Vec<Mat4> = rec
@@ -1841,7 +1848,8 @@ fn dibujar_aula(fb: &mut Framebuffer, post: &mut Post, rec: &Recursos, aula: &Au
     fb.limpiar([20, 18, 24]);
     let st = pipeline::render(fb, &llamadas, opciones);
     post::sombras_de_contacto(fb, 6, 0.5);
-    post.bloom(fb, BLOOM * 0.35);
+    post.bloom(fb, BLOOM * 0.3);
+    post::gradacion(fb, 1.16, 0.2, [0.008, 0.0, 0.016], [0.02, 0.01, -0.012]);
     // Mientras mas errores, mas rojo en los bordes; el golpe, un destello blanco.
     post::terminar(fb, [1.0, 0.08, 0.1], aula.enojo() * 0.9, aula.impacto() * 0.25);
     st
@@ -2148,7 +2156,7 @@ fn dibujar_vegetta(fb: &mut Framebuffer, post: &mut Post, rec: &Recursos, v: &Ve
     use vegetta::{Bloque, Modo};
     let (ojo, mira) = v.camara();
     let fov = vegetta::FOV.to_radians();
-    let (cerca, lejos) = (0.05, 150.0);
+    let (cerca, lejos) = (0.05, 240.0);
     let vista = Mat4::look_at(ojo, mira, Vec3::new(0.0, 1.0, 0.0));
     let proyeccion = Mat4::perspective(fov, fb.ancho as f32 / fb.alto as f32, cerca, lejos);
     let vp = proyeccion * vista;
@@ -2158,7 +2166,10 @@ fn dibujar_vegetta(fb: &mut Framebuffer, post: &mut Post, rec: &Recursos, v: &Ve
     let cielo = colores[1];
     cielo_degradado(fb, adelante, fov, colores);
     let noche = cielo.iter().sum::<f32>() < 0.9;
-    if noche {
+    // En la mina se esta adentro de la tierra: oscuridad de cueva, sin estrellas.
+    if v.bajo_tierra() {
+        fb.limpiar([7, 5, 10]);
+    } else if noche {
         rec.cielo.dibujar_estrellas(fb, &vista, &proyeccion, t, 0.0);
     }
     // El sol cuadrado (de tarde, grande y naranja; de noche, la luna), lejos.
@@ -2167,7 +2178,8 @@ fn dibujar_vegetta(fb: &mut Framebuffer, post: &mut Post, rec: &Recursos, v: &Ve
         (_, Modo::Tnt) => (Vec3::new(-0.35, 0.16, 1.0), 34, [1.0, 0.80, 0.50], [1.0, 0.55, 0.30]),
         _ => (Vec3::new(-0.4, 0.5, 1.0), 26, [1.0, 1.0, 0.82], [1.0, 0.92, 0.55]),
     };
-    if let Some((x, y, _)) = proyectar(ojo + direccion.normalize() * 120.0, &vp, fb) {
+    let sol = if v.bajo_tierra() { None } else { proyectar(ojo + direccion.normalize() * 120.0, &vp, fb) };
+    if let Some((x, y, _)) = sol {
         let k = if noche { 0.35 } else { 1.0 };
         post::halo(fb, (x, y), 90.0, [0.35 * k, 0.33 * k, 0.2 * k], 1.6);
         for dy in -lado..lado {
@@ -2204,6 +2216,22 @@ fn dibujar_vegetta(fb: &mut Framebuffer, post: &mut Post, rec: &Recursos, v: &Ve
     let anim = EstadoAnim { t, ..Default::default() };
     let cubo = |b: Bloque| &rec.cubos[Bloque::TODOS.iter().position(|&o| o == b).unwrap_or(0)];
     let mut llamadas = vec![llamada(&v.modelo, base)];
+    // Alrededor del servidor: islas flotantes y un mar de nubes. Siguen de lejos a la camara, asi
+    // no estorban en la pista y siempre hay algo que ver.
+    if !v.bajo_tierra() {
+        let de = &rec.decorado;
+        let cerca_de = |x: f32, y: f32, z: f32| Vec3::new(ojo.x * 0.86 + x, ojo.y + y, ojo.z * 0.86 + z);
+        for (k, (x, y, z, cual)) in [(-62.0, -8.0, 48.0, 0), (58.0, -2.0, 62.0, 2), (-38.0, 10.0, 88.0, 1), (86.0, -12.0, 12.0, 1), (-92.0, -4.0, -14.0, 2), (46.0, -10.0, -78.0, 0), (-48.0, 6.0, -70.0, 1), (12.0, 14.0, 104.0, 0)].into_iter().enumerate() {
+            let flota = (t * 0.5 + k as f32 * 1.7).sin() * 0.8;
+            llamadas.push(llamada(&rec.decorado.islas[cual], Uniforms { modelo: Mat4::translation(cerca_de(x, y + flota, z)) * Mat4::rotation_y(k as f32 * 0.8), ..base }));
+        }
+        for k in 0..18 {
+            let semilla = k as f32 * 2.399;
+            let pasa = (t * 0.7 + semilla * 40.0).rem_euclid(260.0) - 130.0;
+            let (lado, y) = if k < 11 { ((semilla * 13.0).sin() * 120.0, -46.0 - (k % 3) as f32 * 4.0) } else { ((semilla * 13.0).sin() * 130.0, 28.0 + (k % 4) as f32 * 8.0) };
+            llamadas.push(llamada(&de.nubes[k % 2], Uniforms { modelo: Mat4::translation(cerca_de(pasa, y, lado)) * Mat4::scale(1.0 + (k % 3) as f32 * 0.4), ..base }));
+        }
+    }
     for m in v.matrices_diamantes() {
         llamadas.push(DrawCall { animacion: Some((&rec.sin_animacion, anim)), ..llamada(&rec.diamante_mc, Uniforms { modelo: m, ..base }) });
     }
@@ -2239,7 +2267,7 @@ fn dibujar_vegetta(fb: &mut Framebuffer, post: &mut Post, rec: &Recursos, v: &Ve
     let st = pipeline::render(fb, &llamadas, opciones);
     // Niebla del color del cielo de lejos (sin taparlo); en la mina no hay.
     if !v.bajo_tierra() {
-        post::niebla(fb, cerca, lejos, 40.0, 110.0, cielo, true);
+        post::niebla(fb, cerca, lejos, 70.0, 210.0, cielo, true);
     }
     // El brillo de los diamantes que faltan y de los portales del lobby.
     for m in v.matrices_diamantes() {
@@ -2261,7 +2289,9 @@ fn dibujar_vegetta(fb: &mut Framebuffer, post: &mut Post, rec: &Recursos, v: &Ve
             post::halo(fb, (x, y), 46.0 + 4.0 * (t * 13.0).sin(), [0.42, 0.24, 0.06], 1.5);
         }
     }
+    v.jugo.dibujar(fb, &vp, ojo);
     post.bloom(fb, BLOOM * if v.bajo_tierra() { 0.9 } else { 0.5 });
+    post::gradacion(fb, 1.14, 0.12, [0.0, 0.0, 0.015], [0.012, 0.006, 0.0]);
     post::terminar(fb, [1.0, 1.0, 1.0], 0.0, 0.0);
     st
 }
@@ -2297,11 +2327,11 @@ fn charco() -> Modelo {
 fn dibujar_urano(fb: &mut Framebuffer, post: &mut Post, rec: &Recursos, u: &Urano, opciones: &Opciones) -> Estadisticas {
     let (ojo, mira) = u.camara();
     let vista = Mat4::look_at(ojo, mira, Vec3::new(0.0, 1.0, 0.0));
-    let proyeccion = Mat4::perspective(urano::FOV.to_radians(), fb.ancho as f32 / fb.alto as f32, 0.1, 60.0);
+    let proyeccion = Mat4::perspective(urano::FOV.to_radians(), fb.ancho as f32 / fb.alto as f32, 0.1, 220.0);
     let t = u.total;
     // La luz sale de la lampara del fondo; el ambiente es el blanco frio del baño.
     let base = base_uniforms(vista, proyeccion, Vec3::new(0.0, 6.0, 1.5), ojo, (Vec3::new(0.34, 0.36, 0.42), Vec3::new(0.10, 0.12, 0.16)));
-    fb.limpiar([10, 8, 22]);
+    fb.limpiar([26, 120, 140]);
     let anim = EstadoAnim { t, ..Default::default() };
     let mut partes_bano = vec![Mat4::identity(); rec.bano_chepa.partes.len()];
     for (n, &(i, bisagra)) in rec.bisagras.iter().enumerate() {
@@ -2310,6 +2340,19 @@ fn dibujar_urano(fb: &mut Framebuffer, post: &mut Post, rec: &Recursos, u: &Uran
         }
     }
     let mut llamadas = vec![DrawCall { por_parte: Some(&partes_bano), ..llamada(&rec.bano_chepa, base) }];
+    // El baño flota sobre las nubes de Urano, con su anillo y todo lo que se le ha volado a la Chepa.
+    let de = &rec.decorado;
+    let corre = (t * 0.8).rem_euclid(32.0);
+    llamadas.push(llamada(&de.bandas_urano, Uniforms { modelo: Mat4::translation(Vec3::new(corre, -34.0, 0.0)), ..base }));
+    llamadas.push(llamada(&de.anillo_urano, Uniforms { modelo: Mat4::translation(Vec3::new(0.0, -9.0, 0.0)) * Mat4::rotation_y(t * 0.04) * Mat4::rotation_x(0.1), ..base }));
+    for k in 0..16 {
+        let semilla = k as f32 * 2.399;
+        let a = semilla + t * 0.035;
+        let r = 12.0 + (semilla * 5.0).sin().abs() * 11.0;
+        let p = Vec3::new(a.cos() * r * 1.25, -2.5 - (k % 5) as f32 * 1.5 + (t * 0.6 + semilla).sin() * 0.35, a.sin() * r);
+        let modelo = match k % 3 { 0 => &de.rollo, 1 => &de.hielo, _ => &de.patito };
+        llamadas.push(llamada(modelo, Uniforms { modelo: Mat4::translation(p) * Mat4::rotation_y(t * 0.5 + semilla) * Mat4::rotation_x(t * 0.3 + semilla) * Mat4::scale(1.5), ..base }));
+    }
     // Doña Chepa en su banco, detras del mostrador, viendo a la fila.
     llamadas.push(llamada(&rec.chepa, Uniforms { modelo: Mat4::translation(urano::CHEPA), ..base }));
     let aliens = u.aliens_3d();
@@ -2329,7 +2372,9 @@ fn dibujar_urano(fb: &mut Framebuffer, post: &mut Post, rec: &Recursos, u: &Uran
     }
     let st = pipeline::render(fb, &llamadas, opciones);
     post::sombras_de_contacto(fb, 6, 0.55);
+    u.jugo.dibujar(fb, &(proyeccion * vista), ojo);
     post.bloom(fb, BLOOM * 0.35);
+    post::gradacion(fb, 1.12, 0.12, [0.0, 0.006, 0.014], [0.0, 0.0, 0.0]);
     post::terminar(fb, [1.0, 0.2, 0.2], u.sacudida * 0.2 + u.dano * 0.35, 0.0);
     st
 }
@@ -2975,7 +3020,8 @@ fn dibujar_neptuno(fb: &mut Framebuffer, post: &mut Post, rec: &Recursos, n: &Ne
     if let Some((x, y, _)) = n.foco().and_then(|f| proyectar(f, &vista_proyeccion, fb)) {
         post::halo(fb, (x, y), 90.0, [0.25, 0.22, 0.1], 1.8);
     }
-    post.bloom(fb, BLOOM);
+    post.bloom(fb, BLOOM * 0.55);
+    post::gradacion(fb, 1.1, 0.14, [0.0, 0.0, 0.015], [0.0, 0.0, 0.0]);
     post::terminar(fb, [0.3, 0.5, 1.0], 0.04, 0.0);
     st
 }
@@ -3045,7 +3091,8 @@ fn dibujar_fuente(fb: &mut Framebuffer, post: &mut Post, rec: &Recursos, f: &Fue
     let st = pipeline::render(fb, &llamadas, opciones);
     f.dibujar_efectos(fb, &vista_proyeccion);
     f.dibujar_luces(fb, &vista_proyeccion);
-    post.bloom(fb, BLOOM * post::exposicion(fb));
+    post.bloom(fb, BLOOM * post::exposicion(fb) * 0.6);
+    post::gradacion(fb, 1.12, 0.16, [0.01, 0.0, 0.02], [0.0, 0.0, 0.0]);
     post::terminar(fb, [1.0, 0.6, 0.9], 0.08, 0.0);
     st
 }
@@ -3396,65 +3443,157 @@ fn dibujar_jupiter(fb: &mut Framebuffer, post: &mut Post, rec: &Recursos, j: &Ju
 }
 
 /// Un cuadro del set de filmacion de la Luna.
-/// Un cuadro de la camioneta: el cielo de la tarde, los volcanes al fondo, la carretera en
-/// tramos que pasan, las ceibas y casitas de la orilla, lo que viene en el camino y la camioneta.
+/// Mezcla de tres colores del camino: el del principio, el de la mitad y el del final.
+fn tres_tiempos(a: [f32; 3], b: [f32; 3], c: [f32; 3], k: f32) -> [f32; 3] {
+    let (d, e, u) = if k < 0.5 { (a, b, k * 2.0) } else { (b, c, k * 2.0 - 1.0) };
+    [0, 1, 2].map(|i| d[i] + (e[i] - d[i]) * u)
+}
+
+/// Un cuadro de la camioneta: el cielo que se va haciendo de noche, los volcanes de bloques, la
+/// carretera con el suelo de cada zona, lo de la orilla, los puntos fijos de la ruta (el Arco, la
+/// Torre, la terminal), lo que viene en el camino, la camioneta y sus cubitos.
 fn dibujar_camioneta(fb: &mut Framebuffer, post: &mut Post, rec: &Recursos, c: &Camioneta, opciones: &Opciones) -> Estadisticas {
+    use camioneta::{Deco, Tipo, Zona, ARCO, INICIO_ANTIGUA, INICIO_CAPITAL, RUTA, TORRE, TRAMO};
     let (ojo, mira) = c.camara();
-    let fov = 62f32.to_radians();
-    let (cerca, lejos) = (0.1, 600.0);
+    // Entre mas rapido, mas abierta la camara: ayuda a sentir la velocidad.
+    let fov = (56.0 + c.vel * 0.36).to_radians();
+    let (cerca, lejos) = (0.1, 900.0);
     let vista = Mat4::look_at(ojo, mira, Vec3::new(0.0, 1.0, 0.0));
     let proyeccion = Mat4::perspective(fov, fb.ancho as f32 / fb.alto as f32, cerca, lejos);
     let vp = proyeccion * vista;
-    let cielo = [[1.0, 0.82, 0.62], [0.55, 0.75, 1.0], [0.25, 0.48, 0.92]];
-    cielo_degradado(fb, (mira - ojo).normalize(), fov, cielo);
-    // El sol de la tarde, bajito, detras de los volcanes.
-    if let Some((x, y, _)) = proyectar(ojo + Vec3::new(-0.35, 0.18, -1.0).normalize() * 300.0, &vp, fb) {
-        post::halo(fb, (x, y), 120.0, [0.5, 0.38, 0.18], 1.5);
-        post::halo(fb, (x, y), 22.0, [1.0, 0.95, 0.75], 0.8);
-    }
+    // La tarde dorada, el atardecer lila y la noche de la capital.
+    let k = c.atardecer();
+    let horizonte = tres_tiempos([1.0, 0.72, 0.46], [1.0, 0.46, 0.36], [0.62, 0.22, 0.52], k);
+    let medio = tres_tiempos([0.98, 0.52, 0.66], [0.78, 0.30, 0.64], [0.22, 0.12, 0.42], k);
+    let cenit = tres_tiempos([0.46, 0.36, 0.96], [0.27, 0.17, 0.66], [0.05, 0.04, 0.17], k);
+    cielo_degradado(fb, (mira - ojo).normalize(), fov, [horizonte, medio, cenit]);
     fb.limpiar_profundidad();
-    let base = base_uniforms(vista, proyeccion, Vec3::new(-60.0, 80.0, -40.0), ojo, (Vec3::new(0.42, 0.42, 0.50), Vec3::new(0.18, 0.15, 0.22)));
-    let m = &rec.camioneta;
-    let mut llamadas = vec![llamada(&m.volcanes, base)];
-    // La carretera: tramos que se repiten, corridos segun lo que se ha avanzado.
-    let corrido = c.recorrido.rem_euclid(camioneta::TRAMO);
-    for k in -1..30 {
-        let z = -(k as f32) * camioneta::TRAMO + corrido;
-        llamadas.push(llamada(&m.carretera, Uniforms { modelo: Mat4::translation(Vec3::new(0.0, 0.0, z)), ..base }));
+    if k > 0.68 {
+        rec.cielo.dibujar_estrellas(fb, &vista, &proyeccion, c.total, 0.0);
+        fb.limpiar_profundidad();
     }
+    // El sol va bajando atras de los volcanes.
+    let sol_pos = Vec3::new(-85.0, 92.0 - k * 118.0, -640.0);
+    if let Some((x, y, _)) = proyectar(sol_pos, &vp, fb) {
+        let fuerza = (1.0 - k * 1.15).max(0.0);
+        post::halo(fb, (x, y), 190.0, [0.55 * fuerza, 0.28 * fuerza, 0.20 * fuerza], 1.5);
+    }
+    let ambiente = tres_tiempos([0.56, 0.50, 0.56], [0.50, 0.40, 0.56], [0.34, 0.30, 0.52], k);
+    let borde = tres_tiempos([0.26, 0.16, 0.18], [0.30, 0.14, 0.26], [0.18, 0.14, 0.42], k);
+    let base = base_uniforms(vista, proyeccion, Vec3::new(-60.0, 80.0, 30.0), ojo, (Vec3::new(ambiente[0], ambiente[1], ambiente[2]), Vec3::new(borde[0], borde[1], borde[2])));
+    let m = &rec.camioneta;
+    let en = |x: f32, y: f32, z: f32| Mat4::translation(Vec3::new(x, y, z));
+    let mut llamadas = vec![llamada(&m.llano, base), llamada(&m.volcanes, base), llamada(&m.lava, base)];
+    if k < 1.0 {
+        llamadas.push(llamada(&m.sol, Uniforms { modelo: Mat4::translation(sol_pos), ..base }));
+    }
+    // Las nubes pasan despacio, y las fumarolas del Fuego suben y se abren.
+    for i in 0..8 {
+        let semilla = i as f32 * 2.399;
+        let x = ((semilla * 91.0).sin() * 300.0 + c.total * 1.6 + c.recorrido * 0.015).rem_euclid(760.0) - 380.0;
+        let y = 62.0 + (semilla * 17.0).sin().abs() * 75.0;
+        let z = -210.0 - (semilla * 41.0).cos().abs() * 230.0;
+        llamadas.push(llamada(&m.nube, Uniforms { modelo: en(x, y, z) * Mat4::scale(0.9 + (semilla * 7.0).sin().abs()), ..base }));
+    }
+    for i in 0..7 {
+        let t = (c.total * 0.09 + i as f32 / 7.0).fract();
+        let x = 38.0 + (i as f32 * 2.1).sin() * 3.0 + t * 26.0;
+        let tam = 8.0 + t * 26.0;
+        llamadas.push(llamada(&m.cubos[0], Uniforms { modelo: en(x, 150.0 + t * 78.0, -380.0) * Mat4::scale(tam), ..base }));
+    }
+    // La carretera: cada tramo con el suelo de su zona y turnando franjas.
+    let corrido = c.recorrido.rem_euclid(TRAMO);
+    let primero = (c.recorrido / TRAMO).floor() as i32;
+    for k in -1..30 {
+        let z = -(k as f32) * TRAMO + corrido;
+        let metros = c.recorrido - z + TRAMO * 0.5;
+        let indice = primero + k;
+        let zona = camioneta::zona_de(metros);
+        let cual = match zona { Zona::Campo => 0, Zona::Antigua => 1, Zona::Capital => 2 };
+        llamadas.push(llamada(&m.suelos[cual][indice.rem_euclid(2) as usize], Uniforms { modelo: en(0.0, 0.0, z), ..base }));
+        if zona == Zona::Antigua && indice.rem_euclid(9) == 4 {
+            llamadas.push(llamada(&m.alfombra, Uniforms { modelo: en(0.0, 0.0, z), ..base }));
+        }
+    }
+    // Lo de la orilla. Lo que tiene cara de calle la voltea hacia la carretera.
+    let pi = std::f32::consts::PI;
     for a in &c.adornos {
-        let (modelo, escala) = if a.casita { (&rec.objetos_chapin.casitas[a.color % rec.objetos_chapin.casitas.len()], 2.6) } else { (&rec.objetos_chapin.ceiba, 4.5) };
-        llamadas.push(llamada(modelo, Uniforms { modelo: Mat4::translation(Vec3::new(a.x, 0.0, a.z)) * Mat4::rotation_y(a.giro) * Mat4::scale(escala), ..base }));
+        let hacia_calle = if a.x > 0.0 { Mat4::identity() } else { Mat4::rotation_y(pi) };
+        let donde = en(a.x, 0.0, a.z);
+        let (modelo, matriz) = match a.tipo {
+            Deco::Ceiba => (&rec.objetos_chapin.ceiba, donde * Mat4::rotation_y(a.color as f32) * Mat4::scale(4.5)),
+            Deco::Milpa => (&m.milpa, donde),
+            Deco::Casita => (&m.casitas[a.color % 6], donde * hacia_calle),
+            Deco::Barrilete => (&m.barriletes[a.color % 3], donde),
+            Deco::Poste => (&m.poste, donde),
+            Deco::Puesto => (&m.puesto, donde * hacia_calle),
+            Deco::Casa => (&m.casas[a.color % 6], donde * hacia_calle),
+            Deco::Iglesia => (&m.iglesia, donde),
+            Deco::PapelPicado => (&m.papel, en(0.0, (c.total * 2.5 + a.z).sin() * 0.05, a.z)),
+            Deco::Edificio => (&m.edificios[a.color % 4], donde * hacia_calle),
+            Deco::Valla => (&m.vallas[a.color % 3], donde),
+            Deco::Farol => (&m.farol, donde * if a.x > 0.0 { Mat4::identity() } else { Mat4::rotation_y(pi) }),
+        };
+        llamadas.push(llamada(modelo, Uniforms { modelo: matriz, ..base }));
+    }
+    // Los puntos fijos de la ruta.
+    for (metros, modelo, x) in [(INICIO_ANTIGUA, &m.portada_antigua, 0.0), (ARCO, &m.arco, 0.0), (INICIO_CAPITAL, &m.portada_capital, 0.0), (TORRE, &m.torre, -21.0), (RUTA, &m.terminal, 0.0)] {
+        let z = c.recorrido - metros;
+        if z < 14.0 && z > -300.0 {
+            llamadas.push(llamada(modelo, Uniforms { modelo: en(x, 0.0, z), ..base }));
+        }
     }
     for cosa in &c.cosas {
-        let donde = Mat4::translation(Vec3::new(cosa.x, 0.0, cosa.z));
+        let donde = en(cosa.x, 0.0, cosa.z);
         match cosa.tipo {
-            camioneta::Tipo::TucTuc => llamadas.push(llamada(&m.tuctuc, Uniforms { modelo: donde, ..base })),
-            camioneta::Tipo::Perro => {
+            Tipo::TucTuc => llamadas.push(llamada(&m.tuctuc, Uniforms { modelo: donde, ..base })),
+            Tipo::Perro => {
                 let trote = (c.total * 14.0).sin().abs() * 0.08;
                 let mira_a = if cosa.mov > 0.0 { -std::f32::consts::FRAC_PI_2 } else { std::f32::consts::FRAC_PI_2 };
-                llamadas.push(llamada(&m.perro, Uniforms { modelo: Mat4::translation(Vec3::new(cosa.x, trote, cosa.z)) * Mat4::rotation_y(mira_a), ..base }));
+                llamadas.push(llamada(&m.perro, Uniforms { modelo: en(cosa.x, trote, cosa.z) * Mat4::rotation_y(mira_a), ..base }));
             }
-            camioneta::Tipo::Bache => llamadas.push(llamada(&m.bache, Uniforms { modelo: donde, ..base })),
-            camioneta::Tipo::Tumulo => llamadas.push(llamada(&m.tumulo, Uniforms { modelo: Mat4::translation(Vec3::new(0.0, 0.0, cosa.z)), ..base })),
-            camioneta::Tipo::Parada(gente) => {
-                llamadas.push(llamada(&m.parada, Uniforms { modelo: Mat4::translation(Vec3::new(0.0, 0.0, cosa.z)), ..base }));
+            Tipo::Bache => llamadas.push(llamada(&m.bache, Uniforms { modelo: donde, ..base })),
+            Tipo::Tumulo => {
+                llamadas.push(llamada(&m.tumulo, Uniforms { modelo: en(0.0, 0.0, cosa.z), ..base }));
+                for x in [-4.9, 4.9] {
+                    llamadas.push(llamada(&m.senal_tumulo, Uniforms { modelo: en(x, 0.0, cosa.z - 14.0), ..base }));
+                }
+            }
+            Tipo::Parada(gente) => {
+                llamadas.push(llamada(&m.parada, Uniforms { modelo: en(0.0, 0.0, cosa.z), ..base }));
+                if gente > 0 {
+                    let pintura = if c.vel < camioneta::DESPACIO { &m.zona_lenta } else { &m.zona_rapida };
+                    llamadas.push(llamada(pintura, Uniforms { modelo: en(0.0, 0.0, cosa.z), ..base }));
+                }
                 for p in 0..gente {
                     let x = 4.5 + (p % 3) as f32 * 0.45;
                     let z = cosa.z - 1.0 + (p / 3) as f32 * 0.7 + (p % 2) as f32 * 0.2;
                     // Saludan (brinquitos) para que el chofer los vea.
                     let brinco = ((c.total * 6.0 + p as f32).sin()).max(0.0) * 0.15;
-                    llamadas.push(llamada(&m.personas[p as usize % 3], Uniforms { modelo: Mat4::translation(Vec3::new(x, brinco, z)) * Mat4::rotation_y(std::f32::consts::FRAC_PI_2), ..base }));
+                    llamadas.push(llamada(&m.personas[p as usize % 3], Uniforms { modelo: en(x, brinco, z) * Mat4::rotation_y(std::f32::consts::FRAC_PI_2), ..base }));
                 }
             }
         }
     }
-    llamadas.push(llamada(&m.camioneta, Uniforms { modelo: c.matriz(), ..base }));
+    // La camioneta, con el ayudante colgado saludando y la gallina en la parrilla.
+    let bus = c.matriz();
+    llamadas.push(llamada(&m.camioneta, Uniforms { modelo: bus, ..base }));
+    if c.frenando {
+        llamadas.push(llamada(&m.frenos, Uniforms { modelo: bus, ..base }));
+    }
+    let meneo = (c.total * 7.0).sin();
+    llamadas.push(llamada(&m.ayudante, Uniforms { modelo: bus * Mat4::translation(Vec3::new(0.63, 0.0, 3.68)) * Mat4::rotation_z(meneo * 0.04), ..base }));
+    llamadas.push(llamada(&m.brazo, Uniforms { modelo: bus * Mat4::translation(Vec3::new(0.86, 1.62, 3.68)) * Mat4::rotation_z(-0.9 + meneo * 0.55), ..base }));
+    let brinca = (c.total * 9.0).sin().max(0.0) * 0.1;
+    llamadas.push(llamada(&m.gallina, Uniforms { modelo: bus * Mat4::translation(Vec3::new(0.5, 3.06 + brinca, 0.68)) * Mat4::rotation_y(0.7), ..base }));
+    for ch in &c.chispas {
+        llamadas.push(llamada(&m.cubos[ch.color], Uniforms { modelo: Mat4::translation(ch.pos) * Mat4::rotation_y(ch.vida * 4.0) * Mat4::scale(ch.tam), ..base }));
+    }
     let st = pipeline::render(fb, &llamadas, opciones);
-    // La neblina de la tarde de lejos (asi lo que aparece no sale de golpe).
-    post::niebla(fb, cerca, lejos, 110.0, 560.0, [0.62, 0.70, 0.88], true);
-    post.bloom(fb, BLOOM * 0.5);
-    post::terminar(fb, [1.0, 0.85, 0.6], 0.04, c.destello);
+    // La neblina de lejos, del color del horizonte (asi lo que aparece no sale de golpe).
+    post::niebla(fb, cerca, lejos, 130.0, 760.0, [horizonte[0] * 0.9, horizonte[1] * 0.75, horizonte[2] * 0.95], true);
+    post.bloom(fb, BLOOM * (0.55 + k * 0.5));
+    post::terminar(fb, [1.0, 0.85, 0.6], 0.03, c.destello);
     st
 }
 
@@ -3477,6 +3616,8 @@ fn dibujar_luna(fb: &mut Framebuffer, post: &mut Post, rec: &Recursos, l: &Luna,
     let (tierra, anim_tierra) = rec.planeta_detallado(TIERRA);
     let mut llamadas = vec![
         DrawCall { ocultar: &ocultar, ..llamada(&rec.set_luna, base) },
+        llamada(&rec.decorado.crateres, base),
+        llamada(&rec.decorado.estudio, base),
         llamada(&rec.bandera, Uniforms { modelo: l.bandera(), ..base }),
         llamada(&rec.astronauta, Uniforms { modelo: l.astronauta(), ..base }),
         DrawCall { expresion: Some(l.expresion_director()), ..llamada(&rec.director, Uniforms { modelo: l.director(), luz: Vec3::new(-2.0, 4.0, 4.0), ..base }) },
@@ -3499,6 +3640,15 @@ fn dibujar_luna(fb: &mut Framebuffer, post: &mut Post, rec: &Recursos, l: &Luna,
     }
     let st = pipeline::render(fb, &llamadas, opciones);
     l.dibujar_efectos(fb, &vista_proyeccion);
+    // Los reflectores del estudio, colgados de la armazon, con su resplandor.
+    for k in 0..7 {
+        let x = -24.0 + k as f32 * 8.0;
+        let parpadeo = 1.0 + 0.04 * (t * 3.0 + x).sin();
+        if let Some((px, py, _)) = proyectar(Vec3::new(x, 8.8, 16.0), &vista_proyeccion, fb) {
+            post::halo(fb, (px, py), 46.0 * parpadeo, [0.62, 0.56, 0.38], 1.5);
+            post::halo(fb, (px, py), 8.0, [1.0, 0.95, 0.75], 1.0);
+        }
+    }
     post.bloom(fb, BLOOM * post::exposicion(fb));
     post::terminar(fb, [0.6, 0.6, 0.7], 0.02, 0.0);
     st
@@ -3827,7 +3977,7 @@ fn preparar(t: f32, resto: &[String]) -> (Juego, Escena) {
             }
             escena = Escena::Cita(c);
         }
-        Some(cual @ ("neptuno" | "neptuno_juego")) => {
+        Some(cual @ ("neptuno" | "neptuno_juego" | "neptuno_reto")) => {
             // `neptuno`: la intro, `t` segundos. `neptuno_juego`: Miku juega sola (como bot) `t` segundos.
             let mut n = Neptuno::new(2024);
             n.miku_automatica = cual == "neptuno_juego";
@@ -3838,6 +3988,9 @@ fn preparar(t: f32, resto: &[String]) -> (Juego, Escena) {
                 ahora += 1.0 / 60.0;
             }
             n.miku_automatica = false;
+            if cual == "neptuno_reto" {
+                n.preparar_reto();
+            }
             escena = Escena::Neptuno(n);
         }
         Some(cual @ ("jupiter" | "jupiter_jefe")) => {
@@ -4472,6 +4625,17 @@ fn main() {
         let t = args.get(i + 2).and_then(|s| s.parse().ok()).unwrap_or(0.0);
         (archivo, t, args.get(i + 3..).unwrap_or(&[]).to_vec())
     });
+    // `--grabar video.mp4 [desde] [hasta] [--limpio]`: el recorrido por todo el juego, grabado cuadro por cuadro con
+    // ffmpeg (ver `grabacion.rs`). Por dentro es como una foto de la interfaz que no se acaba: la
+    // partida es de mentira, el teclado no cuenta y cada toma arma su escena.
+    let mut grabar = args.iter().position(|a| a == "--grabar").map(|i| {
+        let mut g = grabacion::Grabacion::new(args.get(i + 1).map_or("space_adventure.mp4", |s| s.as_str()));
+        g.toma = args.get(i + 2).and_then(|s| s.parse().ok()).unwrap_or(0);
+        g.hasta = args.get(i + 3).and_then(|s| s.parse().ok()).unwrap_or(grabacion::GUION.len());
+        g.limpio = args.iter().any(|a| a == "--limpio");
+        g
+    });
+    let foto = foto.or_else(|| grabar.as_ref().map(|_| (String::new(), 0.0, Vec::new())));
     // `--probar-vibracion sin-ventana`: la misma prueba, antes de que raylib abra la ventana (y con
     // ella el control): asi se ve si los dos se pelean por el.
     if args.iter().any(|a| a == "--probar-vibracion") && args.iter().any(|a| a == "sin-ventana") {
@@ -4509,12 +4673,17 @@ fn main() {
             rl.set_window_size(w.clamp(640, 1920), h.clamp(360, 1080));
         }
     }
+    // La grabacion, siempre al tamano de diseno (en Retina sale al doble de pixeles).
+    if grabar.is_some() {
+        rl.set_window_size(VENTANA_W, VENTANA_H);
+        rl.set_window_position(20, 40);
+    }
     ui::cargar_fuente(&thread, rl.get_window_scale_dpi().x);
     ui::cargar_sprites(&thread);
     controles::cargar(&thread);
     // El audio es opcional: sin dispositivo, el juego sigue en silencio.
     let audio = RaylibAudio::init_audio_device().ok();
-    let sonidos = audio.as_ref().map(Sonidos::cargar);
+    let sonidos = audio.as_ref().map(|a| Sonidos::cargar(a, grabar.is_some()));
     let son = sonidos.as_ref();
     // La vibracion del control (si hay SDL2 instalado; si no, el juego sigue igual).
     if args.iter().any(|a| a == "--probar-vibracion") {
@@ -4632,17 +4801,6 @@ fn main() {
     // El fundido a negro: `cambio` es a donde se va cuando la pantalla llegue a negro.
     let mut fundido = 1.0f32;
     let mut cuadros_foto = 0;
-    if let Some((_, t, resto)) = &foto {
-        let modos: Vec<String> = resto.iter().filter(|s| !matches!(s.as_str(), "mensaje" | "info" | "completa" | "menu" | "menu_lista" | "pausa" | "ajustes" | "pasaporte" | "pasaporte_espacio" | "tienda" | "tienda_estelas" | "tienda_personajes" | "uvg" | "casillero" | "pase" | "control_ps" | "control_xbox" | "bill" | "mochila") && !s.starts_with("personaje:") && !s.starts_with("ventana:")).cloned().collect();
-        if resto.iter().any(|s| s == "completa") {
-            unsafe { raylib::ffi::ToggleBorderlessWindowed() };
-        }
-        (juego, escena) = preparar(*t, &modos);
-        fundido = 0.0;
-        if resto.iter().any(|s| s == "mensaje") {
-            juego.decir("Eso era el Sol. Se recomienda no tocar el Sol. Ni con la nave, ni con la mirada.");
-        }
-    }
     // `--demo`: el recorrido de la entrega con piloto automatico (para grabar el video): vuelo,
     // acercamiento al Planeta Chapin, una vuelta en modo orbita y alejamiento.
     let mut demo: Option<demo::Demo> = None;
@@ -4680,90 +4838,136 @@ fn main() {
     // TAB: la info del pipeline y los controles.
     let mut info = false;
 
-    if let Some((_, _, r)) = &foto {
-        info = r.iter().any(|s| s == "info");
-        // Para revisar cada pantalla de la interfaz: el menu principal (con o sin la lista), la pausa y el pasaporte.
-        if r.iter().any(|s| s == "menu" || s == "menu_lista") {
-            let mut m = Menu::new(true);
-            if r.iter().any(|s| s == "menu_lista") {
-                m.iniciar();
+    // Arma la escena de una foto de la interfaz o de una toma de la grabacion: la escena de
+    // `preparar` y lo que se abre encima (el menu, la pausa, el pasaporte, la tienda...).
+    macro_rules! montar {
+        ($t:expr, $resto:expr) => {{
+            let (t, resto): (f32, &[String]) = ($t, $resto);
+            let modos: Vec<String> = resto.iter().filter(|s| !matches!(s.as_str(), "mensaje" | "info" | "completa" | "menu" | "menu_lista" | "pausa" | "ajustes" | "pasaporte" | "pasaporte_espacio" | "tienda" | "tienda_estelas" | "tienda_personajes" | "uvg" | "casillero" | "pase" | "control_ps" | "control_xbox" | "bill" | "mochila" | "vuelo_demo") && !s.starts_with("personaje:") && !s.starts_with("ventana:")).cloned().collect();
+            if resto.iter().any(|s| s == "completa") {
+                unsafe { raylib::ffi::ToggleBorderlessWindowed() };
             }
-            escena = Escena::Menu(m);
-        }
-        if r.iter().any(|s| s == "pausa") {
-            pausa = Some(Pausa::new());
-        }
-        if r.iter().any(|s| s == "ajustes") {
-            pausa = Some(Pausa::ajustes());
-        }
-        if r.iter().any(|s| s == "pasaporte") {
-            pasaporte = Some(3);
-        }
-        // Con algunos sellos puestos, para ver las estampas a color.
-        if r.iter().any(|s| s == "pasaporte" || s == "pasaporte_espacio") {
-            for i in [1, 2, 3, 5, 7, 11] {
-                prog.logros.insert(progreso::sello(i));
+            (juego, escena) = preparar(t, &modos);
+            fundido = 0.0;
+            if resto.iter().any(|s| s == "mensaje") {
+                juego.decir("Eso era el Sol. Se recomienda no tocar el Sol. Ni con la nave, ni con la mirada.");
             }
-        }
-        if r.iter().any(|s| s == "pasaporte_espacio") {
-            pasaporte = Some(progreso::CON_SELLO.len());
-        }
-        // `personaje:<id>`: con ese personaje escogido. Con partida de mentira (para ver el pase a medias).
-        if let Some(id) = r.iter().find_map(|s| s.strip_prefix("personaje:")) {
-            prog.personaje = id.to_string();
-        }
-        if r.iter().any(|s| s == "casillero" || s == "pase") {
-            prog.notas_totales = 300;
-            prog.encargos_cumplidos = 8;
-            prog.cometas = 2;
-            for id in ["sello_mercurio", "sello_venus", "sello_marte", "notas_10", "notas_100", "combo_10"] {
-                prog.logros.insert(id.into());
+            // `vuelo_demo`: el recorrido de `--demo`, desde el principio.
+            if resto.iter().any(|s| s == "vuelo_demo") {
+                let (pos, rumbo) = demo::inicio(0.0);
+                juego = Juego::new(pos, rumbo);
+                juego.camara = Camara::detras_de(&juego.nave);
+                escena = Escena::Espacio;
+                demo = Some(demo::Demo::new());
             }
-            prog.pase_cobrado = prog.nivel_del_pase().0;
-            let mut c = Casillero::new(&prog);
-            let mut pase = Pase::new(&prog);
-            let derecha = Entrada { derecha: true, ..Default::default() };
-            c.actualizar(&derecha, &mut prog, 0.5);
-            c.actualizar(&derecha, &mut prog, 0.5);
-            pase.actualizar(&Entrada::default(), &mut prog, 0.5);
-            submenu = Some(if r.iter().any(|s| s == "pase") { Submenu::Pase(pase) } else { Submenu::Casillero(c) });
-        }
-        // `mochila`: la mochila con algunas lunas y recuerdos.
-        if r.iter().any(|s| s == "mochila") {
-            prog.mochila = [3, 1, 0, 2];
-            for id in ["tarot_lectura", "examen_5", "cita_boda", "jupiter_mancha", "hada_luka", "ciencia_5", "divorcio_3", "luna_oscar", "ritmo_termino", "uno_gana", "junta_si", "cometa"] {
-                prog.logros.insert(id.into());
+            let r = resto;
+            info = r.iter().any(|s| s == "info");
+            // Para revisar cada pantalla de la interfaz: el menu principal (con o sin la lista), la pausa y el pasaporte.
+            if r.iter().any(|s| s == "menu" || s == "menu_lista") {
+                let mut m = Menu::new(true);
+                if r.iter().any(|s| s == "menu_lista") {
+                    m.iniciar();
+                }
+                escena = Escena::Menu(m);
             }
-            submenu = Some(Submenu::Mochila(mochila::Mochila::new(true)));
-        }
-        // `bill`: Bill Nye contando un dato.
-        if r.iter().any(|s| s == "bill") {
-            bill_dice = Some((asteroides::DATOS[1].to_string(), 0.5));
-        }
-        // `uvg`: la entrada de la UVG abierta (con `aterrizar:tierra`, encima de la nave posada).
-        if r.iter().any(|s| s == "uvg") {
-            puerta_uvg = Some(PuertaUvg::new());
-        }
-        // La tienda (con notas de mentira para ver los precios que alcanzan y los que no).
-        if r.iter().any(|s| s.starts_with("tienda")) {
-            prog.notas = 130;
-            let mut t = Tienda::new(&prog);
-            let flecha = |c: bool| Entrada { abajo: !c, derecha: c, ..Default::default() };
-            if r.iter().any(|s| s == "tienda_estelas" || s == "tienda_personajes") {
-                t.actualizar(&flecha(true), &mut prog, 0.5);
+            if r.iter().any(|s| s == "pausa") {
+                pausa = Some(Pausa::new());
             }
-            if r.iter().any(|s| s == "tienda_personajes") {
-                t.actualizar(&flecha(true), &mut prog, 0.5);
+            if r.iter().any(|s| s == "ajustes") {
+                pausa = Some(Pausa::ajustes());
             }
-            for _ in 0..3 {
-                t.actualizar(&flecha(false), &mut prog, 0.5);
+            if r.iter().any(|s| s == "pasaporte") {
+                pasaporte = Some(3);
             }
-            submenu = Some(Submenu::Tienda(t));
-        }
+            // Con algunos sellos puestos, para ver las estampas a color.
+            if r.iter().any(|s| s == "pasaporte" || s == "pasaporte_espacio") {
+                for i in [1, 2, 3, 5, 7, 11] {
+                    prog.logros.insert(progreso::sello(i));
+                }
+            }
+            if r.iter().any(|s| s == "pasaporte_espacio") {
+                pasaporte = Some(progreso::CON_SELLO.len());
+            }
+            // `personaje:<id>`: con ese personaje escogido. Con partida de mentira (para ver el pase a medias).
+            if let Some(id) = r.iter().find_map(|s| s.strip_prefix("personaje:")) {
+                prog.personaje = id.to_string();
+            }
+            if r.iter().any(|s| s == "casillero" || s == "pase") {
+                prog.notas_totales = 300;
+                prog.encargos_cumplidos = 8;
+                prog.cometas = 2;
+                for id in ["sello_mercurio", "sello_venus", "sello_marte", "notas_10", "notas_100", "combo_10"] {
+                    prog.logros.insert(id.into());
+                }
+                prog.pase_cobrado = prog.nivel_del_pase().0;
+                let mut c = Casillero::new(&prog);
+                let mut pase = Pase::new(&prog);
+                let derecha = Entrada { derecha: true, ..Default::default() };
+                c.actualizar(&derecha, &mut prog, 0.5);
+                c.actualizar(&derecha, &mut prog, 0.5);
+                pase.actualizar(&Entrada::default(), &mut prog, 0.5);
+                submenu = Some(if r.iter().any(|s| s == "pase") { Submenu::Pase(pase) } else { Submenu::Casillero(c) });
+            }
+            // `mochila`: la mochila con algunas lunas y recuerdos.
+            if r.iter().any(|s| s == "mochila") {
+                prog.mochila = [3, 1, 0, 2];
+                for id in ["tarot_lectura", "examen_5", "cita_boda", "jupiter_mancha", "hada_luka", "ciencia_5", "divorcio_3", "luna_oscar", "ritmo_termino", "uno_gana", "junta_si", "cometa"] {
+                    prog.logros.insert(id.into());
+                }
+                submenu = Some(Submenu::Mochila(mochila::Mochila::new(true)));
+            }
+            // `bill`: Bill Nye contando un dato.
+            if r.iter().any(|s| s == "bill") {
+                bill_dice = Some((asteroides::DATOS[1].to_string(), 0.5));
+            }
+            // `uvg`: la entrada de la UVG abierta (con `aterrizar:tierra`, encima de la nave posada).
+            if r.iter().any(|s| s == "uvg") {
+                puerta_uvg = Some(PuertaUvg::new());
+            }
+            // La tienda (con notas de mentira para ver los precios que alcanzan y los que no).
+            if r.iter().any(|s| s.starts_with("tienda")) {
+                prog.notas = 130;
+                let mut t = Tienda::new(&prog);
+                let flecha = |c: bool| Entrada { abajo: !c, derecha: c, ..Default::default() };
+                if r.iter().any(|s| s == "tienda_estelas" || s == "tienda_personajes") {
+                    t.actualizar(&flecha(true), &mut prog, 0.5);
+                }
+                if r.iter().any(|s| s == "tienda_personajes") {
+                    t.actualizar(&flecha(true), &mut prog, 0.5);
+                }
+                for _ in 0..3 {
+                    t.actualizar(&flecha(false), &mut prog, 0.5);
+                }
+                submenu = Some(Submenu::Tienda(t));
+            }
+        }};
+    }
+    if let Some((_, t, resto)) = &foto {
+        montar!(*t, resto);
     }
     while !rl.window_should_close() {
+        // La grabacion: al empezar cada toma se arma su escena desde cero (con partida nueva).
+        if let Some(g) = &grabar {
+            if g.termino() {
+                break;
+            }
+            if g.nueva {
+                let toma = g.actual();
+                (pausa, submenu, pasaporte, bill_dice, puerta_uvg, demo, cambio) = (None, None, None, None, None, None, None);
+                hud = true;
+                prog = Progreso::en_memoria();
+                let modos: Vec<String> = toma.modos.iter().map(|s| s.to_string()).collect();
+                montar!(toma.desde, &modos);
+                // Cada maravilla con lo suyo (la linea Petrova solo con la Blip-A y en el vuelo).
+                match toma.modos[0] {
+                    "vuelo_demo" | "maravilla:blip" => {}
+                    m if m.starts_with("maravilla:") => juego.maravillas.callar(false),
+                    _ => juego.maravillas.callar(true),
+                }
+            }
+        }
         // La foto de la interfaz: despues de unos cuadros, se guarda y se sale.
-        if let Some((archivo, _, _)) = &foto {
+        if let (Some((archivo, _, _)), None) = (&foto, &grabar) {
             cuadros_foto += 1;
             if cuadros_foto == 149 {
                 ui::registrar_textos(true);
@@ -4778,7 +4982,7 @@ fn main() {
             }
         }
         // Con el cuadro trabado (arrastrar la ventana) no se teletransporta nada.
-        let dt_real = rl.get_frame_time().min(0.05);
+        let dt_real = if grabar.is_some() { grabacion::DT } else { rl.get_frame_time().min(0.05) };
         let mut e = if cambio.is_some() || foto.is_some() { Entrada::default() } else { Entrada::leer(&rl) };
         // En las fotos, `control_ps` / `control_xbox` hacen como que hay ese control conectado.
         if let Some((_, _, r)) = &foto {
@@ -4790,6 +4994,14 @@ fn main() {
             }
         }
         controles::usar(e.control);
+        if let Some(g) = &grabar {
+            e = entrada_grabada(g, &mut juego, &escena);
+            // Si el sistema le cambia el tamano a la ventana (mosaicos, Stage Manager...), se
+            // regresa al de diseno: el video no puede cambiar de tamano a medias.
+            if (rl.get_screen_width(), rl.get_screen_height()) != (VENTANA_W, VENTANA_H) {
+                rl.set_window_size(VENTANA_W, VENTANA_H);
+            }
+        }
         // ESC o start: la pausa. Tambien se pausa sola si la ventana pierde el foco.
         // En el menu principal no hay nada que pausar: ahi ESC es del menu (cierra los creditos).
         let en_el_menu = matches!(escena, Escena::Menu(_));
@@ -4882,7 +5094,13 @@ fn main() {
             e = Entrada { hay_control: e.hay_control, control: e.control, ..Default::default() };
         }
         // La calidad: el tamano del framebuffer (rapida = menos pixeles que pintar).
-        let (rw, rh) = if prog.ajustes.calidad_rapida { (640, 360) } else { (RENDER_W, RENDER_H) };
+        let (rw, rh) = if grabar.is_some() {
+            GRABAR_RENDER
+        } else if prog.ajustes.calidad_rapida {
+            (640, 360)
+        } else {
+            (RENDER_W, RENDER_H)
+        };
         if fb.ancho != rw {
             fb = Framebuffer::new(rw, rh);
             post = Post::new(&fb);
@@ -5661,6 +5879,7 @@ fn main() {
         }
 
         let (ancho, alto) = (rl.get_screen_width(), rl.get_screen_height());
+        let (pixeles_w, pixeles_h) = (rl.get_render_width(), rl.get_render_height());
         let mut d = rl.begin_drawing(&thread);
         d.clear_background(Color::BLACK);
         let imagen = rect_imagen(ancho, alto);
@@ -5922,8 +6141,8 @@ fn main() {
                     let derecha = if hud { ancho - ANCHO_TABLERO - 40 } else { ancho - 20 };
                     ui::mensaje_ia_entre(&mut d, visible, 20, derecha, alto);
                 }
-                // La demo: el rotulo de la parte del recorrido, arriba al centro.
-                if let Some((titulo, sub)) = demo.as_ref().and_then(|dm| dm.rotulo()) {
+                // La demo: el rotulo de la parte del recorrido, arriba al centro (en las tomas en crudo, no).
+                if let Some((titulo, sub)) = demo.as_ref().and_then(|dm| dm.rotulo()).filter(|_| !grabar.as_ref().is_some_and(|g| g.limpio)) {
                     let tam = 30;
                     let y = (alto as f32 * 0.15) as i32;
                     ui::titulo_de(&mut d, titulo, (ancho - ui::medir_titulo(titulo, tam)) / 2, y, tam, Color::new(110, 235, 225, 255));
@@ -5981,8 +6200,71 @@ fn main() {
         if let Some(k) = pestana_abierta(&pausa, &submenu, en_la_lista) {
             casillero::dibujar_pestanas(&mut d, &e, k, matches!(escena, Escena::Menu(_)), prog.novedades(), reloj_menu, ancho, alto);
         }
+        // La grabacion: el rotulo de la toma, su fundido, y el cuadro (ya con todo) a ffmpeg.
+        if let Some(g) = &mut grabar {
+            if let Some(((titulo, sub), alfa)) = g.rotulo() {
+                let (tam, tam_sub) = (34, 19);
+                let y = (alto as f32 * if g.al_final() { 0.74 } else { 0.13 }) as i32;
+                let w = ui::medir_titulo(titulo, tam).max(ui::medir(sub, tam_sub)) + 56;
+                d.draw_rectangle_rounded(Rectangle::new(((ancho - w) / 2) as f32, (y - 16) as f32, w as f32, (tam + tam_sub + 44) as f32), 0.3, 8, Color::new(10, 6, 24, (alfa * 190.0) as u8));
+                let a = (alfa * 255.0) as u8;
+                ui::titulo_de(&mut d, titulo, (ancho - ui::medir_titulo(titulo, tam)) / 2, y, tam, Color::new(110, 235, 225, a));
+                ui::subtitulo(&mut d, sub, (ancho - ui::medir(sub, tam_sub)) / 2, y + tam + 10, tam_sub, Color::new(240, 230, 255, a));
+            }
+            let negro = g.negro();
+            if negro > 0.0 {
+                d.draw_rectangle(0, 0, ancho, alto, Color::new(0, 0, 0, (negro * 255.0) as u8));
+            }
+            unsafe {
+                raylib::ffi::rlDrawRenderBatchActive();
+                let datos = raylib::ffi::rlReadScreenPixels(pixeles_w, pixeles_h);
+                g.cuadro(pixeles_w, pixeles_h, std::slice::from_raw_parts(datos, (pixeles_w * pixeles_h * 4) as usize));
+                raylib::ffi::MemFree(datos as *mut std::os::raw::c_void);
+            }
+            if let Some(s) = son {
+                s.grabar(grabacion::DT);
+            }
+            g.avanzar();
+        }
+    }
+    if let Some(g) = &mut grabar {
+        g.terminar(son.and_then(|s| s.mezcla().map(|m| m.wav())));
+        // Las tomas en crudo llevan aparte los efectos sin la musica (para editarlas con otra).
+        if let (true, Some(m)) = (g.limpio, son.and_then(|s| s.mezcla())) {
+            std::fs::write(format!("{}.efectos.wav", g.archivo), m.wav_efectos()).expect("no se pudo guardar los efectos");
+        }
     }
     controles::descargar();
+}
+
+/// Lo que "aprieta" la grabacion en este cuadro: el piloto automatico de cada toma.
+fn entrada_grabada(g: &grabacion::Grabacion, juego: &mut Juego, escena: &Escena) -> Entrada {
+    use grabacion::Auto;
+    let t = g.t;
+    match (g.actual().auto, escena) {
+        (Auto::Notas, Escena::Espacio) => {
+            // De nota en nota, como en la captura `recoger`.
+            let nave = juego.nave.pos;
+            if let Some(hacia) = juego.coleccion.notas.iter().filter(|n| n.viva).map(|n| n.pos).min_by(|p, q| (*p - nave).length().total_cmp(&(*q - nave).length())) {
+                (juego.nave.yaw, juego.nave.pitch) = salto::rumbo_hacia(hacia - nave);
+            }
+            Entrada { empuje: 1.0, ..Default::default() }
+        }
+        (Auto::Orbita, Escena::Espacio) => Entrada { empuje: 0.6, ..Default::default() },
+        (Auto::Dialogo, _) => Entrada { aceptar: g.pulso(2.4, 1.2), ..Default::default() },
+        (Auto::Camioneta, Escena::Camioneta(c)) => c.chofer(),
+        (Auto::Parkour, Escena::Vegetta(v)) if v.en_parkour() => v.entrada_parkour(),
+        (Auto::Tnt, Escena::Vegetta(_)) => Entrada { empuje: 1.0, girar: 0.55, disparando: true, ..Default::default() },
+        (Auto::Mina, Escena::Vegetta(v)) if v.en_mina() => Entrada { picar: true, ..Default::default() },
+        (Auto::Asteroides, Escena::Jupiter(_)) => Entrada { girar: (t * 0.7).sin(), cabecear: (t * 0.5).cos() * 0.6, disparando: true, ..Default::default() },
+        (Auto::Ritmo, Escena::Ritmo(r)) => {
+            let (piso, aire) = r.golpes_solos(grabacion::DT);
+            Entrada { piso, aire, ..Default::default() }
+        }
+        (Auto::Abajo, _) => Entrada { abajo: g.pulso(0.9, 0.6), ..Default::default() },
+        (Auto::Derecha, _) => Entrada { derecha: g.pulso(0.8, 0.6), ..Default::default() },
+        _ => Entrada::default(),
+    }
 }
 
 /// La pestana del menu del juego que esta abierta (None si no hay menu): 0 JUGAR / INICIO (la

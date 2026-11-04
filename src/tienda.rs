@@ -57,8 +57,8 @@ pub const SKINS: [Skin; 30] = [
     Skin {
         id: "chapina",
         nombre: "Guate sin lag",
-        precio: 70,
-        texto: "Bandera en el techo, turbina de antorcha y azul patrio. Salió de la Roosevelt hace dos horas. Avanzó hasta Marte.",
+        precio: 0,
+        texto: "Alas de bandera, volcán de sombrero con lava de verdad y halo del pase. No se vende: se suda. Como la Roosevelt a las seis.",
         colores: &[
             ("piel_lila", [0.40, 0.68, 0.96], None),
             ("pelo_violeta", [0.95, 0.95, 1.0], None),
@@ -68,13 +68,13 @@ pub const SKINS: [Skin; 30] = [
             ("llama", [1.0, 0.70, 0.25], Some([1.0, 0.55, 0.15])),
             ("tobera_luz", [1.0, 0.75, 0.30], Some([1.0, 0.60, 0.20])),
         ],
-        brillante: false,
+        brillante: true,
     },
     Skin {
         id: "camioneta",
         nombre: "Bus del multiverso",
-        precio: 90,
-        texto: "Rótulo HAY CAMPO, pintura de camioneta y cero vergüenza. El ayudante cobra hasta por la gravedad. Parada: Saturno.",
+        precio: 0,
+        texto: "Carrocería entera de camioneta: llantas, parrilla cargada y escalera. Solo sale en el pase. El ayudante cobra hasta por la gravedad.",
         colores: &[
             ("piel_lila", [0.98, 0.78, 0.12], None),
             ("pelo_violeta", [0.10, 0.58, 0.24], None),
@@ -85,7 +85,7 @@ pub const SKINS: [Skin; 30] = [
             ("llama", [1.0, 0.45, 0.10], Some([1.0, 0.35, 0.05])),
             ("tobera_luz", [1.0, 0.50, 0.15], Some([1.0, 0.40, 0.10])),
         ],
-        brillante: false,
+        brillante: true,
     },
     Skin {
         id: "luka",
@@ -104,8 +104,8 @@ pub const SKINS: [Skin; 30] = [
     Skin {
         id: "shuco",
         nombre: "Shuco supersónico",
-        precio: 120,
-        texto: "Pan, salchicha y mostaza sobre la cabina. CON TODO incluye jalapeño y turbulencia. El combo no trae servilletas.",
+        precio: 0,
+        texto: "La nave adentro de un shuco completo: pan, salchicha y mostaza. Solo sale en el pase. Con todo, siempre con todo.",
         colores: &[
             ("piel_lila", [0.86, 0.60, 0.30], None),
             ("pelo_violeta", [0.42, 0.66, 0.18], None),
@@ -116,13 +116,13 @@ pub const SKINS: [Skin; 30] = [
             ("llama", [1.0, 0.85, 0.20], Some([0.90, 0.70, 0.10])),
             ("tobera_luz", [1.0, 0.85, 0.25], Some([0.90, 0.70, 0.12])),
         ],
-        brillante: false,
+        brillante: true,
     },
     Skin {
         id: "quetzal",
         nombre: "Quetzal con aura",
-        precio: 150,
-        texto: "Verde quetzal con lentes oscuros. Posa antes de cada aterrizaje. El aura se pierde al chocar, los lentes no.",
+        precio: 0,
+        texto: "Pico, cresta y una cola de plumas verdes más larga que la nave. Solo sale en el pase. Tampoco sobrevive en cautiverio.",
         colores: &[
             ("piel_lila", [0.10, 0.66, 0.40], None),
             ("pelo_violeta", [0.04, 0.42, 0.30], None),
@@ -132,13 +132,13 @@ pub const SKINS: [Skin; 30] = [
             ("llama", [0.50, 1.0, 0.50], Some([0.35, 0.95, 0.40])),
             ("tobera_luz", [0.55, 1.0, 0.55], Some([0.40, 0.95, 0.45])),
         ],
-        brillante: false,
+        brillante: true,
     },
     Skin {
         id: "sombra",
         nombre: "Modo no fui yo",
-        precio: 180,
-        texto: "Negro, neón rojo y lentes de incógnito. El radar la vio chocar. Ella insiste en que era su primo.",
+        precio: 0,
+        texto: "Capucha, katana y cortes de neón rojo. Solo sale en el pase. Nadie la vio llegar. Nadie vio quién se comió el último tamal.",
         colores: &[
             ("piel_lila", [0.14, 0.13, 0.17], None),
             ("pelo_violeta", [0.24, 0.20, 0.28], None),
@@ -155,8 +155,8 @@ pub const SKINS: [Skin; 30] = [
     Skin {
         id: "oro",
         nombre: "Premium sin saldo",
-        precio: 400,
-        texto: "Corona dorada y placa +9999. Parece millonaria hasta que intenta pagar el parqueo con puntos del pase.",
+        precio: 0,
+        texto: "Corona, alas de oro y brillo de millonaria. Solo sale en el pase: la plata no alcanza, hay que jugar. Muy a su pesar.",
         colores: &[
             ("piel_lila", [0.96, 0.74, 0.22], None),
             ("pelo_violeta", [0.74, 0.50, 0.10], None),
@@ -173,7 +173,7 @@ pub const SKINS: [Skin; 30] = [
         id: "aurora",
         nombre: "Farmeadora de aura",
         precio: 130,
-        texto: "Corona, lentes y verde menta: aterriza de lado para el clip. +67 de aura si nadie vio los tres intentos anteriores.",
+        texto: "Lentes, cintas de aurora y verde menta: aterriza de lado para el clip. +67 de aura si nadie vio los tres intentos anteriores.",
         colores: &[
             ("piel_lila", [0.18, 0.86, 0.64], None),
             ("pelo_violeta", [0.3, 0.12, 0.56], None),
@@ -423,8 +423,8 @@ pub const SKINS: [Skin; 30] = [
     Skin {
         id: "gamer",
         nombre: "Setup gamer RGB",
-        precio: 260,
-        texto: "Audífonos con micrófono, tiras RGB por todos lados y la nave en negro mate. Da +10 FPS. GLADAS dice que eso no existe. GLADAS no es gamer.",
+        precio: 0,
+        texto: "Audífonos, alas de teclado y RGB por todos lados: más FPS. Solo sale en el pase, nivel 35. Se la ganó sin ayuda de su primo.",
         colores: &[
             ("piel_lila", [0.08, 0.08, 0.10], None),
             ("pelo_violeta", [0.15, 0.15, 0.18], None),
@@ -518,6 +518,11 @@ pub fn vestir(base: &Modelo, skin: &Skin) -> Modelo {
     }
     crate::adornos::adornar(&mut m, skin.id);
     m
+}
+
+/// Si es una skin MITICA: un premio del pase. Esas no tienen precio, llevan el halo y no se venden.
+pub fn es_del_pase(id: &str) -> bool {
+    crate::progreso::PASE.iter().any(|p| matches!(p, crate::progreso::Premio::Skin(x) if *x == id))
 }
 
 /// Solo se venden los cosmeticos que no son premios del pase.
@@ -742,7 +747,7 @@ impl Tienda {
             x += ancho_p + 12.0;
         }
 
-        let sub = if self.pestana == Pestana::Personajes { "Pilotos extra: los secretos sin esperar al logro, y Rocky" } else { "Exclusivos de tienda" };
+        let sub = if self.pestana == Pestana::Personajes { "Pilotos extra: los secretos sin esperar al logro, y Rocky" } else { "Las míticas con halo: solo en el pase" };
         ui::texto(d, sub, (w * 0.05) as i32, (h * 0.29) as i32, 15, ui::TENUE);
 
         // La lista, a la izquierda: con aire entre filas; si no caben todas, se desliza con el
@@ -969,6 +974,21 @@ mod pruebas {
         t.actualizar(&Entrada { arriba: true, ..Default::default() }, &mut p, 0.1);
         t.actualizar(&Entrada { aceptar: true, ..Default::default() }, &mut p, 0.1);
         assert_eq!((p.skin.as_str(), p.notas), ("lila", 100 - SKINS[1].precio));
+    }
+
+    /// Las del pase no tienen precio y todo lo demas (menos la de fabrica) si: asi ninguna puede
+    /// colarse a la tienda aunque se mueva la lista del pase.
+    #[test]
+    fn las_miticas_no_tienen_precio_y_las_de_la_tienda_si() {
+        for k in &SKINS {
+            if es_del_pase(k.id) {
+                assert_eq!(k.precio, 0, "{} es del pase y tiene precio", k.id);
+                assert!(!skins_tienda().contains(&indice_skin(k.id)));
+            } else if k.id != "lila" {
+                assert!(k.precio > 0, "{} se vende y no tiene precio", k.id);
+            }
+        }
+        assert!(SKINS.iter().filter(|k| es_del_pase(k.id)).count() >= 7);
     }
 
     #[test]

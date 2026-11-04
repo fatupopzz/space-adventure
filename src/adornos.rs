@@ -154,16 +154,9 @@ impl Taller<'_> {
         }
         self.caja(oscuro, [0.0, 0.16, -1.0], [0.22, 0.08, 0.12]);
     }
-
-    fn corona(&mut self, oro: usize) {
-        self.caja(oro, [0.0, 0.91, -0.62], [1.35, 0.15, 0.32]);
-        for (x, h) in [(-0.52, 0.35), (0.0, 0.55), (0.52, 0.35)] {
-            self.caja(oro, [x, 0.98 + h * 0.5, -0.62], [0.22, h, 0.23]);
-        }
-    }
 }
 
-fn glifo(c: char) -> [u8; 5] {
+pub fn glifo(c: char) -> [u8; 5] {
     match c {
         'A' => [2, 5, 7, 5, 5], 'C' => [7, 4, 4, 4, 7], 'D' => [6, 5, 5, 5, 6],
         'E' => [7, 4, 6, 4, 7], 'F' => [7, 4, 6, 4, 4], 'G' => [7, 4, 5, 5, 7],
@@ -171,7 +164,7 @@ fn glifo(c: char) -> [u8; 5] {
         'M' => [5, 7, 7, 5, 5], 'N' => [5, 7, 7, 7, 5], 'O' => [7, 5, 5, 5, 7],
         'P' => [6, 5, 6, 4, 4], 'R' => [6, 5, 6, 5, 5], 'S' => [7, 4, 7, 1, 7],
         'T' => [7, 2, 2, 2, 2], 'U' => [5, 5, 5, 5, 7], 'W' => [5, 5, 7, 7, 5],
-        'Y' => [5, 5, 2, 2, 2], '6' => [7, 4, 7, 5, 7], '7' => [7, 1, 2, 2, 2],
+        'Q' => [7, 5, 5, 7, 1], 'Y' => [5, 5, 2, 2, 2], '6' => [7, 4, 7, 5, 7], '7' => [7, 1, 2, 2, 2],
         '9' => [7, 5, 7, 1, 7], '+' => [0, 2, 7, 2, 0],
         'B' => [6, 5, 6, 5, 6], 'K' => [5, 5, 6, 5, 5], 'V' => [5, 5, 5, 5, 2], 'X' => [5, 5, 2, 5, 5],
         'Z' => [7, 1, 2, 4, 7], 'J' => [1, 1, 1, 5, 7], '0' => [7, 5, 5, 5, 7], '1' => [2, 6, 2, 2, 7],
@@ -202,6 +195,12 @@ pub fn adornar(modelo: &mut Modelo, id: &str) {
     };
     t.caja(negro, [0.0, 0.06, 1.03], [1.82, 0.42, 0.10]);
     t.letras(blanco, placa, 0.06, 1.095, 0.046);
+    // Lo que distingue a una skin mitica de cualquiera de la tienda: el halo del pase.
+    if crate::tienda::es_del_pase(id) {
+        let halo = t.color("halo_pase", [1.0, 0.82, 0.28], 1.3);
+        let alto = if matches!(id, "chapina" | "oro") { 2.45 } else { 2.0 };
+        t.anillo(halo, Vec3::new(0.0, alto, -0.1), 0.62, 0.8, 0.07, 18);
+    }
     match id {
         "miku" => {
             t.caja(blanco, [-0.85, 1.14, -0.20], [0.19, 0.72, 0.19]);
@@ -210,15 +209,50 @@ pub fn adornar(modelo: &mut Modelo, id: &str) {
             }
         }
         "chapina" => {
-            t.caja(negro, [-0.92, 1.24, 0.0], [0.05, 1.0, 0.05]);
-            for (x, m) in [(-0.85, azul), (-0.65, blanco), (-0.45, azul)] {
-                t.caja(m, [x, 1.59, 0.0], [0.20, 0.42, 0.04]);
+            // Alas de bandera (azul, blanco, azul) y un volcan de sombrero, con su lava.
+            let lava = t.color("lava", [1.0, 0.42, 0.08], 1.2);
+            let cerro = t.color("cerro", [0.20, 0.52, 0.34], 0.0);
+            for lado in [-1.0f32, 1.0] {
+                for (k, m) in [azul, blanco, azul].iter().enumerate() {
+                    let (x0, x1) = (lado * (1.0 + k as f32 * 0.46), lado * (1.46 + k as f32 * 0.46));
+                    let (y0, y1) = (0.72 + k as f32 * 0.13, 0.85 + k as f32 * 0.13);
+                    t.aleta(*m, &[Vec3::new(x0, y0, 0.1), Vec3::new(x1, y1, 0.1), Vec3::new(x1, y1 - 0.95 + k as f32 * 0.14, 0.45), Vec3::new(x0, y0 - 1.05 + k as f32 * 0.14, 0.45)], Vec3::new(0.0, 0.0, 0.05));
+                }
+            }
+            t.cono(cerro, Vec3::new(0.15, 0.9, -0.2), Vec3::new(0.0, 1.0, 0.0), 0.72, 0.62, 0.17, 10);
+            t.cono(lava, Vec3::new(0.15, 1.6, -0.2), Vec3::new(0.0, 1.0, 0.0), 0.09, 0.17, 0.12, 8);
+            for (x, y, tam) in [(0.2, 1.84, 0.13), (0.08, 2.02, 0.1), (0.26, 2.16, 0.07)] {
+                t.caja(lava, [x, y, -0.2], [tam, tam, tam]);
             }
         }
         "camioneta" => {
-            t.caja(oro, [0.0, 1.16, -0.65], [1.85, 0.43, 0.21]);
-            t.letras(negro, "HAY CAMPO", 1.16, -0.53, 0.045);
-            for x in [-0.79, 0.79] { t.caja(rosa, [x, 1.43, -0.65], [0.16, 0.14, 0.16]); }
+            // La carroceria entera: cofre, ventanas, llantas, parrilla cargada y escalera.
+            let vidrio = t.color("vidrio_bus", [0.08, 0.12, 0.22], 0.05);
+            let llanta = t.color("llanta", [0.04, 0.04, 0.05], 0.0);
+            let cromo = t.color("cromo", [0.85, 0.85, 0.92], 0.08);
+            let costal = t.color("costal", [0.75, 0.60, 0.36], 0.0);
+            t.caja(oro, [0.0, 1.06, -0.05], [2.32, 0.2, 2.5]);
+            t.caja(rosa, [0.0, 1.18, -0.05], [2.36, 0.05, 2.54]);
+            t.letras(negro, "HAY CAMPO", 1.04, 1.21, 0.045);
+            for lado in [-1.0f32, 1.0] {
+                t.caja(azul, [lado * 1.14, 0.3, -0.05], [0.14, 1.3, 2.4]);
+                t.caja(oro, [lado * 1.21, -0.1, -0.05], [0.03, 0.14, 2.4]);
+                for k in 0..4 {
+                    t.caja(vidrio, [lado * 1.22, 0.55, -0.85 + k as f32 * 0.55], [0.03, 0.42, 0.4]);
+                }
+                for z in [-0.72, 0.68] {
+                    t.cono(llanta, Vec3::new(lado * 1.1, -0.48, z), Vec3::new(lado, 0.0, 0.0), 0.3, 0.33, 0.33, 12);
+                    t.cono(cromo, Vec3::new(lado * 1.4, -0.48, z), Vec3::new(lado, 0.0, 0.0), 0.02, 0.14, 0.14, 8);
+                }
+                t.caja(cromo, [lado * 1.02, 1.32, -0.05], [0.05, 0.24, 2.4]);
+            }
+            t.caja(cromo, [0.0, -0.58, -1.32], [2.1, 0.12, 0.14]);
+            t.caja(oro, [0.0, -0.28, -1.42], [1.6, 0.52, 0.45]);
+            for x in [-0.56, 0.56] { t.caja(blanco, [x, -0.2, -1.66], [0.28, 0.2, 0.04]); }
+            t.caja(costal, [-0.45, 1.34, -0.55], [0.72, 0.34, 0.86]);
+            t.caja(rosa, [0.45, 1.32, -0.3], [0.7, 0.3, 0.7]);
+            t.caja(verde, [-0.32, 1.34, 0.55], [0.72, 0.34, 0.8]);
+            for k in 0..6 { t.caja(cromo, [0.76, 0.0 + k as f32 * 0.22, 1.3], [0.34, 0.03, 0.04]); }
         }
         "luka" => {
             for (fila, bits) in [0b01010, 0b11111, 0b11111, 0b01110, 0b00100].iter().enumerate() {
@@ -228,13 +262,97 @@ pub fn adornar(modelo: &mut Modelo, id: &str) {
             }
         }
         "shuco" => {
-            t.caja(pan, [0.0, 1.02, -0.64], [1.5, 0.28, 0.45]);
-            t.caja(rosa, [0.0, 1.17, -0.64], [1.65, 0.16, 0.21]);
-            for i in 0..7 { t.caja(oro, [-0.6 + i as f32 * 0.2, 1.27, -0.64 + if i % 2 == 0 { 0.05 } else { -0.05 }], [0.21, 0.045, 0.08]); }
+            // La nave va adentro: dos panes a los lados, salchicha encima, mostaza y guacamol.
+            let salchicha = t.color("salchicha", [0.80, 0.22, 0.20], 0.03);
+            let tostado = t.color("tostado", [0.56, 0.26, 0.08], 0.0);
+            for lado in [-1.0f32, 1.0] {
+                t.esfera(pan, Vec3::new(lado * 1.28, 0.25, 0.0), 1.0, Vec3::new(0.48, 0.85, 1.6));
+                for z in [-0.8, 0.0, 0.8] { t.caja(tostado, [lado * 1.72, 0.45, z], [0.05, 0.16, 0.42]); }
+            }
+            t.cono(salchicha, Vec3::new(0.0, 1.22, -1.9), Vec3::new(0.0, 0.0, 1.0), 3.8, 0.34, 0.34, 10);
+            for k in 0..15 {
+                let z = -1.72 + k as f32 * 0.24;
+                t.caja(oro, [if k % 2 == 0 { 0.12 } else { -0.12 }, 1.57, z], [0.38, 0.05, 0.11]);
+            }
+            for (x, z) in [(-0.3, -1.3), (0.3, -0.5), (-0.28, 0.4), (0.3, 1.3)] { t.caja(verde, [x, 1.5, z], [0.24, 0.13, 0.26]); }
         }
-        "quetzal" | "sombra" => t.lentes(negro, if id == "sombra" { rosa } else { verde }),
-        "oro" => t.corona(oro),
-        "aurora" => { t.corona(oro); t.lentes(negro, blanco); }
+        "quetzal" => {
+            // Pico, cresta, pecho rojo, alas y la cola de plumas que tiene fama.
+            let esmeralda = t.color("esmeralda", [0.05, 0.84, 0.46], 0.28);
+            let esmeralda_b = t.color("esmeralda_b", [0.04, 0.58, 0.60], 0.2);
+            let pecho = t.color("pecho", [0.95, 0.08, 0.16], 0.1);
+            t.caja(pecho, [0.0, -0.42, -0.88], [1.36, 0.62, 0.3]);
+            t.aleta(oro, &[Vec3::new(-0.2, 0.05, -1.02), Vec3::new(0.2, 0.05, -1.02), Vec3::new(0.0, -0.15, -1.48)], Vec3::new(0.0, -0.06, 0.0));
+            for k in 0..7 {
+                let x = -0.42 + k as f32 * 0.14;
+                let h = 0.52 - (k as f32 - 3.0).abs() * 0.1;
+                t.caja(esmeralda, [x, 1.04 + h * 0.5, -0.4], [0.11, h, 0.34]);
+            }
+            for lado in [-1.0f32, 1.0] {
+                t.aleta(esmeralda_b, &[Vec3::new(lado * 1.0, 0.65, -0.3), Vec3::new(lado * 2.25, 0.36, 0.15), Vec3::new(lado * 1.85, -0.25, 0.42), Vec3::new(lado * 1.0, -0.2, 0.25)], Vec3::new(0.0, 0.05, 0.0));
+                t.aleta(esmeralda, &[Vec3::new(lado * 1.0, 0.42, -0.05), Vec3::new(lado * 1.7, 0.22, 0.2), Vec3::new(lado * 1.42, -0.2, 0.42), Vec3::new(lado * 1.0, -0.25, 0.3)], Vec3::new(0.0, 0.08, 0.0));
+            }
+            // Las dos plumas largas, mas largas que toda la nave, y dos cortas.
+            for (x, largo, m) in [(-0.3, 4.1, esmeralda), (0.3, 3.4, esmeralda), (-0.14, 2.2, esmeralda_b), (0.14, 2.6, esmeralda_b)] {
+                t.aleta(m, &[Vec3::new(x - 0.13, -0.28, 0.95), Vec3::new(x + 0.13, -0.28, 0.95), Vec3::new(x + 0.2, -0.65, 0.95 + largo * 0.7), Vec3::new(x, -0.72, 0.95 + largo), Vec3::new(x - 0.2, -0.65, 0.95 + largo * 0.7)], Vec3::new(0.0, 0.04, 0.0));
+            }
+        }
+        "sombra" => {
+            // Capucha, ojos de neon, katana a la espalda, cortes rojos y cuchillas alrededor.
+            let neon = t.color("neon_rojo", [1.0, 0.06, 0.16], 1.5);
+            let capucha = t.color("capucha", [0.03, 0.03, 0.07], 0.0);
+            let acero = t.color("acero", [0.8, 0.85, 0.95], 0.2);
+            t.caja(capucha, [0.0, 1.02, -0.05], [2.28, 0.3, 2.2]);
+            t.caja(capucha, [0.0, 1.32, 0.1], [1.5, 0.3, 1.6]);
+            t.caja(capucha, [0.0, 1.58, 0.28], [0.72, 0.26, 0.92]);
+            for lado in [-1.0f32, 1.0] {
+                t.caja(capucha, [lado * 1.1, 0.5, 0.1], [0.2, 1.05, 1.9]);
+                t.caja(neon, [lado * 1.21, 0.5, 0.1], [0.02, 0.04, 1.7]);
+                t.caja(neon, [lado * 0.47, 0.13, -1.1], [0.62, 0.07, 0.02]);
+            }
+            t.caja(neon, [0.0, 1.18, 1.05], [1.8, 0.04, 0.03]);
+            // La katana cruzada.
+            t.aleta(acero, &[Vec3::new(-1.42, 1.72, 1.15), Vec3::new(-1.3, 1.82, 1.15), Vec3::new(1.05, -0.22, 1.15), Vec3::new(0.93, -0.32, 1.15)], Vec3::new(0.0, 0.0, 0.05));
+            t.caja(neon, [1.1, -0.35, 1.17], [0.42, 0.42, 0.06]);
+            t.caja(capucha, [1.28, -0.54, 1.17], [0.34, 0.34, 0.07]);
+            // Las cuchillas que la siguen, en circulo.
+            for k in 0..8 {
+                let a = k as f32 / 8.0 * std::f32::consts::TAU;
+                let (cx, cz) = (a.cos() * 2.0, a.sin() * 2.0);
+                let (ux, uz) = (a.cos() * 0.34, a.sin() * 0.34);
+                t.aleta(if k % 2 == 0 { neon } else { acero }, &[Vec3::new(cx - uz, 0.1, cz + ux), Vec3::new(cx + ux, 0.1, cz + uz), Vec3::new(cx + uz, 0.1, cz - ux), Vec3::new(cx - ux, 0.1, cz - uz)], Vec3::new(0.0, 0.05, 0.0));
+            }
+        }
+        "oro" => {
+            // Corona grande con joyas, alas de oro y su capa de tarjeta sin saldo.
+            let dorado = t.color("dorado", [1.0, 0.78, 0.18], 0.45);
+            let capa = t.color("capa", [0.72, 0.05, 0.22], 0.05);
+            t.caja(dorado, [0.0, 0.98, -0.1], [1.72, 0.2, 1.6]);
+            for (x, z) in [(-0.74, -0.8), (0.0, -0.8), (0.74, -0.8), (-0.74, 0.6), (0.0, 0.6), (0.74, 0.6), (-0.74, -0.1), (0.74, -0.1)] {
+                let h = if x == 0.0 { 0.72 } else { 0.48 };
+                t.caja(dorado, [x, 1.08 + h * 0.5, z], [0.26, h, 0.26]);
+                t.caja(if x == 0.0 { rosa } else { azul }, [x, 1.08 + h + 0.08, z], [0.16, 0.16, 0.16]);
+            }
+            for lado in [-1.0f32, 1.0] {
+                for k in 0..5 {
+                    let e = k as f32 * 0.42;
+                    let (y0, y1) = (0.62 + e * 0.32, 0.84 + e * 0.42);
+                    t.aleta(dorado, &[Vec3::new(lado * (1.0 + e), y0, 0.1), Vec3::new(lado * (1.42 + e), y1, 0.1), Vec3::new(lado * (1.42 + e), y1 - 1.0 + e * 0.16, 0.5), Vec3::new(lado * (1.0 + e), y0 - 1.0 + e * 0.16, 0.5)], Vec3::new(0.0, 0.0, 0.05));
+                }
+            }
+            t.aleta(capa, &[Vec3::new(-0.92, 0.75, 1.02), Vec3::new(0.92, 0.75, 1.02), Vec3::new(1.15, -1.15, 1.42), Vec3::new(-1.15, -1.15, 1.42)], Vec3::new(0.0, 0.0, 0.05));
+            t.caja(dorado, [0.0, -0.1, 1.28], [0.5, 0.5, 0.03]);
+        }
+        "aurora" => {
+            // Lentes, y arriba las cintas de la aurora, ondulando.
+            t.lentes(negro, blanco);
+            let cinta = [t.color("aurora_a", [0.25, 1.0, 0.70], 0.4), t.color("aurora_b", [0.60, 0.42, 1.0], 0.4)];
+            for k in 0..14 {
+                let x = -0.84 + k as f32 * 0.13;
+                let y = 1.2 + (k as f32 * 0.9).sin() * 0.14;
+                t.caja(cinta[k % 2], [x, y, -0.2], [0.13, 0.42, 0.05]);
+            }
+        }
         "cobre" => {
             // Taza abierta: cuatro paredes, cafe y un asa rectangular con hueco.
             t.caja(blanco, [-0.78, 1.0, -0.35], [0.55, 0.12, 0.52]);

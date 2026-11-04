@@ -764,6 +764,8 @@ pub struct Vegetta {
     pub diamantes_willy: u32,
     quemado: f32,
     pub particulas: Vec<Particula>,
+    /// Las chispas de los diamantes, los puntos de control y la meta.
+    pub jugo: crate::chispas::Jugo,
     // El minijuego.
     pub tiempo: f32,
     pub tomados: Vec<bool>,
@@ -812,6 +814,7 @@ impl Vegetta {
             diamantes_willy: 0,
             quemado: 0.0,
             particulas: Vec::new(),
+            jugo: Default::default(),
             tiempo: 0.0,
             tomados: Vec::new(),
             gano: false,
@@ -920,6 +923,7 @@ impl Vegetta {
     pub fn actualizar(&mut self, e: &Entrada, dt: f32) -> AccionVegetta {
         self.t += dt;
         self.total += dt;
+        self.jugo.actualizar(dt);
         if let Some(m) = &mut self.mensaje {
             m.3 -= dt;
             if m.3 <= 0.0 {
@@ -1030,6 +1034,8 @@ impl Vegetta {
                     if (c - self.control).length() > 3.0 {
                         self.control = c;
                         self.anunciar("¡PUNTO DE CONTROL!");
+                        self.jugo.estallar(c + Vec3::new(0.0, 0.8, 0.0), [0.75, 0.4, 1.0], 26, 6.0);
+                        self.jugo.onda(c + Vec3::new(0.0, 0.2, 0.0), [0.75, 0.4, 1.0], 4.0);
                         self.eventos.push(Efecto::Sello);
                     }
                 }
@@ -1045,6 +1051,9 @@ impl Vegetta {
         for i in 0..self.pista.diamantes.len() {
             if !self.tomados[i] && (self.pista.diamantes[i] - (self.prota.pos + Vec3::new(0.0, 0.6, 0.0))).length() < 0.9 {
                 self.tomados[i] = true;
+                let p = self.pista.diamantes[i];
+                self.jugo.estallar(p, [0.35, 1.0, 0.95], 24, 6.0);
+                self.jugo.onda(p, [0.35, 1.0, 0.95], 3.0);
                 self.eventos.push(Efecto::Nota3);
             }
         }
@@ -1078,6 +1087,10 @@ impl Vegetta {
             self.ganadas += 1;
             self.marcador[k].0 += 1;
             self.anunciar("¡GANASTE!");
+            let p = self.prota.pos + Vec3::new(0.0, 1.0, 0.0);
+            self.jugo.estallar(p, [1.0, 0.84, 0.25], 70, 11.0);
+            self.jugo.estallar(p, [1.0, 0.36, 0.7], 40, 9.0);
+            self.jugo.onda(p, [1.0, 0.84, 0.25], 9.0);
             self.eventos.push(Efecto::Fuego);
             let frase = match self.modo {
                 Modo::Parkour => "¡Increíble! ¡Le ganaste a Willy en el parkour! Willy, ya sabes: la casa. De tierra.",
@@ -1327,6 +1340,9 @@ impl Vegetta {
             Bloque::MenaDiamante => {
                 self.diamantes_mina += 1;
                 self.anunciar("¡DIAMANTE!");
+                let p = Vec3::new(c.0 as f32 + 0.5, c.1 as f32 + 0.5, c.2 as f32 + 0.5);
+                self.jugo.estallar(p, [0.35, 1.0, 0.95], 34, 7.0);
+                self.jugo.onda(p, [0.35, 1.0, 0.95], 3.5);
                 self.eventos.push(Efecto::Perfecto);
             }
             Bloque::MenaOro => self.eventos.push(Efecto::Nota3),
@@ -1453,31 +1469,46 @@ impl Vegetta {
         self.cambiar(Fase::Jugando);
         let mut t = 0.0;
         while t < segundos && self.fase == Fase::Jugando {
-            let p = &self.prota;
-            let siguiente = self.pista.camino.iter().filter(|c| c.1).map(|c| c.0).find(|c| c.z > p.pos.z + 0.8).unwrap_or(p.pos + Vec3::new(0.0, 0.0, 1.0));
-            let a = siguiente - p.pos;
-            let quiere = (-a.x).atan2(-a.z);
-            let giro = (quiere - p.yaw + PI).rem_euclid(TAU) - PI;
-            let adelante = p.pos + p.adelante() * 0.45;
-            let piso = |d: f32| {
-                let q = p.pos + p.adelante() * d;
-                self.pista.bloque(q.x.floor() as i32, (p.pos.y - 0.05).floor() as i32, q.z.floor() as i32)
-            };
-            let sin_piso = piso(0.45).is_none_or(|b| b == Bloque::Lava) || piso(0.9) == Some(Bloque::Lava);
-            let escalon = self.pista.solido(adelante.x.floor() as i32, (p.pos.y + 0.1).floor() as i32, adelante.z.floor() as i32);
-            let derecho = giro.abs() < 0.35;
-            let hueco_largo = self.pista.plataformas.iter().find(|q| q.z0 as f32 > p.pos.z + 0.5).is_some_and(|q| {
-                let antes = self.pista.plataformas.iter().filter(|r| (r.z1 as f32) < q.z0 as f32).map(|r| r.z1).max().unwrap_or(0);
-                q.z0 - antes > 3
-            });
-            let cerca = !p.en_suelo && Vec3::new(a.x, 0.0, a.z).length() < 0.9;
-            let empuje = if cerca || (!derecho && sin_piso) { 0.0 } else { 1.0 };
-            let e = Entrada { empuje, turbo: hueco_largo, girar: (giro * 3.0).clamp(-1.0, 1.0), aceptar: p.en_suelo && derecho && (sin_piso || escalon), disparando: true, ..Default::default() };
+            let e = self.entrada_parkour();
             self.actualizar(&e, 1.0 / 60.0);
             t += 1.0 / 60.0;
         }
         let p = &self.prota;
         self.camara = (p.pos - p.adelante() * 4.2 + Vec3::new(0.0, 2.3, 0.0), p.pos + Vec3::new(0.0, 1.0, 0.0) + p.adelante() * 2.5);
+    }
+
+    /// Si se esta corriendo el parkour (para que la grabacion lo juegue sola).
+    pub fn en_parkour(&self) -> bool {
+        self.modo == Modo::Parkour && self.fase == Fase::Jugando
+    }
+
+    /// Si se esta jugando la mineria.
+    pub fn en_mina(&self) -> bool {
+        self.modo == Modo::Mineria && self.fase == Fase::Jugando
+    }
+
+    /// Lo que apretaria quien corre el parkour solo: sigue el camino de Willy, a saltos.
+    pub fn entrada_parkour(&self) -> Entrada {
+        let p = &self.prota;
+        let siguiente = self.pista.camino.iter().filter(|c| c.1).map(|c| c.0).find(|c| c.z > p.pos.z + 0.8).unwrap_or(p.pos + Vec3::new(0.0, 0.0, 1.0));
+        let a = siguiente - p.pos;
+        let quiere = (-a.x).atan2(-a.z);
+        let giro = (quiere - p.yaw + PI).rem_euclid(TAU) - PI;
+        let adelante = p.pos + p.adelante() * 0.45;
+        let piso = |d: f32| {
+            let q = p.pos + p.adelante() * d;
+            self.pista.bloque(q.x.floor() as i32, (p.pos.y - 0.05).floor() as i32, q.z.floor() as i32)
+        };
+        let sin_piso = piso(0.45).is_none_or(|b| b == Bloque::Lava) || piso(0.9) == Some(Bloque::Lava);
+        let escalon = self.pista.solido(adelante.x.floor() as i32, (p.pos.y + 0.1).floor() as i32, adelante.z.floor() as i32);
+        let derecho = giro.abs() < 0.35;
+        let hueco_largo = self.pista.plataformas.iter().find(|q| q.z0 as f32 > p.pos.z + 0.5).is_some_and(|q| {
+            let antes = self.pista.plataformas.iter().filter(|r| (r.z1 as f32) < q.z0 as f32).map(|r| r.z1).max().unwrap_or(0);
+            q.z0 - antes > 3
+        });
+        let cerca = !p.en_suelo && Vec3::new(a.x, 0.0, a.z).length() < 0.9;
+        let empuje = if cerca || (!derecho && sin_piso) { 0.0 } else { 1.0 };
+        Entrada { empuje, turbo: hueco_largo, girar: (giro * 3.0).clamp(-1.0, 1.0), aceptar: p.en_suelo && derecho && (sin_piso || escalon), disparando: true, ..Default::default() }
     }
 
     /// Para las capturas: `vegetta` (la llegada), `vegetta_lobby`, `vegetta_tnt` (a media
@@ -1601,7 +1632,7 @@ impl Vegetta {
     /// Los colores del cielo (abajo, medio, arriba): de dia en el parkour, atardecer en TNT Run,
     /// de noche en la mina; en el lobby, el dia pasa (un ciclo cada dos minutos).
     pub fn cielo(&self) -> [[f32; 3]; 3] {
-        let dia = [[0.78, 0.88, 1.0], [0.62, 0.78, 1.0], [0.36, 0.55, 0.95]];
+        let dia = [[0.62, 0.82, 1.0], [0.42, 0.68, 1.0], [0.16, 0.36, 0.92]];
         let tarde = [[1.0, 0.72, 0.45], [0.95, 0.5, 0.45], [0.35, 0.25, 0.55]];
         let noche = [[0.10, 0.10, 0.22], [0.05, 0.05, 0.14], [0.02, 0.02, 0.06]];
         match self.modo {

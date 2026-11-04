@@ -226,6 +226,12 @@ impl Ritmo {
         self.jugando
     }
 
+    /// Jugando solo (la grabacion): (piso, aire) si alguna nota cae justo en los siguientes `dt`.
+    pub fn golpes_solos(&self, dt: f32) -> (bool, bool) {
+        let toca = |aire: bool| self.jugando && self.notas.iter().any(|n| n.aire == aire && n.t > self.t && n.t <= self.t + dt);
+        (toca(false), toca(true))
+    }
+
     /// Como termino la cancion, si ya termino: la dificultad, la nota (S, A, B, C) y los fallos.
     pub fn resultado(&self) -> Option<(Dificultad, &'static str, u32)> {
         self.termino().then(|| (self.dificultad, self.nota_final(), self.fallos))

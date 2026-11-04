@@ -134,6 +134,12 @@ impl Maravillas {
 
     /// Cuenta algo (una sola vez); si ya hay algo que decir este cuadro o GLADAS esta hablando,
     /// espera su turno (para no cortarla).
+    /// Para la grabacion: GLADAS ya no cuenta nada (`todo`), o solo deja de contar la linea
+    /// Petrova (que si no sale en casi cualquier toma cerca del Sol).
+    pub fn callar(&mut self, todo: bool) {
+        self.dichas |= if todo { u32::MAX } else { PETROVA };
+    }
+
     fn contar(&mut self, bit: u32, n: &mut Novedades, mensaje: &str, efecto: Option<Efecto>) -> bool {
         if self.dichas & bit != 0 || n.mensaje.is_some() || self.hablando {
             return false;

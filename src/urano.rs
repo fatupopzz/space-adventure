@@ -202,6 +202,8 @@ const LLEGADA: [(&str, &str, Voz); 3] = [
 ];
 
 pub struct Urano {
+    /// Las chispas de cuando algo sale bien (o mal).
+    pub jugo: crate::chispas::Jugo,
     fase: Fase,
     /// Segundos en la fase.
     t: f32,
@@ -264,6 +266,7 @@ impl Urano {
             mensaje: None,
             dano: 0.0,
             sacudida: 0.0,
+            jugo: Default::default(),
             imagen: (0.0, 0.0, 1.0, 1.0),
             partidas: 0,
             dias_ganados: 0,
@@ -377,6 +380,7 @@ impl Urano {
         self.total += dt;
         self.dano = (self.dano - dt * 1.5).max(0.0);
         self.sacudida = (self.sacudida - dt * 2.0).max(0.0);
+        self.jugo.actualizar(dt);
         if let Some(m) = &mut self.mensaje {
             m.3 -= dt;
             if m.3 <= 0.0 {
@@ -719,7 +723,10 @@ impl Urano {
                 self.eventos.push(Efecto::Chorro);
             }
             if self.charcos[i].tam < 0.15 {
+                let p = self.charcos[i].pos;
                 self.charcos.remove(i);
+                self.jugo.estallar(p + Vec3::new(0.0, 0.2, 0.0), [0.5, 0.95, 1.0], 18, 4.0);
+                self.jugo.onda(p, [0.5, 0.95, 1.0], 2.0);
                 self.eventos.push(Efecto::Acierto);
             }
             return;
@@ -741,6 +748,8 @@ impl Urano {
                         a.camino = vec![Vec3::new(-3.0, 0.0, 2.95), Vec3::new(-3.0, 0.0, 0.4), Vec3::new(xc, 0.0, Z_PUERTA + 0.2), Vec3::new(xc, 0.0, Z_ADENTRO)];
                         self.cubiculos[n].ocupado = true;
                         self.quetzales += 1;
+                        let p = self.jugador.pos + Vec3::new(0.0, 1.2, 0.0);
+                        self.jugo.estallar(p, [1.0, 0.84, 0.25], 14, 3.5);
                         self.eventos.push(Efecto::Acierto);
                     }
                     (Some(_), None) => {
@@ -764,12 +773,16 @@ impl Urano {
                     if c.destape >= 1.0 {
                         c.tapado = false;
                         c.destape = 0.0;
+                        let p = Vec3::new(x_cubiculo(n), 0.8, Z_PUERTA);
+                        self.jugo.estallar(p, [0.55, 1.0, 0.7], 30, 6.0);
+                        self.jugo.onda(p, [0.55, 1.0, 0.7], 3.0);
                         self.eventos.push(Efecto::Acierto);
                         self.chepa(format!("¡GLUP! Destapado el {}. Usted tiene futuro en esto.", n + 1));
                     }
                 } else if carga == Some(Item::Papel) && c.papel < ROLLOS {
                     c.papel = ROLLOS;
                     self.jugador.carga = None;
+                    self.jugo.estallar(Vec3::new(x_cubiculo(n), 1.0, Z_PUERTA), [1.0, 1.0, 1.0], 16, 3.5);
                     self.eventos.push(Efecto::Sello);
                     // Si alguien esperaba el papel adentro, sigue en lo suyo.
                     if let Some(a) = self.aliens.iter_mut().find(|a| a.hace == Hace::SinPapel(n)) {
