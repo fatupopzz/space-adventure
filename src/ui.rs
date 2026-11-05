@@ -675,7 +675,7 @@ fn dibujar_simbolo(d: &mut RaylibDrawHandle, s: char, x: f32, y: f32, tam: f32, 
             d.draw_line_ex(Vector2::new(c.x - k, c.y + k), Vector2::new(c.x + k, c.y - k), grueso, azul);
         }
         '\u{E001}' => d.draw_ring(c, k - grueso * 0.5, k + grueso * 0.5, 0.0, 360.0, 24, con(255, 105, 115)),
-        '\u{E002}' => d.draw_rectangle_lines_ex(Rectangle::new(c.x - k, c.y - k, 2.0 * k, 2.0 * k), grueso * 0.9, con(240, 135, 220)),
+        '\u{E002}' => d.draw_rectangle_lines_ex(Rectangle::new(c.x - k, c.y - k, 2.0 * k, 2.0 * k), grueso * 0.9, con(255, 209, 64)),
         _ => {
             let verde = con(70, 225, 180);
             let (a, b, e) = (Vector2::new(c.x, c.y - k * 1.1), Vector2::new(c.x - k * 1.1, c.y + k * 0.8), Vector2::new(c.x + k * 1.1, c.y + k * 0.8));

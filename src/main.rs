@@ -1089,10 +1089,11 @@ impl Juego {
         }
         // E se escucha tambien durante el destello de llegada de un salto.
         if e.aterrizar && !junto_al_monolito && self.salto.puede_maniobrar() && self.aterrizaje.is_none() {
-            match aterrizable(self.nave.pos, self.t) {
+            match self.donde_aterrizar() {
                 Some(i) => self.empezar_aterrizaje(i),
                 // Lejos de todo: salta al planeta escogido (o al mas cercano) y baja solo al llegar.
                 None => {
+                    self.orbita = None;
                     let destino = self.objetivo.unwrap_or_else(|| mas_cercano(self.nave.pos, self.t).0.max(1));
                     self.salto = Salto::new();
                     self.salto.iniciar(&self.nave, destino);
@@ -1151,6 +1152,13 @@ impl Juego {
             }
         }
         self.eventos.push(Efecto::Perfecto);
+    }
+
+    /// Donde se aterriza si se aprieta el boton ahorita. En modo orbita, en el planeta que se esta
+    /// rodeando: la orbita llega mas lejos que el alcance de aterrizaje, y si no, el boton mandaba
+    /// a un salto al hiperespacio (con la orbita jalando la nave para atras). Al Sol, nunca.
+    fn donde_aterrizar(&self) -> Option<usize> {
+        self.orbita.map(|o| o.0).filter(|&i| i != 0).or_else(|| aterrizable(self.nave.pos, self.t))
     }
 
     fn empezar_aterrizaje(&mut self, planeta: usize) {
@@ -6461,7 +6469,7 @@ fn barra_de_acciones(d: &mut RaylibDrawHandle, juego: &Juego, e: &Entrada, hud: 
         None => {
             acciones.push((aceptar, format!("Salto a {}", CUERPOS[juego.destino_del_salto()].nombre), false));
             let ir_a = juego.objetivo.unwrap_or(cerca.max(1));
-            match aterrizable(juego.nave.pos, juego.t) {
+            match juego.donde_aterrizar() {
                 _ if (juego.nave.pos - mirador_en(juego.t)).length() < DISTANCIA_MIRADOR => acciones.push((aterrizar, "Descansar en el Mirador".to_string(), true)),
                 Some(i) if !juego.aterrizar_al_llegar => acciones.push((aterrizar, format!("Aterrizar en {}", CUERPOS[i].nombre), true)),
                 _ => acciones.push((aterrizar, format!("Ir a {} y aterrizar", CUERPOS[ir_a].nombre), false)),
@@ -7308,6 +7316,28 @@ mod estres {
                 eprintln!("{}: {total:.0} s de juego", stringify!($nombre));
             }
         };
+    }
+
+    /// En modo orbita, el boton de aterrizar baja en ese planeta, aunque se orbite lejos.
+    #[test]
+    fn se_puede_aterrizar_desde_la_orbita() {
+        for (planeta, lejos) in [(MARTE, 12.0), (TIERRA, 1.5), (JUPITER, 10.0), (PLUTON, 12.0)] {
+            let c = &CUERPOS[planeta];
+            let t = 5.0;
+            let lado = c.posicion(t).normalize();
+            let pos = c.posicion(t) + lado * (c.radio_visual() + lejos);
+            let mut j = Juego::new(pos, 0.0);
+            j.t = t;
+            j.actualizar(&Entrada { orbitar: true, ..Default::default() }, 1.0 / 60.0);
+            assert_eq!(j.orbita.map(|o| o.0), Some(planeta), "no entro en orbita de {}", c.nombre);
+            for _ in 0..30 {
+                j.actualizar(&Entrada::default(), 1.0 / 60.0);
+            }
+            j.actualizar(&Entrada { aterrizar: true, ..Default::default() }, 1.0 / 60.0);
+            assert!(j.orbita.is_none(), "{}: la orbita sigue jalando", c.nombre);
+            assert!(!j.salto.activo(), "{}: se fue al hiperespacio", c.nombre);
+            assert_eq!(j.aterrizaje.as_ref().map(|a| a.planeta), Some(planeta), "{}: no aterrizo", c.nombre);
+        }
     }
 
     /// F1 y F2: al cambiar el radio de un planeta, la colision se mueve con el dibujo.

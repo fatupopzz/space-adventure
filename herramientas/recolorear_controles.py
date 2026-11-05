@@ -37,5 +37,8 @@ for nombre in HOJAS:
             r, g, b, a = px[x, y]
             if a and (r, g, b) in CAMBIOS:
                 px[x, y] = CAMBIOS[(r, g, b)] + (a,)
+            # El cuadrado de PlayStation (fila 2), amarillo: rosa, se confundia con el circulo rojo.
+            if nombre == "controller_ps" and 32 <= y < 48 and (r, g, b) == (255, 82, 119):
+                px[x, y] = (255, 209, 64, a)
     hoja.save(os.path.join(destino, nombre + ".png"))
     print(f"{nombre}.png: {hoja.width}x{hoja.height}")
