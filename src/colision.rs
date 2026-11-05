@@ -16,7 +16,7 @@ impl Cuerpo {
     /// El radio del cuerpo solido (sin anillos), ya escalado.
     pub fn radio_cuerpo(&self) -> f32 {
         // El modelo de Saturno es de radio 2; los demas, de radio 1.
-        self.escala * if self.archivo == "saturno_ritmo" { 2.0 } else { 1.0 }
+        self.escala_viva() * if self.archivo == "saturno_ritmo" { 2.0 } else { 1.0 }
     }
 
     /// Los anillos, de radio interior a exterior, en unidades del modelo.
@@ -39,7 +39,7 @@ pub fn resolver(pos: &mut Vec3, t: f32) -> Option<usize> {
         // relieve con ruido): el radio de la superficie en la direccion de la nave.
         let d = *pos - centro;
         let radio = if c.archivo == "chapin" {
-            c.escala * crate::chapin::radio_superficie(c.a_local(t, *pos).normalize())
+            c.escala_viva() * crate::chapin::radio_superficie(c.a_local(t, *pos).normalize())
         } else {
             c.radio_cuerpo() * crate::planetas::radio_superficie(c.archivo, c.a_local(t, *pos).normalize()).unwrap_or(1.0)
         };
@@ -51,11 +51,11 @@ pub fn resolver(pos: &mut Vec3, t: f32) -> Option<usize> {
         // Los anillos: un disco delgado en el plano XZ del planeta.
         if let Some((r0, r1)) = c.anillos() {
             let inclinacion = c.inclinacion.to_radians();
-            let local = Mat4::rotation_z(-inclinacion).transform_point(*pos - centro) * (1.0 / c.escala);
+            let local = Mat4::rotation_z(-inclinacion).transform_point(*pos - centro) * (1.0 / c.escala_viva());
             let radio = (local.x * local.x + local.z * local.z).sqrt();
-            let grosor = RADIO_NAVE / c.escala + 0.05;
+            let grosor = RADIO_NAVE / c.escala_viva() + 0.05;
             if (r0..=r1).contains(&radio) && local.y.abs() < grosor {
-                let empujado = Vec3::new(local.x, grosor.copysign(local.y), local.z) * c.escala;
+                let empujado = Vec3::new(local.x, grosor.copysign(local.y), local.z) * c.escala_viva();
                 *pos = centro + Mat4::rotation_z(inclinacion).transform_point(empujado);
                 choque = Some(i);
             }

@@ -64,6 +64,13 @@ pub fn nivel_para(radio_px: f32) -> usize {
     }
 }
 
+/// Lo que mide un voxel en el nivel `n` del planeta `archivo` (en el espacio del modelo, donde el
+/// radio es 1). `None` si no se arma con receta o no es solo voxels de un color por material.
+pub fn celda_de(archivo: &str, n: usize) -> Option<f32> {
+    let r = RECETAS.iter().find(|r| r.archivo == archivo)?;
+    Some(2.0 / lado_del_nivel(r.diametro, n.min(NIVELES.len() - 1)) as f32)
+}
+
 /// Los voxels de lado a lado del nivel `n` de algo que en el nivel normal lleva `diametro`.
 fn lado_del_nivel(diametro: i32, n: usize) -> i32 {
     ((diametro as f32 * NIVELES[n] / 2.0).round() as i32 * 2).max(4)
@@ -508,7 +515,7 @@ fn volcan_y_rover(vx: &mut Voxels, _hd: bool) {
 
 // ---------- Jupiter: franjas por latitud y la Gran Mancha Roja ----------
 const MAT_JUPITER: &[Mat] = &[
-    ("jup_crema", [0.95, 0.88, 0.72], None, 1.0),
+    ("jup_crema", [0.78, 0.70, 0.56], None, 1.0),
     ("jup_naranja", [0.92, 0.62, 0.35], None, 1.0),
     ("jup_cafe", [0.62, 0.40, 0.28], None, 1.0),
     ("mancha_roja", [0.85, 0.28, 0.20], None, 1.0),

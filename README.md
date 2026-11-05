@@ -61,9 +61,11 @@ control. Basta grabar la pantalla.
 | Niveles de detalle según la distancia | 8 | **Cada planeta se arma en 5 niveles** de voxels (de 0.75 a 3.25 veces su tamaño normal; el Chapín, de 16 a 64 de lado a lado) y se dibuja el que toca según cuánto mide en pantalla (`planetas::nivel_para`, el mismo para todos): de lejos, voxels grandes. Las ceibas y rocas del Chapín tienen versión de lejos, y lo que mide menos de 3 píxeles no se pide. En **TAB**: los triángulos procesados y en qué nivel va el planeta de junto. |
 | Coherencia visual y claridad | 10 | Ver capturas en `previews/`, los controles en **TAB** y las ayudas en pantalla. |
 
-Para pedir cambios en vivo durante la presentación: junto a **cualquier planeta**, F5/F6 le
-cambian la semilla del ruido y F7/F8 el relieve (se vuelve a armar ahí mismo; el panel de TAB
-dice cuáles tiene), y F9/F10 la intensidad de los shaders. En el código: las recetas de cada
+Para pedir cambios en vivo durante la presentación: junto a **cualquier planeta**, **F1/F2** le
+cambian el radio (el dibujo y las colisiones lo siguen), F5/F6 la semilla del ruido y F7/F8 el
+relieve (se vuelve a armar ahí mismo). En cualquier parte del espacio, **F3/F4** cambian la
+velocidad de las órbitas y F9/F10 la intensidad de los shaders. El panel de TAB dice qué valores
+tiene cada uno. En el código: las recetas de cada
 planeta en `RECETAS` de [src/planetas.rs](src/planetas.rs) (amplitud, frecuencia y semilla del
 ruido), los parámetros del Chapín en `chapin::PARAMETROS`, los radios y velocidades orbitales en
 la tabla `CUERPOS` de [src/escena.rs](src/escena.rs) y la gravedad en `GRAVEDAD`.

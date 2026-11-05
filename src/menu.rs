@@ -58,12 +58,16 @@ pub struct Menu {
     pub creditos: bool,
     /// Si ya se paso la pantalla de "Presiona ESPACIO".
     iniciado: bool,
+    /// La frase de esta vez (sale al lado del logo, una distinta cada vez que se abre el juego).
+    frase: &'static str,
     pub eventos: Vec<Efecto>,
 }
 
 impl Menu {
     pub fn new(hay_partida: bool) -> Self {
-        Menu { cursor: 0, desde: 0.0, lista: 0.0, reloj: 0.0, hay_partida, creditos: false, iniciado: false, eventos: Vec::new() }
+        let reloj = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_secs() as usize);
+        let frase = crate::personalidad::FRASES_MENU[reloj % crate::personalidad::FRASES_MENU.len()];
+        Menu { frase, cursor: 0, desde: 0.0, lista: 0.0, reloj: 0.0, hay_partida, creditos: false, iniciado: false, eventos: Vec::new() }
     }
 
     fn opciones(&self) -> Vec<Opcion> {
@@ -189,6 +193,11 @@ impl Menu {
         let ancho_logo = ui::medir_titulo("ADVENTURE", tam2 as i32) as f32;
         let y_raya = y2 + tam2 * 1.08;
         d.draw_rectangle_pro(Rectangle::new(x0 - 6.0, y_raya, ancho_logo + 40.0, 5.0), Vector2::zero(), -6.0, Color::new(255, 130, 210, 230));
+        // La frase de esta vez, a un lado del logo, latiendo.
+        let late = 1.0 + 0.06 * (self.reloj * 5.0).sin();
+        let tam_frase = (tam1 * 0.3 * late).clamp(13.0, 30.0);
+        let x_frase = x0 + ui::medir_titulo("SPACE", tam1 as i32) as f32 + 28.0;
+        ui::titulo_girado_de(d, self.frase, x_frase, y0 + tam1 * 0.42, tam_frase, -9.0, Color::new(255, 225, 90, 255));
         let sub = "Divorcios en Venus. Citas en Marte. ¿Y la entrega?";
         let mut tam_sub = 18;
         while tam_sub > 11 && ui::medir(sub, tam_sub) as f32 > w * 0.88 { tam_sub -= 1; }

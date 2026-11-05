@@ -305,7 +305,7 @@ pub fn disco() -> Modelo {
 pub fn dibujar_petrova(fb: &mut Framebuffer, vista_proyeccion: &Mat4, t: f32, reloj: f32) {
     let sol = CUERPOS[0].posicion(t);
     let venus = CUERPOS[VENUS].posicion(t);
-    let (desde, hasta) = (sol + (venus - sol).normalize() * CUERPOS[0].escala * 1.05, venus - (venus - sol).normalize() * CUERPOS[VENUS].escala * 1.1);
+    let (desde, hasta) = (sol + (venus - sol).normalize() * CUERPOS[0].escala_viva() * 1.05, venus - (venus - sol).normalize() * CUERPOS[VENUS].escala * 1.1);
     let pasos = 48;
     for k in 0..pasos {
         let (u0, u1) = (k as f32 / pasos as f32, (k + 1) as f32 / pasos as f32);

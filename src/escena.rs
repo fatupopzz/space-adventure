@@ -10,6 +10,7 @@
 //! `ESCALA_SISTEMA`: asi la nave (que mide lo mismo) queda chiquita junto a
 //! los planetas, como en los juegos de naves, sin reescribir cada numero.
 
+use std::sync::atomic::{AtomicU32, Ordering};
 use crate::matematica::{Mat4, Vec3};
 use std::f32::consts::TAU;
 
@@ -72,6 +73,21 @@ pub const URANO: usize = 8;
 pub const VEGETTA: usize = 12;
 pub const CHAPIN: usize = 13;
 
+/// Cuantas veces el radio de la tabla mide cada cuerpo ahorita (en vivo, con F1 y F2): en bits de f32.
+static FACTOR_RADIO: [AtomicU32; 14] = {
+    const UNO: AtomicU32 = AtomicU32::new(0x3f80_0000);
+    [UNO; 14]
+};
+
+/// Cambia el radio del cuerpo `i` (1 es el de la tabla). El dibujo y las colisiones lo siguen.
+pub fn poner_factor_radio(i: usize, factor: f32) {
+    FACTOR_RADIO[i].store(factor.to_bits(), Ordering::Relaxed);
+}
+
+pub fn factor_radio(i: usize) -> f32 {
+    f32::from_bits(FACTOR_RADIO[i].load(Ordering::Relaxed))
+}
+
 pub const CUERPOS: [Cuerpo; 14] = [
     planeta("Sol", "sol", 6.0, 0.0, 1.0, 60.0, 0.0, 0.0),
     // Mercurio: el que orbita mas rapido.
@@ -117,9 +133,15 @@ impl Cuerpo {
         centro + Vec3::new(self.orbita * a.cos(), 0.0, -self.orbita * a.sin())
     }
 
+    /// La escala de la tabla por lo que se le haya cambiado en vivo (F1 y F2).
+    pub fn escala_viva(&self) -> f32 {
+        let i = CUERPOS.iter().position(|c| c.archivo == self.archivo).unwrap_or(0);
+        self.escala * factor_radio(i)
+    }
+
     /// Que tan grande se ve: el radio del planeta, o el de los anillos.
     pub fn radio_visual(&self) -> f32 {
-        self.escala * self.radio_modelo
+        self.escala_viva() * self.radio_modelo
     }
 
     /// Un punto del mundo llevado al espacio del planeta, sin la escala (la inversa de la
@@ -141,6 +163,6 @@ impl Cuerpo {
         Mat4::translation(self.posicion(t))
             * Mat4::rotation_z(self.inclinacion.to_radians())
             * Mat4::rotation_y(giro)
-            * Mat4::scale(self.escala)
+            * Mat4::scale(self.escala_viva())
     }
 }

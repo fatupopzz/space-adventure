@@ -87,7 +87,8 @@ pub struct Entrada {
     pub orbitar: bool,
     /// V: prende o apaga el descarte de objetos fuera de la vista (para comparar).
     pub descarte: bool,
-    /// F5 a F10: los parametros en vivo (semilla, relieve e intensidad de los shaders, - y +).
+    /// Los parametros en vivo, - y +: F5 y F6 la semilla, F7 y F8 el relieve, F9 y F10 los shaders,
+    /// F1 y F2 el radio del planeta, F3 y F4 la velocidad de las orbitas.
     pub ajuste: Option<usize>,
     pub hay_control: bool,
     /// Que control es (para nombrar sus botones como vienen pintados en el).
@@ -177,7 +178,7 @@ impl Entrada {
             orbitar: pulsada(KEY_R),
             picar: tecla(KEY_F),
             descarte: pulsada(KEY_V),
-            ajuste: numero(&[KEY_F5, KEY_F6, KEY_F7, KEY_F8, KEY_F9, KEY_F10]),
+            ajuste: numero(&[KEY_F5, KEY_F6, KEY_F7, KEY_F8, KEY_F9, KEY_F10, KEY_F1, KEY_F2, KEY_F3, KEY_F4]),
             pestana_izq: pulsada(KEY_Q),
             pestana_der: pulsada(KEY_E),
             hay_control: rl.is_gamepad_available(CONTROL),

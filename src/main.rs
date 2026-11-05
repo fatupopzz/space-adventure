@@ -25,6 +25,7 @@ mod cancion;
 mod casillero;
 mod chispas;
 mod decorado;
+mod personalidad;
 mod cielo;
 mod cita;
 mod divorcio;
@@ -618,6 +619,14 @@ struct Juego {
     params_chapin: chapin::Parametros,
     /// Lo que se le cambio en vivo a cada planeta (F5 a F8, junto a el): semilla y relieve.
     ajustes: [planetas::Ajuste; CUERPOS.len()],
+    /// A que velocidad corre el sistema solar: las orbitas y los giros (en vivo, con F3 y F4).
+    rapidez_orbitas: f32,
+    /// Cuantas veces se ha saludado cada planeta, si ya saludo en esta visita, y hace cuanto que
+    /// el piloto no toca nada (para que GLADAS opine).
+    saludos: [u32; CUERPOS.len()],
+    saludo_dicho: [bool; CUERPOS.len()],
+    ocio: f32,
+    veces_ocio: usize,
     /// La velocidad que junta la gravedad de los planetas (se suma a la de la nave).
     deriva: Vec3,
     /// El planeta que mas jala ahorita y con cuanta aceleracion (para el tablero).
@@ -714,6 +723,11 @@ impl Juego {
             intensidad: 1.0,
             params_chapin: chapin::PARAMETROS,
             ajustes: [planetas::Ajuste::default(); CUERPOS.len()],
+            rapidez_orbitas: 1.0,
+            saludos: [0; CUERPOS.len()],
+            saludo_dicho: [false; CUERPOS.len()],
+            ocio: 0.0,
+            veces_ocio: 0,
             deriva: Vec3::zero(),
             gravedad: None,
             orbita: None,
@@ -761,8 +775,9 @@ impl Juego {
         }
         self.reloj += dt;
         if self.aterrizaje.is_none() {
-            self.t += dt;
+            self.t += dt * self.rapidez_orbitas;
         }
+        self.personalidad(e, dt);
         // T o LB: escoger el destino del hiperespacio (pasa por todos y luego "ninguno").
         if e.objetivo {
             self.objetivo = match self.objetivo {
@@ -1199,6 +1214,32 @@ impl Juego {
         self.sacudida = self.sacudida.max(n.sacudida);
     }
 
+    /// Los planetas saludan cuando uno llega, y GLADAS se aburre si uno no hace nada. Nunca le
+    /// quitan la palabra a un mensaje que este saliendo.
+    fn personalidad(&mut self, e: &Entrada, dt: f32) {
+        let toco = e.empuje != 0.0 || e.girar != 0.0 || e.cabecear != 0.0 || e.horizontal != 0.0 || e.aceptar || e.turbo || e.barrel || e.aterrizar || e.orbitar;
+        self.ocio = if toco || self.nave.velocidad > 2.0 { 0.0 } else { self.ocio + dt };
+        for (i, c) in CUERPOS.iter().enumerate() {
+            let d = (c.posicion(self.t) - self.nave.pos).length();
+            let radio = c.radio_visual();
+            if d > radio * 7.0 + 30.0 {
+                self.saludo_dicho[i] = false;
+            } else if d < radio * 3.2 + 6.0 && !self.saludo_dicho[i] && self.mensaje.is_none() && self.aterrizaje.is_none() {
+                let frases = personalidad::saludos(c.archivo);
+                if !frases.is_empty() {
+                    self.saludo_dicho[i] = true;
+                    self.decir(frases[self.saludos[i] as usize % frases.len()]);
+                    self.saludos[i] += 1;
+                }
+            }
+        }
+        if self.ocio > 24.0 && self.mensaje.is_none() {
+            self.ocio = 0.0;
+            self.decir(personalidad::OCIO[self.veces_ocio % personalidad::OCIO.len()]);
+            self.veces_ocio += 1;
+        }
+    }
+
     /// Al volver de una escena: la nave esta posada sobre el planeta y despega.
     fn despegar_de(&mut self, planeta: usize, mensaje: String) {
         self.aterrizaje = Some(Aterrizaje::despegando(planeta, &self.nave));
@@ -1231,7 +1272,7 @@ fn panel_planeta(juego: &Juego) -> String {
         let a = juego.ajustes[cerca];
         format!("semilla {:+}, relieve ×{:.2}", a.semilla as i32, a.relieve)
     };
-    format!("{}: nivel {nivel}/5, {ajuste}, shaders {:.2}", c.nombre, juego.intensidad)
+    format!("{}: nivel {nivel}/5, {ajuste}, radio ×{:.1}, órbitas ×{}, shaders {:.2}", c.nombre, escena::factor_radio(cerca), juego.rapidez_orbitas, juego.intensidad)
 }
 
 /// Los planetas que tienen aterrizaje.
@@ -1341,7 +1382,7 @@ fn dibujar_espacio(fb: &mut Framebuffer, post: &mut Post, rec: &Recursos, juego:
         modelo: c.matriz(t),
         centro: c.posicion(t),
         eje: c.eje(),
-        radio: c.escala,
+        radio: c.escala_viva(),
         tiempo: juego.reloj,
         intensidad: juego.intensidad,
         ..base
@@ -1364,7 +1405,14 @@ fn dibujar_espacio(fb: &mut Framebuffer, post: &mut Post, rec: &Recursos, juego:
                 CHAPIN => llamada(&chapin.niveles[nivel_chapin], Uniforms { shader: Shader::Terreno, celda: chapin::celda(nivel_chapin), ..de_planeta(c) }),
                 _ => {
                     let (m, a) = rec.planeta(i, radio_px);
-                    DrawCall { animacion: Some((a, anim)), ..llamada(m, Uniforms { modelo: c.matriz(t), ..base }) }
+                    // Los planetas de voxels llevan el shader de terreno: cada bloque con su
+                    // relieve (mapa de normales) y su variacion, y la noche es la del planeta.
+                    let nivel = planetas::nivel_para(radio_px);
+                    let uniforms = match planetas::celda_de(c.archivo, nivel) {
+                        Some(celda) => Uniforms { shader: Shader::Terreno, celda, ..de_planeta(c) },
+                        None => Uniforms { modelo: c.matriz(t), ..base },
+                    };
+                    DrawCall { animacion: Some((a, anim)), ..llamada(m, uniforms) }
                 }
             }
         })
@@ -1380,7 +1428,7 @@ fn dibujar_espacio(fb: &mut Framebuffer, post: &mut Post, rec: &Recursos, juego:
             // Nivel de detalle por objeto: lo que mediria menos de 3 pixeles ni se pide.
             let donde = u_chapin.modelo.transform_point(inst.posicion);
             let local = &inst.locales[nivel_chapin];
-            let tamano = Vec3::new(local.m[0][1], local.m[1][1], local.m[2][1]).length() * c_chapin.escala;
+            let tamano = Vec3::new(local.m[0][1], local.m[1][1], local.m[2][1]).length() * c_chapin.escala_viva();
             let pixeles = tamano / (donde - ojo).length().max(0.1) * pixeles_por_unidad;
             if pixeles < 3.0 {
                 por_detalle += 1;
@@ -1555,9 +1603,9 @@ fn dibujar_espacio(fb: &mut Framebuffer, post: &mut Post, rec: &Recursos, juego:
     let centro_sol = sol.posicion(t);
     let distancia = -vista.transform_point(centro_sol).z;
     if let (Some((x, y, _)), true) = (proyectar(centro_sol, &vista_proyeccion, fb), distancia > 0.0) {
-        let radio = sol.escala / distancia * (fb.alto as f32 * 0.5) / (fov * 0.5).tan();
+        let radio = sol.escala_viva() / distancia * (fb.alto as f32 * 0.5) / (fov * 0.5).tan();
         // Un punto justo delante de su superficie: lo que este mas cerca, lo tapa.
-        let frente = centro_sol + (ojo - centro_sol).normalize() * (sol.escala * 1.15);
+        let frente = centro_sol + (ojo - centro_sol).normalize() * (sol.escala_viva() * 1.15);
         let z_frente = proyectar(frente, &vista_proyeccion, fb).map_or(0.0, |p| p.2);
         // Si el Sol ya llena la pantalla, la corona y los destellos se apagan (si no, todo se quema).
         let lleno = (1.0 - (radio / fb.alto as f32 - 0.25) / 0.35).clamp(0.0, 1.0);
@@ -1636,6 +1684,7 @@ fn dibujar_espacio(fb: &mut Framebuffer, post: &mut Post, rec: &Recursos, juego:
     }
 
     // ---------- post-procesado ----------
+    post::sombras_de_contacto(fb, 5, 0.4);
     // Exposicion automatica: si la imagen ya es muy brillante (el Sol de cerca), el bloom baja.
     post.bloom(fb, BLOOM * post::exposicion(fb));
     // El teseracto, encima de todo (ya con el bloom: lineas nitidas).
@@ -2289,6 +2338,7 @@ fn dibujar_vegetta(fb: &mut Framebuffer, post: &mut Post, rec: &Recursos, v: &Ve
             post::halo(fb, (x, y), 46.0 + 4.0 * (t * 13.0).sin(), [0.42, 0.24, 0.06], 1.5);
         }
     }
+    post::sombras_de_contacto(fb, 5, 0.45);
     v.jugo.dibujar(fb, &vp, ojo);
     post.bloom(fb, BLOOM * if v.bajo_tierra() { 0.9 } else { 0.5 });
     post::gradacion(fb, 1.14, 0.12, [0.0, 0.0, 0.015], [0.012, 0.006, 0.0]);
@@ -2506,6 +2556,7 @@ fn dibujar_junta(fb: &mut Framebuffer, post: &mut Post, rec: &Recursos, j: &Junt
     rec.cielo.dibujar_estrellas(fb, &vista, &proyeccion, t, 0.0);
     rec.cielo.dibujar_adornos(fb, &vista, &proyeccion, t, 0.0);
     let st = pipeline::render(fb, &llamadas, opciones);
+    post::sombras_de_contacto(fb, 5, 0.45);
     // Un reflector sobre quien habla.
     let vista_proyeccion = proyeccion * vista;
     if j.foco().length() > 0.1 {
@@ -3020,6 +3071,7 @@ fn dibujar_neptuno(fb: &mut Framebuffer, post: &mut Post, rec: &Recursos, n: &Ne
     if let Some((x, y, _)) = n.foco().and_then(|f| proyectar(f, &vista_proyeccion, fb)) {
         post::halo(fb, (x, y), 90.0, [0.25, 0.22, 0.1], 1.8);
     }
+    post::sombras_de_contacto(fb, 5, 0.45);
     post.bloom(fb, BLOOM * 0.55);
     post::gradacion(fb, 1.1, 0.14, [0.0, 0.0, 0.015], [0.0, 0.0, 0.0]);
     post::terminar(fb, [0.3, 0.5, 1.0], 0.04, 0.0);
@@ -3590,6 +3642,7 @@ fn dibujar_camioneta(fb: &mut Framebuffer, post: &mut Post, rec: &Recursos, c: &
         llamadas.push(llamada(&m.cubos[ch.color], Uniforms { modelo: Mat4::translation(ch.pos) * Mat4::rotation_y(ch.vida * 4.0) * Mat4::scale(ch.tam), ..base }));
     }
     let st = pipeline::render(fb, &llamadas, opciones);
+    post::sombras_de_contacto(fb, 5, 0.42);
     // La neblina de lejos, del color del horizonte (asi lo que aparece no sale de golpe).
     post::niebla(fb, cerca, lejos, 130.0, 760.0, [horizonte[0] * 0.9, horizonte[1] * 0.75, horizonte[2] * 0.95], true);
     post.bloom(fb, BLOOM * (0.55 + k * 0.5));
@@ -3639,6 +3692,7 @@ fn dibujar_luna(fb: &mut Framebuffer, post: &mut Post, rec: &Recursos, l: &Luna,
         llamadas.push(DrawCall { expresion: Some("feliz"), ..llamada(&rec.profe, Uniforms { modelo: m, ..base }) });
     }
     let st = pipeline::render(fb, &llamadas, opciones);
+    post::sombras_de_contacto(fb, 6, 0.5);
     l.dibujar_efectos(fb, &vista_proyeccion);
     // Los reflectores del estudio, colgados de la armazon, con su resplandor.
     for k in 0..7 {
@@ -5272,7 +5326,20 @@ fn main() {
                 if let Some(k) = e.ajuste {
                     let (cerca, distancia) = mas_cercano(juego.nave.pos, juego.t);
                     let nombre = CUERPOS[cerca].nombre;
-                    if k >= 4 {
+                    if k >= 8 {
+                        // F3 y F4: la velocidad de las orbitas (y de los giros), de todo el sistema.
+                        juego.rapidez_orbitas = if k == 8 { (juego.rapidez_orbitas * 0.5).max(0.125) } else { (juego.rapidez_orbitas * 2.0).min(16.0) };
+                        juego.decir(format!("Velocidad de las órbitas: ×{}. Depende del tiempo, no de los cuadros.", juego.rapidez_orbitas));
+                    } else if k >= 6 {
+                        // F1 y F2: el radio del planeta de junto (el dibujo y las colisiones lo siguen).
+                        if distancia > CUERPOS[cerca].radio_visual() * 4.0 + 40.0 {
+                            juego.decir("Para cambiarle el radio a un planeta, hay que acercarse a uno.");
+                        } else {
+                            let f = (escena::factor_radio(cerca) + if k == 6 { -0.1 } else { 0.1 }).clamp(0.4, 2.5);
+                            escena::poner_factor_radio(cerca, f);
+                            juego.decir(format!("{nombre} en vivo: radio ×{f:.1} ({:.2} unidades).", CUERPOS[cerca].radio_visual()));
+                        }
+                    } else if k >= 4 {
                         juego.intensidad = if k == 4 { (juego.intensidad - 0.25).max(0.0) } else { (juego.intensidad + 0.25).min(3.0) };
                         juego.decir(format!("Intensidad de los shaders: {:.2} (0 los apaga: sin olas, sin relieve en los bloques).", juego.intensidad));
                     } else if distancia > CUERPOS[cerca].radio_visual() * 4.0 + 40.0 {
@@ -7125,4 +7192,105 @@ mod pruebas {
         }
         assert!(r.ia().starts_with("Nota S"), "{}", r.ia());
     }
+}
+
+#[cfg(test)]
+mod estres {
+    //! Botones al azar en todos los minijuegos, miles de cuadros y con cuadros chicos y grandes:
+    //! nada debe tronar. No revisa que se gane: revisa que ninguna combinacion rompa el juego.
+    use super::*;
+    use crate::entrada::Entrada;
+
+    struct Azar(u32);
+    impl Azar {
+        fn f(&mut self) -> f32 {
+            self.0 = self.0.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+            (self.0 >> 8) as f32 / 16_777_216.0
+        }
+        fn b(&mut self, p: f32) -> bool {
+            self.f() < p
+        }
+    }
+
+    /// Una entrada al azar. `aterrizar` y `pausa` casi nunca (no sacan del juego en estas pruebas).
+    fn entrada(a: &mut Azar) -> Entrada {
+        Entrada {
+            girar: a.f() * 2.0 - 1.0,
+            cabecear: a.f() * 2.0 - 1.0,
+            empuje: a.f() * 2.0 - 1.0,
+            horizontal: a.f() * 2.0 - 1.0,
+            aceptar: a.b(0.25),
+            arriba: a.b(0.08),
+            abajo: a.b(0.08),
+            izquierda: a.b(0.1),
+            derecha: a.b(0.1),
+            barrel: a.b(0.05),
+            disparando: a.b(0.3),
+            gatillo: a.b(0.1),
+            clic: a.b(0.1),
+            raton_apretado: a.b(0.2),
+            piso: a.b(0.2),
+            aire: a.b(0.2),
+            picar: a.b(0.3),
+            turbo: a.b(0.1),
+            respuesta: if a.b(0.08) { Some((a.f() * 6.0) as usize) } else { None },
+            ..Default::default()
+        }
+    }
+
+    fn dt(a: &mut Azar) -> f32 {
+        // Cuadros normales, y a veces un tiron de medio segundo.
+        if a.b(0.01) { 0.5 } else { 1.0 / 30.0 + a.f() * 0.03 }
+    }
+
+    macro_rules! estres {
+        ($nombre:ident, $crear:expr) => {
+            #[test]
+            fn $nombre() {
+                let mut total = 0.0;
+                for semilla in [1u32, 77, 2026] {
+                    let mut a = Azar(semilla.wrapping_mul(2_654_435_761) | 1);
+                    let mut juego = $crear(semilla);
+                    for _ in 0..6000 {
+                        let e = entrada(&mut a);
+                        let d = dt(&mut a);
+                        let _ = juego.actualizar(&e, d);
+                        juego.eventos.clear();
+                        total += d;
+                    }
+                }
+                // Que de verdad haya corrido el tiempo (si no, la prueba no probo nada).
+                assert!(total > 3.0 * 6000.0 / 30.0, "corrio {total} s");
+                eprintln!("{}: {total:.0} s de juego", stringify!($nombre));
+            }
+        };
+    }
+
+    /// F1 y F2: al cambiar el radio de un planeta, la colision se mueve con el dibujo.
+    #[test]
+    fn el_radio_en_vivo_mueve_la_colision() {
+        use crate::escena::{factor_radio, poner_factor_radio};
+        let c = &CUERPOS[PLUTON];
+        let antes = c.radio_visual();
+        poner_factor_radio(PLUTON, 2.0);
+        assert!((c.radio_visual() - antes * 2.0).abs() < 1e-4);
+        assert!((c.radio_cuerpo() - c.escala * 2.0).abs() < 1e-4);
+        poner_factor_radio(PLUTON, 1.0);
+        assert_eq!(factor_radio(PLUTON), 1.0);
+    }
+
+    estres!(camioneta, Camioneta::new);
+    estres!(neptuno, Neptuno::new);
+    estres!(urano, Urano::new);
+    estres!(vegetta, |s| Vegetta::new(s, None));
+    estres!(jupiter, |s| Jupiter::new(s, 0));
+    estres!(ritmo, |_| Ritmo::new());
+    estres!(divorcio, Divorcio::new);
+    estres!(mercurio, Mercurio::new);
+    estres!(luna, Luna::new);
+    estres!(cita, |_| Cita::new());
+    estres!(junta, |_| Junta::new());
+    estres!(aula, Aula::new);
+    estres!(entrega, Entrega::new);
+    estres!(historia, |_| Historia::new());
 }

@@ -191,7 +191,7 @@ pub fn dibujar(fb: &mut Framebuffer, vp: &Mat4, rastro: &[Vec3], estela: &str, r
             "miku" if k % 4 == 0 => {
                 let p = rastro[k] + Vec3::new(azar(s) - 0.5, azar(s + 1) - 0.3, azar(s + 2) - 0.5) * (edad * 1.6);
                 if let Some(c) = proyectar(p, vp, fb) {
-                    let ang = azar(s + 3) * 6.28 + edad * 9.0;
+                    let ang = azar(s + 3) * std::f32::consts::TAU + edad * 9.0;
                     let (dx, dy) = (ang.cos() * 7.0 * esc, ang.sin() * 7.0 * esc);
                     let blanco = [0.95, 0.95, 0.9].map(|v| v * vida);
                     let verde = [0.25, 0.85, 0.35].map(|v| v * vida);
@@ -266,7 +266,7 @@ pub fn dibujar(fb: &mut Framebuffer, vp: &Mat4, rastro: &[Vec3], estela: &str, r
             // Glitter: estrellitas de cuatro picos regadas alrededor, que titilan.
             "estelar" if k % 2 == 0 => {
                 let o = (azar(s) - 0.5) * 26.0 * esc * (0.3 + edad);
-                let brillo = (reloj * 5.0 + azar(s + 4) * 6.28).sin().max(0.0);
+                let brillo = (reloj * 5.0 + azar(s + 4) * std::f32::consts::TAU).sin().max(0.0);
                 if brillo > 0.1 {
                     estrella(fb, b.0 + nx * o, b.1 + ny * o, z, (3.0 + 6.0 * brillo) * esc, [1.0, 0.85, 0.4].map(|v| v * (0.4 + vida) * brillo));
                 }
@@ -311,7 +311,7 @@ pub fn dibujar(fb: &mut Framebuffer, vp: &Mat4, rastro: &[Vec3], estela: &str, r
             "astrofago" if k % 2 == 0 => {
                 let deriva = Vec3::new((azar(s) - 0.5) * 1.4, (azar(s + 1) - 0.5) * 1.4, (azar(s + 2) - 0.5) * 1.4) * edad;
                 if let Some(c) = proyectar(rastro[k] + deriva, vp, fb) {
-                    let late = 0.55 + 0.45 * (reloj * 7.0 + azar(s + 3) * 6.28).sin();
+                    let late = 0.55 + 0.45 * (reloj * 7.0 + azar(s + 3) * std::f32::consts::TAU).sin();
                     let color = [1.0, 0.08, 0.16].map(|v| v * (0.35 + 0.65 * vida) * late);
                     post::halo(fb, (c.0, c.1), (3.0 + 5.0 * vida) * esc, color.map(|v| v * 1.3), 1.0);
                     cuadro(fb, c.0, c.1, c.2, (1.0 + vida) * esc, [1.0, 0.45, 0.5].map(|v| v * (0.4 + 0.6 * vida) * late));
