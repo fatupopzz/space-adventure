@@ -5,7 +5,8 @@
 //! - ANTIGUA: calle de casas de colores, papel picado, iglesias y el Arco de Santa Catalina.
 //! - LA CAPITAL: edificios con la luz prendida, vallas, la Torre del Reformador y la terminal.
 //!
-//! - Tres carriles: A / D (o el stick) cambian de carril; W le pisa, S frena.
+//! - Tres carriles: A / D (o el stick, o la cruceta) cambian de carril; W le pisa y S frena (R2 y
+//!   L2, o el stick y la cruceta para arriba y para abajo).
 //! - En las PARADAS (a la derecha) se levanta gente: hay que ir en el carril de la derecha y
 //!   pasar despacio. Cada pasajero paga su pasaje al llegar a la terminal.
 //! - Los TUC-TUCS van mas despacio, los PERROS se cruzan y los BACHES sacuden: chocar abolla la
@@ -165,7 +166,7 @@ pub const AYUDANTE: &str = "AYUDANTE";
 
 const LLEGADA: [(&str, &str, Voz); 3] = [
     (AYUDANTE, "¡Capital, capital, capital! ¡Hay campo, hay campo! ...Ah, usted es el chofer nuevo. Súbase, que ya vamos tarde.", Voz::Radio),
-    (AYUDANTE, "A y D para cambiar de carril, W le pisa, S frena. La gente espera a la derecha: carril derecho y despacito, que si no, se pasa la parada.", Voz::Radio),
+    (AYUDANTE, "{mover} para cambiar de carril. {acelerar}: pisarle y frenar. La gente espera a la derecha: carril derecho y despacito, que si no, se pasa la parada.", Voz::Radio),
     (ui::NOMBRE_IA, "Ojo con los túmulos: si no frena, los pasajeros salen volando. Y con los tuc-tucs. Y con los perros. Y con los baches. Bienvenido a la carretera.", Voz::Ia),
 ];
 const SUBEN: [&str; 4] = ["¡Súbase, súbase! ¡Atrás hay lugar!", "¡Córranse para atrás, que vienen más!", "¡Hay campo, hay campo!", "¡Pasaje, pasaje! Cinco quetzales, mija."];
@@ -524,8 +525,8 @@ impl Camioneta {
     fn jugar(&mut self, e: &Entrada, dt: f32) {
         // Cambiar de carril: al apretar (no se queda cambiando mientras se mantiene).
         let girar = e.girar;
-        let a_la_izquierda = e.izquierda || (girar > 0.5 && self.girar_antes <= 0.5);
-        let a_la_derecha = e.derecha || (girar < -0.5 && self.girar_antes >= -0.5);
+        let a_la_izquierda = e.izquierda || (girar > 0.35 && self.girar_antes <= 0.35);
+        let a_la_derecha = e.derecha || (girar < -0.35 && self.girar_antes >= -0.35);
         self.girar_antes = girar;
         if a_la_izquierda && self.carril > 0 {
             self.carril -= 1;
@@ -540,7 +541,7 @@ impl Camioneta {
         self.x += (objetivo - self.x) * (1.0 - (-9.0 * dt).exp());
         self.ladeo += (((self.x - antes) / dt.max(1e-4)) * 0.05 - self.ladeo) * (1.0 - (-8.0 * dt).exp());
         // La velocidad: sola va a la de crucero; W le pisa, S frena.
-        self.frenando = e.empuje < -0.3;
+        self.frenando = e.empuje < -0.3 || e.cabecear < -0.3;
         self.echar_humo(dt);
         let zona = zona_de(self.recorrido);
         if zona != self.zona {
@@ -548,7 +549,9 @@ impl Camioneta {
             self.desde_zona = 0.0;
             self.eventos.push(Efecto::Perfecto);
         }
-        let deseada = if e.empuje > 0.3 { PISANDOLE } else if e.empuje < -0.3 { MINIMA } else { CRUCERO };
+        // Los gatillos o W y S; y con el control, tambien el stick y la cruceta para arriba y abajo.
+        let pedal = if e.cabecear.abs() > e.empuje.abs() { e.cabecear } else { e.empuje };
+        let deseada = if pedal > 0.3 { PISANDOLE } else if pedal < -0.3 { MINIMA } else { CRUCERO };
         let k = if deseada < self.vel { 3.2 } else { 0.9 };
         self.vel += (deseada - self.vel) * (1.0 - (-k * dt).exp());
         self.invulnerable = (self.invulnerable - dt).max(0.0);
@@ -786,10 +789,11 @@ impl Camioneta {
         }
         let (aceptar, salir) = (e.nombre("aceptar"), e.nombre("aterrizar"));
         let mover = if e.hay_control { "stick" } else { "A / D" };
+        let acelerar = e.nombre("acelerar");
         let acciones: Vec<(&str, &str)> = match self.fase {
             Fase::Llegada(_) => vec![(aceptar, "Seguir"), (salir, "Despegar")],
             Fase::Fin(_) => vec![(aceptar, "Otra vuelta"), (salir, "Despegar")],
-            Fase::Jugando => vec![(mover, "Carril"), ("W", "Pisarle"), ("S", "Frenar"), (salir, "Despegar")],
+            Fase::Jugando => vec![(mover, "Carril"), (acelerar, "Pisarle / frenar"), (salir, "Despegar")],
         };
         let pie = ui::alto_ayudas(&acciones, ancho);
         if let (Some((nombre, completo, _)), false) = (self.hablante(), texto.is_empty()) {
@@ -1729,6 +1733,33 @@ mod pruebas {
             total += c.pasajeros;
         }
         assert!(total >= 60, "en promedio llego casi vacio: {total} en seis viajes");
+    }
+
+    /// Con el control: el stick cambia de carril (cada empujon, uno) y tambien acelera y frena.
+    #[test]
+    fn se_maneja_con_el_stick() {
+        let mut c = Camioneta::new(3);
+        c.empezar();
+        c.hasta_cosa = 1e9;
+        c.hasta_parada = 1e9;
+        let stick = |girar: f32, cabecear: f32| Entrada { girar, cabecear, hay_control: true, ..Default::default() };
+        assert_eq!(c.carril, 1);
+        // Mantenerlo no sigue cambiando de carril.
+        for _ in 0..30 {
+            c.actualizar(&stick(0.6, 0.0), 1.0 / 60.0);
+        }
+        assert_eq!(c.carril, 0, "a la izquierda, uno solo");
+        c.actualizar(&stick(0.0, 0.0), 1.0 / 60.0);
+        c.actualizar(&stick(-0.6, 0.0), 1.0 / 60.0);
+        assert_eq!(c.carril, 1, "a la derecha");
+        for _ in 0..180 {
+            c.actualizar(&stick(0.0, -1.0), 1.0 / 60.0);
+        }
+        assert!(c.vel < 8.0 && c.frenando, "para abajo frena: {}", c.vel);
+        for _ in 0..240 {
+            c.actualizar(&stick(0.0, 1.0), 1.0 / 60.0);
+        }
+        assert!(c.vel > CRUCERO, "para arriba le pisa: {}", c.vel);
     }
 
     /// Ir rapido sobre un tumulo baja gente; frenando, no.

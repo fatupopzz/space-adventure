@@ -990,7 +990,8 @@ impl Neptuno {
                 self.decir(NEPTUNO, "Esa no se puede, Miku. Color con color, número con número. O un comodín, que para eso están.", Voz::Neptuno);
             }
         }
-        if e.abajo && self.t_turno > 0.2 {
+        // Robar es a proposito: con la cruceta, no con un rozon del stick.
+        if e.abajo && !e.por_stick && self.t_turno > 0.2 {
             if self.robo.is_some() {
                 self.pasar_turno(0);
             } else if self.manos[MIKU].iter().any(|&c| se_puede(c, self.arriba(), self.color)) {

@@ -38,7 +38,7 @@ const COMENTARIOS: [&str; 5] = [
     "Bienvenidos a Saturno Ritmo. Miku en vivo. Sin playback, supuestamente. Yo no metería las manos al fuego.",
     "Los anillos son un vinil de 280,000 km. El DJ cobra por hora de Saturno: diez horas y media. Ni modo.",
     "Saturno flotaría en una piscina. El público también, si hubiera. Son doce alienígenas y vinieron por la refa.",
-    "El ecualizador sigue el ritmo. Usted no. A: jugar, para que lo compruebe.",
+    "El ecualizador sigue el ritmo. Usted no. {aceptar}: jugar, para que lo compruebe.",
     "La tormenta del polo es hexagonal de verdad. Producción barata, idea cara. Como todo proyecto final.",
 ];
 

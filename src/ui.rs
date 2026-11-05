@@ -755,8 +755,10 @@ fn con_botones(s: &str) -> Cow<'_, str> {
 fn nombre_de_marca(marca: &str) -> Option<String> {
     let e = crate::entrada::Entrada { control: crate::controles::control(), ..Default::default() };
     match marca {
-        "aceptar" | "aterrizar" | "barrel" | "turbo" | "pausa" | "pasaporte" | "objetivo" | "info" | "piso" | "aire" | "gatillo" | "apuntar" | "orbitar" => Some(e.nombre(marca).to_string()),
+        "aceptar" | "aterrizar" | "barrel" | "turbo" | "pausa" | "pasaporte" | "objetivo" | "info" | "piso" | "aire" | "gatillo" | "apuntar" | "orbitar" | "acelerar" => Some(e.nombre(marca).to_string()),
         "flechas" => Some("flechas".into()),
+        // Lo que mueve de lado a lado: el stick con control, A y D en el teclado.
+        "mover" => Some(if e.control == crate::entrada::Control::Teclado { "A / D".into() } else { "stick".into() }),
         "izq_der" => Some(format!("{IZQUIERDA} {DERECHA}")),
         "arriba_abajo" => Some(format!("{ARRIBA} {ABAJO}")),
         _ => None,

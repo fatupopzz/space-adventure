@@ -27,7 +27,29 @@ use raylib::prelude::*;
 const ZONA_MUERTA: f32 = 0.15;
 const CONTROL: i32 = 0;
 
+/// Que tanto hay que empujar el stick para que cuente como una flecha, y hasta donde hay que
+/// soltarlo para que pueda contar otra vez.
+const STICK_FLECHA: f32 = 0.6;
+const STICK_SUELTO: f32 = 0.35;
+
+/// El stick como flechas (para los menus y las listas): un empujon, una flecha, hacia donde mas se
+/// empuje. `listo` dice si ya se habia soltado. Devuelve la direccion (0 arriba, 1 abajo, 2 izquierda,
+/// 3 derecha) si se acaba de empujar.
+fn flecha_del_stick(x: f32, y: f32, listo: &mut bool) -> Option<usize> {
+    if x.abs().max(y.abs()) < STICK_SUELTO {
+        *listo = true;
+        return None;
+    }
+    if !*listo || x.abs().max(y.abs()) < STICK_FLECHA {
+        return None;
+    }
+    *listo = false;
+    Some(if y.abs() > x.abs() { if y < 0.0 { 0 } else { 1 } } else if x < 0.0 { 2 } else { 3 })
+}
+
 thread_local! {
+    /// Si el stick ya se habia soltado (para que un empujon sea una sola flecha).
+    static STICK_LISTO: std::cell::Cell<bool> = const { std::cell::Cell::new(true) };
     /// Los botones del cuadro pasado (para saber cual se acaba de apretar).
     static BOTONES_ANTES: std::cell::Cell<u32> = const { std::cell::Cell::new(0) };
 }
@@ -103,6 +125,8 @@ pub struct Entrada {
     /// F1 y F2 el radio del planeta, F3 y F4 la velocidad de las orbitas.
     pub ajuste: Option<usize>,
     pub hay_control: bool,
+    /// La flecha de este cuadro salio de empujar el stick (no de la cruceta ni del teclado).
+    pub por_stick: bool,
     /// Que control es (para nombrar sus botones como vienen pintados en el).
     pub control: Control,
 }
@@ -195,6 +219,7 @@ impl Entrada {
             pestana_der: pulsada(KEY_E),
             hay_control: false,
             control: Control::Teclado,
+            por_stick: false,
         };
         // El control: en macOS, por el framework de Apple (por el camino de GLFW el DualSense se ve
         // conectado, pero sus sticks y botones no cambian); si no, por raylib. El de raylib se busca
@@ -240,6 +265,15 @@ impl Entrada {
             e.aceptar |= boton(GAMEPAD_BUTTON_RIGHT_FACE_DOWN);
             e.barrel |= boton(GAMEPAD_BUTTON_RIGHT_FACE_UP);
             e.aterrizar |= boton(GAMEPAD_BUTTON_RIGHT_FACE_LEFT);
+            // El stick tambien mueve los menus y las listas, como la cruceta.
+            let mut listo = STICK_LISTO.with(|l| l.get());
+            let flecha = flecha_del_stick(eje_crudo(GAMEPAD_AXIS_LEFT_X), eje_crudo(GAMEPAD_AXIS_LEFT_Y), &mut listo);
+            STICK_LISTO.with(|l| l.set(listo));
+            e.por_stick = flecha.is_some();
+            e.arriba |= flecha == Some(0);
+            e.abajo |= flecha == Some(1);
+            e.izquierda |= flecha == Some(2);
+            e.derecha |= flecha == Some(3);
             e.arriba |= boton(GAMEPAD_BUTTON_LEFT_FACE_UP);
             e.abajo |= boton(GAMEPAD_BUTTON_LEFT_FACE_DOWN);
             e.izquierda |= boton(GAMEPAD_BUTTON_LEFT_FACE_LEFT);
@@ -335,6 +369,21 @@ impl Entrada {
 #[cfg(test)]
 mod pruebas_controles {
     use super::*;
+
+    #[test]
+    fn un_empujon_del_stick_es_una_sola_flecha() {
+        let mut listo = true;
+        assert_eq!(flecha_del_stick(0.1, 0.0, &mut listo), None, "poquito no cuenta");
+        assert_eq!(flecha_del_stick(0.0, -0.9, &mut listo), Some(0), "arriba");
+        assert_eq!(flecha_del_stick(0.0, -1.0, &mut listo), None, "mantenerlo no repite");
+        assert_eq!(flecha_del_stick(0.0, -0.5, &mut listo), None, "a medio soltar tampoco");
+        assert_eq!(flecha_del_stick(0.0, 0.0, &mut listo), None);
+        assert_eq!(flecha_del_stick(0.0, 0.8, &mut listo), Some(1), "abajo, ya soltado");
+        assert_eq!(flecha_del_stick(0.0, 0.0, &mut listo), None);
+        assert_eq!(flecha_del_stick(-0.8, 0.3, &mut listo), Some(2), "gana el eje mas empujado");
+        assert_eq!(flecha_del_stick(0.0, 0.0, &mut listo), None);
+        assert_eq!(flecha_del_stick(0.9, 0.0, &mut listo), Some(3));
+    }
 
     #[test]
     fn reconoce_los_mandos_y_respeta_la_posicion_de_sus_botones() {
