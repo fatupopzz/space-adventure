@@ -14,6 +14,24 @@ extern "C" {
     fn haptica_nombre() -> *const c_char;
     fn haptica_error() -> *const c_char;
     fn haptica_vibrar(intensidad: c_float, nitidez: c_float, segundos: c_float) -> c_int;
+    fn haptica_leer(ejes: *mut c_float, botones: *mut std::ffi::c_uint) -> c_int;
+}
+
+/// Lo que dice el framework de Apple del control ahorita, en la convencion de raylib.
+#[derive(Clone, Debug)]
+pub struct Lectura {
+    pub ejes: [f32; 6],
+    pub botones: u32,
+    pub nombre: String,
+}
+
+/// Lee el control por GameController (empieza a escucharlos la primera vez).
+pub fn leer() -> Option<Lectura> {
+    unsafe {
+        haptica_iniciar();
+        let (mut ejes, mut botones) = ([0.0f32; 6], 0u32);
+        (haptica_leer(ejes.as_mut_ptr(), &mut botones) == 1).then(|| Lectura { ejes, botones, nombre: texto(haptica_nombre()) })
+    }
 }
 
 fn texto(p: *const c_char) -> String {

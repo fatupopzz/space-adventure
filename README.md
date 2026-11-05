@@ -106,6 +106,10 @@ la tabla `CUERPOS` de [src/escena.rs](src/escena.rs) y la gravedad en `GRAVEDAD`
 - **Vibración**: por SDL2 en modo HIDAPI (directo al DualSense o DualShock,
   sin pasar por el framework de controles de macOS, que se tragaba la
   vibración). `--probar-vibracion` dice qué control ve SDL y lo hace vibrar.
+- **Lectura del control en macOS**: por el framework GameController de Apple
+  ([nativo/haptica_mac.m](nativo/haptica_mac.m)), porque por el camino HID de GLFW el DualSense
+  se ve conectado pero sus sticks y botones no cambian. En otros sistemas, raylib.
+  `--probar-control [segundos]` enseña lo que llega por cada camino.
 
 Están el Sol, Mercurio, Venus (gira al revés), la Tierra (23.5°) con la Luna
 orbitándola, Marte con su volcán y un rover, Júpiter con su mancha roja,

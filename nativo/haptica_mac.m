@@ -31,6 +31,11 @@ static GCController *buscar_control(void) API_AVAILABLE(macos(11.0)) {
 // Empieza a escuchar controles. Los avisos de "se conecto" llegan por la cola principal: la ventana
 // del juego (que procesa sus eventos cada cuadro) los hace correr.
 int haptica_iniciar(void) {
+    static int ya = 0;
+    if (ya) {
+        return 1;
+    }
+    ya = 1;
     if (@available(macOS 11.3, *)) {
         // Que el control siga vibrando aunque la ventana no este al frente (por ejemplo al grabar).
         GCController.shouldMonitorBackgroundEvents = YES;
@@ -46,6 +51,41 @@ int haptica_iniciar(void) {
                                                       }
                                                   }];
     return 1;
+}
+
+// Lee el primer control con sticks y gatillos, en la convencion de raylib: `ejes` son stick izquierdo
+// X y Y, derecho X y Y, y gatillos izquierdo y derecho (Y: -1 arriba; gatillos: -1 suelto, 1 a fondo),
+// y en `botones` cada bit es un GamepadButton de raylib. Devuelve 0 si no hay control. Es para el
+// DualSense en macOS: por el camino HID de GLFW se ve conectado, pero sus valores no cambian.
+int haptica_leer(float ejes[6], unsigned int *botones) {
+    @autoreleasepool {
+        for (GCController *c in [GCController controllers]) {
+            GCExtendedGamepad *g = c.extendedGamepad;
+            if (g == nil) {
+                continue;
+            }
+            ejes[0] = g.leftThumbstick.xAxis.value;
+            ejes[1] = -g.leftThumbstick.yAxis.value;
+            ejes[2] = g.rightThumbstick.xAxis.value;
+            ejes[3] = -g.rightThumbstick.yAxis.value;
+            ejes[4] = g.leftTrigger.value * 2.0f - 1.0f;
+            ejes[5] = g.rightTrigger.value * 2.0f - 1.0f;
+            unsigned int b = 0;
+            #define PON(n, boton) if ((boton).pressed) b |= 1u << (n)
+            PON(1, g.dpad.up); PON(2, g.dpad.right); PON(3, g.dpad.down); PON(4, g.dpad.left);
+            PON(5, g.buttonY); PON(6, g.buttonB); PON(7, g.buttonA); PON(8, g.buttonX);
+            PON(9, g.leftShoulder); PON(10, g.leftTrigger); PON(11, g.rightShoulder); PON(12, g.rightTrigger);
+            if (g.buttonOptions) PON(13, g.buttonOptions);
+            PON(15, g.buttonMenu);
+            if (g.leftThumbstickButton) PON(16, g.leftThumbstickButton);
+            if (g.rightThumbstickButton) PON(17, g.rightThumbstickButton);
+            #undef PON
+            *botones = b;
+            strlcpy(nombre, c.vendorName ? c.vendorName.UTF8String : "", sizeof(nombre));
+            return 1;
+        }
+        return 0;
+    }
 }
 
 // Cuantos controles ve el framework (tengan o no hapticos).

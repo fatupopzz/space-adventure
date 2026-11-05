@@ -4747,7 +4747,51 @@ fn main() {
         return;
     }
     // (Las fotos no abren SDL: si el juego esta abierto con el control, se pelearian por el.)
-    let vibra = if foto.is_some() { None } else { vibracion::Vibrador::abrir() };
+    let vibra = if foto.is_some() || args.iter().any(|a| a == "sin-sdl") { None } else { vibracion::Vibrador::abrir() };
+    // `--probar-control [segundos]`: dice que controles ve el juego y que se esta apretando.
+    if let Some(i) = args.iter().position(|a| a == "--probar-control") {
+        let segundos: f32 = args.get(i + 1).and_then(|s| s.parse().ok()).unwrap_or(8.0);
+        let mut pasado = 0.0;
+        let mut antes = String::new();
+        println!("PRUEBA del control: {segundos} s. Vibrador abierto: {}", vibra.is_some());
+        while pasado < segundos && !rl.window_should_close() {
+            let mut linea = String::new();
+            for g in 0..4 {
+                if rl.is_gamepad_available(g) {
+                    let nombre = rl.get_gamepad_name(g).unwrap_or_default();
+                    let ejes = rl.get_gamepad_axis_count(g);
+                    let boton = unsafe { raylib::ffi::GetGamepadButtonPressed() };
+                    linea += &format!("[{g}] {nombre} ({ejes} ejes) ");
+                    for k in 0..ejes.min(6) {
+                        linea += &format!("{:+.1} ", unsafe { raylib::ffi::GetGamepadAxisMovement(g, k) });
+                    }
+                    linea += &format!("boton {boton} ");
+                }
+            }
+            #[cfg(haptica_apple)]
+            if let Some(l) = haptica::leer() {
+                linea += &format!("APPLE {} ", l.nombre);
+                for v in l.ejes {
+                    linea += &format!("{v:+.1} ");
+                }
+                linea += &format!("botones {:#x}", l.botones);
+            }
+            if linea.is_empty() {
+                linea = "ningun control disponible".into();
+            }
+            if linea != antes {
+                println!("{pasado:5.1} s: {linea}");
+                antes = linea;
+            }
+            let mut d = rl.begin_drawing(&thread);
+            d.clear_background(Color::BLACK);
+            d.draw_text("Prueba del control: mueva los sticks y apriete botones", 40, 40, 24, Color::WHITE);
+            d.draw_text(&antes, 40, 90, 18, Color::GREEN);
+            drop(d);
+            pasado += rl.get_frame_time();
+        }
+        return;
+    }
     let vibrar_activo = std::cell::Cell::new(true);
     // Cada sonido del juego, y su vibracion (los golpes, el turbo, el ¡PROTESTO!...).
     let tocar = |e: Efecto| {

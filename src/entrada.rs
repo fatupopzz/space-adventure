@@ -27,6 +27,18 @@ use raylib::prelude::*;
 const ZONA_MUERTA: f32 = 0.15;
 const CONTROL: i32 = 0;
 
+thread_local! {
+    /// Los botones del cuadro pasado (para saber cual se acaba de apretar).
+    static BOTONES_ANTES: std::cell::Cell<u32> = const { std::cell::Cell::new(0) };
+}
+
+#[cfg(not(haptica_apple))]
+struct Lectura {
+    ejes: [f32; 6],
+    botones: u32,
+    nombre: String,
+}
+
 #[derive(Default)]
 pub struct Entrada {
     /// De -1 (derecha) a 1 (izquierda).
@@ -181,18 +193,34 @@ impl Entrada {
             ajuste: numero(&[KEY_F5, KEY_F6, KEY_F7, KEY_F8, KEY_F9, KEY_F10, KEY_F1, KEY_F2, KEY_F3, KEY_F4]),
             pestana_izq: pulsada(KEY_Q),
             pestana_der: pulsada(KEY_E),
-            hay_control: rl.is_gamepad_available(CONTROL),
+            hay_control: false,
             control: Control::Teclado,
         };
-        if e.hay_control {
-            e.control = rl.get_gamepad_name(CONTROL).map_or(Control::Otro, |n| Control::por_nombre(&n));
+        // El control: en macOS, por el framework de Apple (por el camino de GLFW el DualSense se ve
+        // conectado, pero sus sticks y botones no cambian); si no, por raylib. El de raylib se busca
+        // en todos los espacios: al reconectarse, un control puede caer en otro.
+        #[cfg(haptica_apple)]
+        let apple = crate::haptica::leer();
+        #[cfg(not(haptica_apple))]
+        let apple: Option<Lectura> = None;
+        let espacio = (0..4).find(|&g| rl.is_gamepad_available(g)).unwrap_or(CONTROL);
+        e.hay_control = apple.is_some() || rl.is_gamepad_available(espacio);
+        if let Some(l) = &apple {
+            e.control = Control::por_nombre(&l.nombre);
+        } else if e.hay_control {
+            e.control = rl.get_gamepad_name(espacio).map_or(Control::Otro, |n| Control::por_nombre(&n));
         }
 
         if e.hay_control {
-            let eje_c = |a| zona_muerta(rl.get_gamepad_axis_movement(CONTROL, a));
+            let antes = BOTONES_ANTES.with(|b| b.get());
+            let ahora = apple.as_ref().map_or(0, |l| l.botones);
+            BOTONES_ANTES.with(|b| b.set(ahora));
+            let eje_crudo = |a: GamepadAxis| apple.as_ref().map_or_else(|| rl.get_gamepad_axis_movement(espacio, a), |l| l.ejes[a as usize]);
+            let abajo = |b: GamepadButton| if apple.is_some() { ahora & (1 << b as u32) != 0 } else { rl.is_gamepad_button_down(espacio, b) };
+            let eje_c = |a| zona_muerta(eje_crudo(a));
             // Los gatillos van de -1 (suelto) a 1 (a fondo).
-            let gatillo = |a| ((rl.get_gamepad_axis_movement(CONTROL, a) + 1.0) * 0.5).clamp(0.0, 1.0);
-            let boton = |b| rl.is_gamepad_button_pressed(CONTROL, b);
+            let gatillo = |a| ((eje_crudo(a) + 1.0) * 0.5).clamp(0.0, 1.0);
+            let boton = |b: GamepadButton| if apple.is_some() { ahora & !antes & (1 << b as u32) != 0 } else { rl.is_gamepad_button_pressed(espacio, b) };
             let girar = curva(-eje_c(GAMEPAD_AXIS_LEFT_X));
             let cabecear = curva(-eje_c(GAMEPAD_AXIS_LEFT_Y));
             let empuje = zona_muerta(gatillo(GAMEPAD_AXIS_RIGHT_TRIGGER) - gatillo(GAMEPAD_AXIS_LEFT_TRIGGER));
@@ -202,13 +230,13 @@ impl Entrada {
             e.cabecear = mayor(e.cabecear, cabecear);
             e.empuje = mayor(e.empuje, empuje);
             // La cruceta mantenida tambien gira (y cubre, en el box).
-            let cruceta = |b| rl.is_gamepad_button_down(CONTROL, b);
+            let cruceta = |b| abajo(b);
             let cruz_x = cruceta(GAMEPAD_BUTTON_LEFT_FACE_RIGHT) as i32 as f32 - cruceta(GAMEPAD_BUTTON_LEFT_FACE_LEFT) as i32 as f32;
             let cruz_y = cruceta(GAMEPAD_BUTTON_LEFT_FACE_UP) as i32 as f32 - cruceta(GAMEPAD_BUTTON_LEFT_FACE_DOWN) as i32 as f32;
             e.girar = mayor(e.girar, -cruz_x);
             e.cabecear = mayor(e.cabecear, cruz_y);
             e.horizontal = mayor(mayor(e.horizontal, eje_c(GAMEPAD_AXIS_LEFT_X)), cruz_x);
-            e.turbo |= rl.is_gamepad_button_down(CONTROL, GAMEPAD_BUTTON_RIGHT_TRIGGER_1);
+            e.turbo |= abajo(GAMEPAD_BUTTON_RIGHT_TRIGGER_1);
             e.aceptar |= boton(GAMEPAD_BUTTON_RIGHT_FACE_DOWN);
             e.barrel |= boton(GAMEPAD_BUTTON_RIGHT_FACE_UP);
             e.aterrizar |= boton(GAMEPAD_BUTTON_RIGHT_FACE_LEFT);
@@ -226,7 +254,7 @@ impl Entrada {
             e.info |= boton(GAMEPAD_BUTTON_MIDDLE_LEFT);
             e.pasaporte |= boton(GAMEPAD_BUTTON_RIGHT_THUMB);
             e.pestana_izq |= boton(GAMEPAD_BUTTON_LEFT_TRIGGER_1);
-            e.disparando |= rl.is_gamepad_button_down(CONTROL, GAMEPAD_BUTTON_RIGHT_FACE_DOWN);
+            e.disparando |= abajo(GAMEPAD_BUTTON_RIGHT_FACE_DOWN);
             e.gatillo = gatillo(GAMEPAD_AXIS_RIGHT_TRIGGER) > 0.4;
             e.picar |= e.gatillo;
             e.pestana_der |= boton(GAMEPAD_BUTTON_RIGHT_TRIGGER_1);
