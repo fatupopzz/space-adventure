@@ -5,3 +5,6 @@ __pycache__/
 # La partida guardada de cada quien y basura del sistema
 partida.txt
 .DS_Store
+
+# La cancion local de la cinematica: tiene derechos, no se sube.
+assets/musica/

@@ -72,6 +72,16 @@ planeta en `RECETAS` de [src/planetas.rs](src/planetas.rs) (amplitud, frecuencia
 ruido), los parámetros del Chapín en `chapin::PARAMETROS`, los radios y velocidades orbitales en
 la tabla `CUERPOS` de [src/escena.rs](src/escena.rs) y la gravedad en `GRAVEDAD`.
 
+## Cinemática de inicio
+
+Al abrir el juego se cuenta la historia de Plutón, el planeta al que le quitaron el título en 2006,
+y se puede saltar con el botón de aceptar, ESC o un clic. No es un video: `Prologo` en
+[src/main.rs](src/main.rs) corre las tomas en vivo con el mismo rasterizador (sus cámaras son `TomaCine`,
+las mismas de `--cine`) y encima hace el look de cinta vieja: sin color, azul, lluvia y ruido.
+
+La música es un piano triste original (`sintetizar_prologo` en [src/cancion.rs](src/cancion.rs)). Si
+existe `assets/musica/prologo.mp3` (no está en el repositorio), suena ese archivo en su lugar.
+
 ## Personajes y pase espacial
 
 - **Personajes** (en el menú principal): un casillero como el de Fortnite con

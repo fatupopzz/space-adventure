@@ -277,6 +277,60 @@ pub fn sintetizar_fuente() -> Vec<f32> {
     pista
 }
 
+/// La cinematica de inicio: un piano triste y lento, original, en la menor, con lluvia. 12 compases que
+/// se repiten sin corte.
+pub fn sintetizar_prologo() -> Vec<f32> {
+    // la menor, fa, do, sol (con la raiz abajo y el acorde arriba, separados).
+    const ACORDES: [(i32, [i32; 3]); 4] = [(45, [0, 3, 7]), (41, [0, 4, 7]), (48, [0, 4, 7]), (43, [0, 4, 7])];
+    const MELODIA: [i32; 12] = [76, 72, 71, 72, 76, 74, 72, 67, 69, 72, 71, 67];
+    let compas = 60.0 / 54.0 * 4.0;
+    let total = compas * 12.0;
+    let largo = (total * FRECUENCIA as f32) as usize;
+    let mut pista = vec![0.0f32; largo];
+    let piano = |f: f32, dura: f32| -> Vec<f32> {
+        (0..(dura * FRECUENCIA as f32) as usize)
+            .map(|k| {
+                let t = k as f32 / FRECUENCIA as f32;
+                let cuerpo = (TAU * f * t).sin() + 0.45 * (TAU * f * 2.0 * t).sin() * (-t * 1.8).exp() + 0.18 * (TAU * f * 3.0 * t).sin() * (-t * 3.2).exp();
+                cuerpo * (t / 0.006).min(1.0) * (-t * 1.1).exp()
+            })
+            .collect()
+    };
+    let mut sumar = |desde: f32, muestras: &[f32], volumen: f32| {
+        let i0 = (desde * FRECUENCIA as f32) as usize;
+        for (k, m) in muestras.iter().enumerate() {
+            pista[(i0 + k) % largo] += m * volumen;
+        }
+    };
+    for c in 0..12 {
+        let (raiz, acorde) = ACORDES[c % 4];
+        let inicio = c as f32 * compas;
+        sumar(inicio, &piano(midi(raiz - 12), 5.0), 0.28);
+        for (k, &i) in acorde.iter().enumerate() {
+            sumar(inicio + compas * 0.25 * (k + 1) as f32, &piano(midi(raiz + 12 + i), 3.2), 0.13);
+        }
+        // La melodia entra poco a poco y deja huecos.
+        if c >= 2 {
+            sumar(inicio + compas * 0.5, &piano(midi(MELODIA[c]), 4.0), 0.2);
+        }
+    }
+    // Eco de cuarto vacio.
+    let eco = (0.31 * FRECUENCIA as f32) as usize;
+    for i in 0..largo {
+        pista[i] += pista[(i + largo - eco) % largo] * 0.3;
+    }
+    // La lluvia, muy bajita.
+    let mut azar = 7u32;
+    let mut pasado = 0.0f32;
+    for m in pista.iter_mut() {
+        azar = azar.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+        let r = (azar >> 8) as f32 / 8_388_608.0 - 1.0;
+        pasado += 0.3 * (r - pasado);
+        *m = (*m + (r - pasado) * 0.018).tanh() * 0.8;
+    }
+    pista
+}
+
 /// La musica del consultorio de Madame Mercurio: original, misteriosa, en mi
 /// frigio dominante (el sonido "de adivina"): un bordon grave de mi y si,
 /// arpegios de cuerda pulsada y una melodia lenta de theremin con vibrato.

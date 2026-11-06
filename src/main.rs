@@ -3817,6 +3817,8 @@ enum Escena {
     Historia(Historia),
     /// El menu principal (lo primero que se ve).
     Menu(Menu),
+    /// La cinematica de inicio.
+    Prologo(Box<Prologo>),
 }
 
 /// `--captura archivo.ppm [segundos] [x y z rumbo] [alambre|puntos|salto|portal|entrega|entrega_teams|intro|concierto|ritmo|...|aterrizar:<planeta>] [zbuffer|normales|uv|stencil]`:
@@ -3912,6 +3914,12 @@ fn preparar(t: f32, resto: &[String]) -> (Juego, Escena) {
                 ahora += 1.0 / 60.0;
             }
             juego.mensaje = None;
+        }
+        // `prologo`: la cinematica de inicio, en el segundo `t`.
+        Some("prologo") => {
+            let mut p = Prologo::nuevo(false);
+            p.saltar_a(t);
+            escena = Escena::Prologo(Box::new(p));
         }
         Some(cual) if cual.starts_with("maravilla:") => {
             // `maravilla:<gargantua|gusano|blip|monolito|huerto|teseracto>`: la nave frente a esa
@@ -4300,14 +4308,50 @@ fn cine(lista: &str, carpeta: &str, solo: &[String]) {
     const FPS: f32 = 30.0;
     let dt = 1.0 / FPS;
     for renglon in texto.lines().map(str::trim).filter(|l| !l.is_empty() && !l.starts_with('#')) {
-        let mut piezas = renglon.split_whitespace();
-        let nombre = piezas.next().unwrap();
+        let nombre = renglon.split_whitespace().next().unwrap();
         if !solo.is_empty() && !solo.iter().any(|s| s == nombre) {
             continue;
         }
-        let claves: std::collections::HashMap<&str, &str> = piezas.filter_map(|p| p.split_once('=')).collect();
+        let mut toma = TomaCine::nueva(renglon);
+        let mut fb = Framebuffer::new(1920, 1080);
+        let mut post = Post::new(&fb);
+        let salida = format!("{carpeta}/{nombre}.mp4");
+        let mut ffmpeg = std::process::Command::new("ffmpeg")
+            .args(["-v", "error", "-y", "-f", "rawvideo", "-pix_fmt", "rgba", "-s", "1920x1080", "-r", "30", "-i", "-", "-c:v", "libx264", "-preset", "fast", "-crf", "13", "-pix_fmt", "yuv420p", &salida])
+            .stdin(std::process::Stdio::piped())
+            .spawn()
+            .expect("hace falta ffmpeg");
+        let mut tubo = ffmpeg.stdin.take().unwrap();
+        let cuadros = (toma.segundos * FPS).round() as usize;
+        let inicio = std::time::Instant::now();
+        for _ in 0..cuadros {
+            toma.avanzar(dt);
+            dibujar_escena(&mut fb, &mut post, &rec, &toma.juego, &toma.escena);
+            std::io::Write::write_all(&mut tubo, fb.bytes()).expect("ffmpeg se cerro");
+        }
+        drop(tubo);
+        let _ = ffmpeg.wait();
+        println!("{nombre}: {cuadros} cuadros en {:.0} s", inicio.elapsed().as_secs_f32());
+    }
+}
+
+/// Una toma con su camara: la usan `--cine` (a un archivo) y la cinematica de inicio (en vivo).
+struct TomaCine {
+    claves: std::collections::HashMap<String, String>,
+    juego: Juego,
+    escena: Escena,
+    segundos: f32,
+    t: f32,
+}
+
+impl TomaCine {
+    fn num(&self, k: &str, d: f32) -> f32 {
+        self.claves.get(k).and_then(|v| v.parse().ok()).unwrap_or(d)
+    }
+
+    fn nueva(renglon: &str) -> Self {
+        let claves: std::collections::HashMap<String, String> = renglon.split_whitespace().filter_map(|p| p.split_once('=')).map(|(a, b)| (a.to_string(), b.to_string())).collect();
         let num = |k: &str, d: f32| claves.get(k).and_then(|v| v.parse::<f32>().ok()).unwrap_or(d);
-        let segundos = num("seg", 5.0);
         let modos: Vec<String> = claves.get("modos").map_or(Vec::new(), |m| m.split(',').map(String::from).collect());
         let (mut juego, mut escena) = preparar(num("t", 0.0), &modos);
         if modos.is_empty() {
@@ -4320,69 +4364,256 @@ fn cine(lista: &str, carpeta: &str, solo: &[String]) {
         if let Some(t) = claves.get("dia").and_then(|v| v.parse().ok()) {
             juego.t = t;
         }
-        let auto = claves.get("auto").copied().unwrap_or("nada");
-        let centro = claves.get("centro").copied();
-        let mut fb = Framebuffer::new(1920, 1080);
-        let mut post = Post::new(&fb);
-        let salida = format!("{carpeta}/{nombre}.mp4");
-        let mut ffmpeg = std::process::Command::new("ffmpeg")
-            .args(["-v", "error", "-y", "-f", "rawvideo", "-pix_fmt", "rgba", "-s", "1920x1080", "-r", "30", "-i", "-", "-c:v", "libx264", "-preset", "fast", "-crf", "13", "-pix_fmt", "yuv420p", &salida])
-            .stdin(std::process::Stdio::piped())
-            .spawn()
-            .expect("hace falta ffmpeg");
-        let mut tubo = ffmpeg.stdin.take().unwrap();
-        let cuadros = (segundos * FPS).round() as usize;
-        let inicio = std::time::Instant::now();
-        for k in 0..cuadros {
-            let reloj = k as f32 * dt;
-            let e = entrada_de_cine(auto, reloj, &mut juego, &escena);
-            avanzar_cine(&mut escena, &mut juego, &e, dt);
-            if let (Some(cual), Escena::Espacio) = (centro, &escena) {
-                let t = juego.t;
-                let planeta = CUERPOS.iter().find(|c| c.archivo == cual);
-                let (donde, radio) = match (planeta, cual) {
-                    (Some(c), _) => (c.posicion(t), c.radio_visual()),
-                    (_, "gargantua") => (maravillas::GARGANTUA, 1.0),
-                    (_, "monolito") => (maravillas::monolito_en(t) + Vec3::new(0.0, 4.0, 0.0), 1.0),
-                    (_, "blip") => (maravillas::blip_en(t) + Vec3::new(4.0, 0.0, 0.0), 1.0),
-                    (_, "gusano") => (maravillas::gusano_en(t), 1.0),
-                    _ => (maravillas::huerto_en(t), 1.0),
-                };
-                // Avanza rapido al principio y se asienta: una camara con peso.
-                let u = (k as f32 / (cuadros.max(2) - 1) as f32).clamp(0.0, 1.0);
-                let s = if claves.contains_key("parejo") { u } else { 1.0 - (1.0 - u) * (1.0 - u) };
-                let mezcla = |a: f32, b: f32| a + (b - a) * s;
-                let al_sol = (CUERPOS[0].posicion(t) - donde).normalize();
-                let base = al_sol.z.atan2(al_sol.x);
-                let a = base + mezcla(num("a0", 40.0), num("a1", 60.0)).to_radians();
-                let d = mezcla(num("d0", 3.0), num("d1", 2.5)) * radio;
-                let h = mezcla(num("h0", 0.15), num("h1", 0.15));
-                let lado_ojo = Vec3::new(a.cos(), h, a.sin()).normalize();
-                let ojo = donde + lado_ojo * d;
-                let derecha = (donde - ojo).normalize().cross(Vec3::new(0.0, 1.0, 0.0)).normalize();
-                let mira = donde + derecha * (num("mx", 0.0) * radio) + Vec3::new(0.0, num("my", 0.0) * radio, 0.0);
-                juego.camara = Camara::new(ojo, mira);
-                let adelante = (mira - ojo).normalize();
-                juego.nave.velocidad = 0.0;
-                if let Some(n) = claves.get("nave") {
-                    let v: Vec<f32> = n.split(',').filter_map(|x| x.parse().ok()).collect();
-                    // La distancia puede cambiar: `nave=desde,lado,alto,giro,hasta`.
-                    let dist = mezcla(v[0], v.get(4).copied().unwrap_or(v[0]));
-                    let (lado, alto, yaw) = (v[1], v[2], v[3]);
-                    juego.nave.pos = ojo + adelante * dist + derecha * lado + Vec3::new(0.0, alto, 0.0);
-                    (juego.nave.yaw, juego.nave.pitch) = salto::rumbo_hacia(adelante);
-                    juego.nave.yaw += yaw.to_radians();
-                } else {
-                    juego.nave.pos = ojo - adelante * 40.0;
+        let segundos = num("seg", 5.0);
+        TomaCine { claves, juego, escena, segundos, t: 0.0 }
+    }
+
+    /// Avanza `dt`: la escena se mueve sola y, en las orbitales, la camara sigue su camino.
+    fn avanzar(&mut self, dt: f32) {
+        let auto = self.claves.get("auto").map_or("nada", |s| s.as_str()).to_string();
+        let e = entrada_de_cine(&auto, self.t, &mut self.juego, &self.escena);
+        avanzar_cine(&mut self.escena, &mut self.juego, &e, dt);
+        self.t += dt;
+        if let (Some(cual), Escena::Espacio) = (self.claves.get("centro").cloned(), &self.escena) {
+            let t = self.juego.t;
+            let planeta = CUERPOS.iter().find(|c| c.archivo == cual);
+            let (donde, radio) = match (planeta, cual.as_str()) {
+                (Some(c), _) => (c.posicion(t), c.radio_visual()),
+                (_, "gargantua") => (maravillas::GARGANTUA, 1.0),
+                (_, "monolito") => (maravillas::monolito_en(t) + Vec3::new(0.0, 4.0, 0.0), 1.0),
+                (_, "blip") => (maravillas::blip_en(t) + Vec3::new(4.0, 0.0, 0.0), 1.0),
+                (_, "gusano") => (maravillas::gusano_en(t), 1.0),
+                _ => (maravillas::huerto_en(t), 1.0),
+            };
+            // Avanza rapido al principio y se asienta: una camara con peso.
+            let u = (self.t / self.segundos.max(1e-3)).clamp(0.0, 1.0);
+            let s = if self.claves.contains_key("parejo") { u } else { 1.0 - (1.0 - u) * (1.0 - u) };
+            let mezcla = |a: f32, b: f32| a + (b - a) * s;
+            let al_sol = (CUERPOS[0].posicion(t) - donde).normalize();
+            let base = al_sol.z.atan2(al_sol.x);
+            let a = base + mezcla(self.num("a0", 40.0), self.num("a1", 60.0)).to_radians();
+            let d = mezcla(self.num("d0", 3.0), self.num("d1", 2.5)) * radio;
+            let h = mezcla(self.num("h0", 0.15), self.num("h1", 0.15));
+            let lado_ojo = Vec3::new(a.cos(), h, a.sin()).normalize();
+            let ojo = donde + lado_ojo * d;
+            let derecha = (donde - ojo).normalize().cross(Vec3::new(0.0, 1.0, 0.0)).normalize();
+            let mira = donde + derecha * (self.num("mx", 0.0) * radio) + Vec3::new(0.0, self.num("my", 0.0) * radio, 0.0);
+            self.juego.camara = Camara::new(ojo, mira);
+            let adelante = (mira - ojo).normalize();
+            self.juego.nave.velocidad = 0.0;
+            if let Some(n) = self.claves.get("nave") {
+                let v: Vec<f32> = n.split(',').filter_map(|x| x.parse().ok()).collect();
+                // La distancia puede cambiar: `nave=desde,lado,alto,giro,hasta`.
+                let dist = mezcla(v[0], v.get(4).copied().unwrap_or(v[0]));
+                self.juego.nave.pos = ojo + adelante * dist + derecha * v[1] + Vec3::new(0.0, v[2], 0.0);
+                (self.juego.nave.yaw, self.juego.nave.pitch) = salto::rumbo_hacia(adelante);
+                self.juego.nave.yaw += v[3].to_radians();
+            } else {
+                self.juego.nave.pos = ojo - adelante * 40.0;
+            }
+        }
+        // En las tomas no hay choques que valgan: sin sacudida ni pausa de golpe en la camara.
+        self.juego.sacudida = 0.0;
+        self.juego.jugo.pausa = 0.0;
+    }
+}
+
+/// La cinematica de inicio: la historia de Pluton, en vivo con el motor. (t, si es un recuerdo,
+/// velocidad, toma). Es lo primero que se ve al abrir el juego; se puede saltar.
+const PROLOGO: [(f32, bool, f32, &str); 21] = [
+    (0.0, false, 1.0, "lejos seg=15 dia=30 centro=pluton d0=46 d1=38 a0=38 a1=44 h0=0.05 h1=0.05 fov=-12 mx=9 parejo=1 ritmo=0.2 detalle=1"),
+    (13.79, false, 1.0, "corazon seg=14 dia=90 centro=pluton d0=3.1 d1=2.25 a0=54 a1=63 h0=0.1 h1=0.08 fov=-10 ritmo=0.15 parejo=1 detalle=2"),
+    (25.32, false, 1.0, "noche seg=6 dia=30 centro=pluton d0=2.9 d1=2.7 a0=158 a1=162 h0=0.06 h1=0.05 fov=-10 ritmo=0.15 parejo=1 detalle=2"),
+    (29.38, true, 0.7, "junta seg=12 modos=junta t=2 auto=dialogo"),
+    (37.99, true, 0.4, "junta seg=9 modos=junta t=7 auto=dialogo"),
+    (41.17, false, 1.0, "alla seg=8 dia=30 centro=saturno_ritmo d0=30 d1=26 a0=30 a1=35 h0=0.1 h1=0.09 fov=-16 parejo=1 detalle=1"),
+    (47.79, false, 1.0, "tierra_lejos seg=5 dia=60 centro=tierra d0=30 d1=27 a0=30 a1=34 h0=0.1 h1=0.09 fov=-20 parejo=1 detalle=1"),
+    (51.47, true, 0.6, "campo seg=8 modos=camioneta_juego t=0 auto=camioneta"),
+    (56.99, true, 0.55, "arco seg=7 modos=camioneta_arco t=0 auto=camioneta"),
+    (60.3, true, 0.6, "concierto seg=7 modos=concierto t=3"),
+    (65.83, true, 0.6, "ritmo seg=7 modos=ritmo t=6 auto=ritmo"),
+    (71.17, true, 0.6, "fuente seg=6 modos=fuente_hada t=1"),
+    (74.66, false, 1.0, "noche seg=8 dia=30 centro=pluton d0=2.7 d1=2.6 a0=162 a1=165 h0=0.05 h1=0.04 fov=-10 ritmo=0.15 parejo=1 detalle=2"),
+    (80.9, false, 1.0, "pasa seg=14 dia=90 centro=pluton d0=4.2 d1=3.7 a0=50 a1=58 h0=0.1 h1=0.1 fov=-6 nave=4,-2.2,-0.8,-25,34 parejo=1 ritmo=0.15 detalle=2"),
+    (94.18, false, 1.0, "noche seg=13 dia=30 centro=pluton d0=2.6 d1=2.4 a0=165 a1=170 h0=0.04 h1=0.03 fov=-10 ritmo=0.15 parejo=1 detalle=2"),
+    (105.96, true, 0.6, "mercurio seg=10 modos=mercurio t=2 auto=dialogo"),
+    (114.8, true, 0.6, "cita seg=7 modos=cita t=3 auto=dialogo"),
+    (120.33, false, 1.0, "lejos seg=8 dia=30 centro=pluton d0=38 d1=34 a0=44 a1=48 h0=0.05 h1=0.05 fov=-12 mx=9 parejo=1 ritmo=0.2 detalle=1"),
+    (126.58, false, 1.0, "llega seg=20 dia=90 centro=pluton d0=4.4 d1=3.6 a0=48 a1=58 h0=0.12 h1=0.1 fov=-6 nave=30,2.4,-0.3,0,5.2 mx=0.5 ritmo=0.15 detalle=2"),
+    (145.36, false, 1.0, "juntos seg=27 dia=90 centro=pluton d0=3.6 d1=3.9 a0=58 a1=100 h0=0.1 h1=0.14 fov=-6 nave=5.2,2.4,-0.4,0,5.6 mx=0.5 ritmo=0.15 parejo=1 detalle=2"),
+    (171.0, false, 1.0, "aleja seg=22 dia=90 centro=pluton d0=3.9 d1=14 a0=100 a1=125 h0=0.14 h1=0.28 fov=-6 nave=5.6,2.4,-0.4,0,16 mx=0.5 ritmo=0.15 parejo=1 detalle=2"),
+];
+const PROLOGO_FIN: f32 = 183.65;
+const PROLOGO_DURACION: f32 = 193.0;
+const PROLOGO_FRASES: [(f32, f32, &str); 18] = [
+    (5.74, 12.8, "antes era el noveno planeta"),
+    (18.91, 24.6, "tengo un corazón enorme. nadie pregunta"),
+    (30.2, 36.8, "en 2006 hicieron una junta"),
+    (38.4, 40.7, "no salió bien"),
+    (42.0, 50.8, "los demás siguieron girando"),
+    (52.2, 59.5, "todos tienen su minijuego"),
+    (60.9, 70.5, "a todos los invitan"),
+    (75.4, 80.1, "a mí me quedan las cartas de cinco"),
+    (82.6, 89.5, "a veces pasa una nave"),
+    (90.6, 93.6, "no se detiene"),
+    (95.0, 101.0, "tardo 248 años en dar una vuelta"),
+    (101.9, 105.2, "nadie me espera al llegar"),
+    (107.0, 113.6, "le pregunté a las cartas"),
+    (115.6, 119.6, "hasta los rovers tienen cita"),
+    (130.3, 137.0, "...¿hola?"),
+    (147.5, 155.0, "¿puedo jugar?"),
+    (160.5, 168.5, "soy planeta. soy planeta. soy planeta"),
+    (172.2, 181.5, "si lo digo tres veces, cuenta"),
+];
+
+struct Prologo {
+    t: f32,
+    i: usize,
+    toma: TomaCine,
+    /// Las dos capas de lluvia (cerca y lejos), que se repiten al caer.
+    lluvia: [Vec<f32>; 2],
+    ancho_lluvia: usize,
+    con_cancion: bool,
+}
+
+impl Prologo {
+    fn nuevo(con_cancion: bool) -> Self {
+        let mut azar = 12345u32;
+        let mut sig = move || {
+            azar = azar.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+            (azar >> 8) as usize
+        };
+        let (w, h) = (RENDER_W, RENDER_H);
+        let mut capa = |n: usize, largo: usize, brillo: f32| {
+            let mut c = vec![0.0f32; w * h];
+            for _ in 0..n {
+                let (x, y, l) = (sig() % w, sig() % h, largo / 2 + sig() % (largo / 2).max(1));
+                for k in 0..l {
+                    let i = ((y + k) % h) * w + (x + w - (k / 7) % w) % w;
+                    c[i] += brillo * k as f32 / l as f32;
                 }
             }
-            let st = dibujar_escena(&mut fb, &mut post, &rec, &juego, &escena);
-            let _ = st;
-            std::io::Write::write_all(&mut tubo, fb.bytes()).expect("ffmpeg se cerro");
+            c
+        };
+        let lluvia = [capa(310, 37, 0.24), capa(700, 14, 0.13)];
+        Prologo { t: 0.0, i: 0, toma: TomaCine::nueva(PROLOGO[0].3), lluvia, ancho_lluvia: w, con_cancion }
+    }
+
+    /// Para las capturas: se pone en el segundo `t`.
+    fn saltar_a(&mut self, t: f32) {
+        self.t = t;
+        self.i = PROLOGO.iter().rposition(|p| p.0 <= t).unwrap_or(0);
+        self.toma = TomaCine::nueva(PROLOGO[self.i].3);
+        for _ in 0..((t - PROLOGO[self.i].0).max(0.0) * PROLOGO[self.i].2 * 15.0) as usize {
+            self.toma.avanzar(1.0 / 15.0);
         }
-        drop(tubo);
-        let _ = ffmpeg.wait();
-        println!("{nombre}: {cuadros} cuadros en {:.0} s", inicio.elapsed().as_secs_f32());
+    }
+
+    /// Devuelve si ya se acabo.
+    fn actualizar(&mut self, dt: f32) -> bool {
+        self.t += dt;
+        if self.i + 1 < PROLOGO.len() && self.t >= PROLOGO[self.i + 1].0 {
+            self.i += 1;
+            self.toma = TomaCine::nueva(PROLOGO[self.i].3);
+        }
+        self.toma.avanzar(dt * PROLOGO[self.i].2);
+        self.t >= PROLOGO_DURACION
+    }
+
+    fn dibujar(&self, fb: &mut Framebuffer, post: &mut Post, rec: &Recursos) -> Estadisticas {
+        let st = dibujar_escena_sin_trazo(fb, post, rec, &self.toma.juego, &self.toma.escena);
+        self.tratar(fb);
+        st
+    }
+
+    /// La cinta vieja: casi sin color, azul de lluvia, colores corridos, rayas, ruido y lluvia.
+    fn tratar(&self, fb: &mut Framebuffer) {
+        let t = self.t;
+        let recuerdo = PROLOGO[self.i].1;
+        // El color regresa cuando llega la nave.
+        let sat = if t >= 139.47 { 0.3 + 0.75 * ((t - 139.47) / 7.0).clamp(0.0, 1.0) } else if recuerdo { 0.62 } else { 0.16 };
+        let azul = if t >= 126.58 { (1.0 - (t - 126.58) / 18.0).clamp(0.0, 1.0) } else if recuerdo { 0.0 } else { 1.0 };
+        let escampa = (1.0 - (t - 130.0) / 16.0).clamp(0.0, 1.0);
+        // De negro al empezar, a negro en cada cambio de toma y al final.
+        let hasta_corte = PROLOGO.get(self.i + 1).map_or(9.0, |p| p.0 - t);
+        let desde_corte = t - PROLOGO[self.i].0;
+        let corte = (hasta_corte / 0.45).min(desde_corte / 0.45).clamp(0.0, 1.0);
+        let fin = 1.0 - 0.8 * ((t - PROLOGO_FIN) / 1.5).clamp(0.0, 1.0);
+        let fundido = (t / 3.5).min(1.0) * corte * fin * ((PROLOGO_DURACION - t) / 2.5).clamp(0.0, 1.0);
+        let quemado = if recuerdo { ((t * 1.7).sin() * (t * 0.61).sin()).max(0.0) } else { 0.0 };
+        let (w, h) = (fb.ancho, fb.alto);
+        let banda = ((t * 23.0) % (h as f32 + 100.0)) as usize;
+        let mut ruido = (t * 30.0) as u32 * 2_654_435_761;
+        let (cerca, lejos) = (&self.lluvia[0], &self.lluvia[1]);
+        let (cy, ly) = ((t * 450.0) as usize, (t * 260.0) as usize);
+        let mut fila = vec![[0.0f32; 3]; w];
+        for y in 0..h {
+            // La banda de la cinta corre la fila de lado.
+            let corrida = if y + 8 > banda && y < banda { ((ruido >> 7) % 26) as usize } else { 0 };
+            for x in 0..w {
+                fila[x] = fb.leer(y * w + (x + corrida) % w);
+            }
+            let dy = (y as f32 + 0.5) / h as f32 * 2.0 - 1.0;
+            let rayas = if y % 3 == 0 { 0.945 } else { 1.0 };
+            for x in 0..w {
+                let c = fila[x];
+                // Colores corridos (rojo y azul, para lados contrarios).
+                let (r, b) = (fila[x.saturating_sub(1)][0], fila[(x + 1).min(w - 1)][2]);
+                let luz = 0.2126 * r + 0.7152 * c[1] + 0.0722 * b;
+                let mut p = [luz + (r - luz) * sat, luz + (c[1] - luz) * sat, luz + (b - luz) * sat];
+                // Negros levantados, como cinta vieja, y el azul.
+                let k = 0.8 - 0.1 * azul;
+                let levanta = 0.4 + 0.6 * azul;
+                p[0] = p[0] * k + (16.0 / 255.0) * levanta - azul * 0.03 + quemado * 0.1;
+                p[1] = p[1] * k + (20.0 / 255.0) * levanta + quemado * 0.04;
+                p[2] = p[2] * k + (34.0 / 255.0) * levanta + azul * 0.06;
+                // La lluvia y el grano.
+                if escampa > 0.0 {
+                    let i = (y + h - cy % h) % h * self.ancho_lluvia + x;
+                    let j = (y + h - ly % h) % h * self.ancho_lluvia + x;
+                    let l = (cerca.get(i).copied().unwrap_or(0.0) + lejos.get(j).copied().unwrap_or(0.0)) * escampa;
+                    p[0] += l * 0.72;
+                    p[1] += l * 0.82;
+                    p[2] += l;
+                }
+                ruido = ruido.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+                let grano = ((ruido >> 24) as f32 / 255.0 - 0.5) * 0.09;
+                let dx = (x as f32 + 0.5) / w as f32 * 2.0 - 1.0;
+                let vineta = 1.0 - 0.62 * (dx * dx * 0.6 + dy * dy).min(1.0);
+                let f = rayas * vineta * fundido;
+                fb.pintar(y * w + x, [(p[0] + grano) * f, (p[1] + grano) * f, (p[2] + grano) * f], 1.0);
+            }
+        }
+    }
+
+    fn dibujar_ui(&self, d: &mut RaylibDrawHandle, e: &Entrada, ancho: i32, alto: i32) {
+        let t = self.t;
+        let tam = (alto as f32 * 0.04).clamp(18.0, 36.0) as i32;
+        for (a, z, texto) in PROLOGO_FRASES {
+            if a <= t && t < z {
+                let n = (((t - a) * 13.0) as usize + 1).min(texto.chars().count());
+                let parte: String = texto.chars().take(n).collect();
+                let alfa = (((z - t) / 1.0).clamp(0.0, 1.0) * 255.0) as u8;
+                ui::subtitulo(d, &parte, (ancho - ui::medir(texto, tam)) / 2, (alto as f32 * 0.8) as i32, tam, Color::new(238, 240, 250, alfa));
+            }
+        }
+        if t < 171.0 {
+            if (t * 1.2) as i32 % 2 == 0 {
+                ui::subtitulo(d, "PLAY  >", 40, 34, tam * 2 / 3, Color::new(235, 235, 240, 190));
+            }
+            let fecha = if (29.38..41.17).contains(&t) { "24 AGO 2006" } else { "AÑO 248" };
+            ui::subtitulo(d, fecha, ancho - ui::medir(fecha, tam * 3 / 5) - 40, alto - 96, tam * 3 / 5, Color::new(235, 235, 240, 180));
+        }
+        if t >= PROLOGO_FIN {
+            let u = t - PROLOGO_FIN;
+            let alfa = ((u / 1.4).clamp(0.0, 1.0) * ((PROLOGO_DURACION - 0.3 - t) / 1.5).clamp(0.0, 1.0) * 255.0) as u8;
+            let grande = (alto as f32 * 0.075) as i32;
+            ui::titulo_de(d, "SPACE ADVENTURE", (ancho - ui::medir_titulo("SPACE ADVENTURE", grande)) / 2, (alto as f32 * 0.38) as i32, grande, Color::new(110, 235, 225, alfa));
+            let credito = if self.con_cancion { "Fátima Navarro  ·  Música: Alan Walker, Alone" } else { "Fátima Navarro" };
+            ui::subtitulo(d, credito, (ancho - ui::medir(credito, tam * 2 / 3)) / 2, (alto as f32 * 0.52) as i32, tam * 2 / 3, Color::new(225, 225, 235, alfa));
+        }
+        let aceptar = e.nombre("aceptar");
+        ui::ayudas(d, &[(aceptar, "Saltar")], ancho, alto);
     }
 }
 
@@ -4795,6 +5026,7 @@ fn dibujar_escena_sin_trazo(fb: &mut Framebuffer, post: &mut Post, rec: &Recurso
         Escena::Historia(h) => dibujar_historia(fb, post, rec, h, &juego.opciones),
         // Atras del menu principal, el sistema solar girando (con la camara dando vueltas a la Tierra).
         Escena::Menu(_) => dibujar_espacio(fb, post, rec, juego, None),
+        Escena::Prologo(p) => p.dibujar(fb, post, rec),
     }
 }
 
@@ -5104,8 +5336,9 @@ fn main() {
         a.set_master_volume(prog.ajustes.volumen as f32 / 4.0);
     }
     // El juego arranca en el menu principal (las fotos de la interfaz, en la escena que se pidio).
-    if foto.is_none() {
-        escena = Escena::Menu(Menu::new(prog.notas_totales > 0 || !prog.logros.is_empty()));
+    // (El `--demo` va directo al recorrido: es lo que se graba para la entrega.)
+    if foto.is_none() && demo.is_none() {
+        escena = Escena::Prologo(Box::new(Prologo::nuevo(sonido::hay_cancion_del_prologo())));
     }
     let mut hud = true;
     // TAB: la info del pipeline y los controles.
@@ -5277,7 +5510,7 @@ fn main() {
         }
         // ESC o start: la pausa. Tambien se pausa sola si la ventana pierde el foco.
         // En el menu principal no hay nada que pausar: ahi ESC es del menu (cierra los creditos).
-        let en_el_menu = matches!(escena, Escena::Menu(_));
+        let en_el_menu = matches!(escena, Escena::Menu(_) | Escena::Prologo(_));
         // El menu del juego tiene pestanas (JUGAR o INICIO, PERSONAJES, PASE, TIENDA, AJUSTES):
         // con Q / E o L1 / R1 se pasa a la de al lado. En el menu principal tambien sirven desde
         // la lista (que es la pestana INICIO).
@@ -5763,6 +5996,12 @@ fn main() {
                     tocar(ev);
                 }
             }
+            Escena::Prologo(p) => {
+                // Se puede saltar en cualquier momento.
+                if p.actualizar(dt) || e.aceptar || e.pausa || e.clic {
+                    cambio = Some(Escena::Menu(Menu::new(prog.notas_totales > 0 || !prog.logros.is_empty())));
+                }
+            }
             Escena::Menu(m) => {
                 // Atras, el sistema solar sigue girando y la camara le da vueltas a la Tierra.
                 juego.t += dt;
@@ -6118,6 +6357,7 @@ fn main() {
                 Escena::Mirador(_) => (Some(Pista::Fuente), true),
                 Escena::Historia(_) => (Some(Pista::Espacio), true),
                 Escena::Menu(_) => (Some(Pista::Cancion), true),
+                Escena::Prologo(_) => (Some(Pista::Prologo), true),
                 Escena::Divorcio(d) => (Some(if d.de_fiesta() { Pista::Cancion } else { Pista::Juicio }), true),
                 Escena::Jupiter(_) => (Some(Pista::Arcade), true),
             };
@@ -6278,6 +6518,7 @@ fn main() {
                 let visible = dialogo_ia.mostrar(texto, voz, dt, son);
                 f.dibujar_ui(&mut d, &e, visible, ancho, alto);
             }
+            Escena::Prologo(p) => p.dibujar_ui(&mut d, &e, ancho, alto),
             Escena::Menu(m) => {
                 // Con los ajustes abiertos, el menu de atras no se dibuja (se asomaria detras).
                 if submenu.is_none() && pausa.is_none() {
@@ -7505,6 +7746,26 @@ mod estres {
             assert!(!j.salto.activo(), "{}: se fue al hiperespacio", c.nombre);
             assert_eq!(j.aterrizaje.as_ref().map(|a| a.planeta), Some(planeta), "{}: no aterrizo", c.nombre);
         }
+    }
+
+    /// La cinematica de inicio: todas sus tomas arrancan, van en orden y sin atorarse al cambiar.
+    #[test]
+    fn la_cinematica_corre_completa() {
+        assert!(PROLOGO.windows(2).all(|p| p[0].0 < p[1].0));
+        assert!(PROLOGO_FRASES.windows(2).all(|f| f[0].1 <= f[1].0));
+        for (t, _, vel, renglon) in PROLOGO {
+            let inicio = std::time::Instant::now();
+            let mut toma = TomaCine::nueva(renglon);
+            let carga = inicio.elapsed().as_secs_f32();
+            eprintln!("{t:>7.2} {:<14} carga {:.0} ms", renglon.split_whitespace().next().unwrap(), carga * 1000.0);
+            for _ in 0..60 {
+                toma.avanzar(vel / 30.0);
+            }
+        }
+        // Y se acaba sola.
+        let mut p = Prologo::nuevo(false);
+        p.saltar_a(PROLOGO_DURACION - 0.1);
+        assert!(p.actualizar(0.2));
     }
 
     /// F1 y F2: al cambiar el radio de un planeta, la colision se mueve con el dibujo.

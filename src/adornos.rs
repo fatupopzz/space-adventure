@@ -200,13 +200,13 @@ pub fn adornar(modelo: &mut Modelo, id: &str) {
     // brillo y aletas chiquitas. De espaldas (la vista de vuelo) es lo que mas se ve.
     let neon = t.color("neon", [0.42, 1.0, 0.95], 1.25);
     let motor = t.color("motor", [0.16, 0.16, 0.22], 0.0);
-    let fuego = t.color("fuego_motor", [0.55, 0.8, 1.0], 1.6);
+    let fuego = t.color("fuego_motor", [0.3, 0.62, 1.0], 0.75);
     for y in [0.29, -0.17] {
         t.caja(neon, [0.0, y, 1.07], [1.82, 0.035, 0.03]);
     }
     for lado in [-1.0f32, 1.0] {
         t.cono(motor, Vec3::new(lado * 1.12, -0.42, 0.25), Vec3::new(0.0, 0.0, 1.0), 0.72, 0.2, 0.27, 10);
-        t.cono(fuego, Vec3::new(lado * 1.12, -0.42, 0.97), Vec3::new(0.0, 0.0, 1.0), 0.03, 0.2, 0.2, 10);
+        t.cono(fuego, Vec3::new(lado * 1.12, -0.42, 0.97), Vec3::new(0.0, 0.0, 1.0), 0.03, 0.15, 0.15, 10);
         t.caja(neon, [lado * 1.12, -0.42, 0.5], [0.42, 0.03, 0.05]);
         t.aleta(motor, &[Vec3::new(lado * 1.0, 0.1, 0.1), Vec3::new(lado * 1.42, -0.1, 0.42), Vec3::new(lado * 1.42, -0.22, 0.72), Vec3::new(lado * 1.0, -0.2, 0.62)], Vec3::new(0.05, 0.0, 0.0));
     }

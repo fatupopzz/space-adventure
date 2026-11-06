@@ -89,6 +89,16 @@ pub enum Pista {
     Lofi,
     /// El Planeta Chapin: un son de marimba en 6/8.
     Marimba,
+    /// La cinematica de inicio: la cancion local si esta, o el piano triste original.
+    Prologo,
+}
+
+/// La cancion opcional de la cinematica de inicio. No va en el repositorio (tiene derechos): si no
+/// esta, suena el piano original de `cancion::sintetizar_prologo`.
+const CANCION_DEL_PROLOGO: &str = "assets/musica/prologo.mp3";
+
+pub fn hay_cancion_del_prologo() -> bool {
+    std::path::Path::new(CANCION_DEL_PROLOGO).exists()
 }
 
 #[derive(Clone, Copy)]
@@ -622,10 +632,16 @@ impl<'a> Sonidos<'a> {
             .filter_map(|e| cargar(efecto(e)))
             .collect();
         let primera_pista = banco.borrow().len();
-        let pistas = [(Pista::Cancion, cancion::sintetizar()), (Pista::Espacio, cancion::sintetizar_espacio()), (Pista::Fuente, cancion::sintetizar_fuente()), (Pista::Tarot, cancion::sintetizar_tarot()), (Pista::TarotReves, cancion::sintetizar_tarot().into_iter().rev().collect()), (Pista::Juicio, cancion::sintetizar_juicio()), (Pista::Arcade, cancion::sintetizar_arcade()), (Pista::Lofi, cancion::sintetizar_lofi()), (Pista::Marimba, cancion::sintetizar_marimba())]
+        let mut pistas: Vec<(Pista, Canal<'a>, Cell<f32>)> = [(Pista::Cancion, cancion::sintetizar()), (Pista::Espacio, cancion::sintetizar_espacio()), (Pista::Fuente, cancion::sintetizar_fuente()), (Pista::Tarot, cancion::sintetizar_tarot()), (Pista::TarotReves, cancion::sintetizar_tarot().into_iter().rev().collect()), (Pista::Juicio, cancion::sintetizar_juicio()), (Pista::Arcade, cancion::sintetizar_arcade()), (Pista::Lofi, cancion::sintetizar_lofi()), (Pista::Marimba, cancion::sintetizar_marimba())]
             .into_iter()
             .filter_map(|(p, muestras)| cargar(muestras).map(|s| (p, s, Cell::new(0.0))))
             .collect();
+        // La de la cinematica: la cancion local si esta (y no se graba); si no, el piano original.
+        let local = if grabando || !hay_cancion_del_prologo() { None } else { audio.new_sound(CANCION_DEL_PROLOGO).ok() };
+        match local {
+            Some(sonido) => pistas.push((Pista::Prologo, Canal { sonido, id: 0 }, Cell::new(0.0))),
+            None => pistas.extend(cargar(cancion::sintetizar_prologo()).map(|s| (Pista::Prologo, s, Cell::new(0.0)))),
+        }
         let muestras = banco.into_inner();
         let mezcla = grabando.then(|| {
             let voces = vec![VozMezcla { pos: 0.0, paso: 1.0, volumen: 1.0, sonando: false }; muestras.len()];
