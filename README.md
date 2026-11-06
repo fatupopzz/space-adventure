@@ -13,7 +13,7 @@ personaje escogido: el juego le cambia el nombre en todos los diálogos.)
 
 ## Para la entrega: requisitos y menú de puntos
 
-**Proyecto individual:** _(nombre y carné)_ ([@fatupopzz](https://github.com/fatupopzz)). Todo el
+**Proyecto individual:** Fátima Navarro, carné 24044 ([@fatupopzz](https://github.com/fatupopzz)). Todo el
 proyecto (el pipeline, los planetas, la nave, los minijuegos, los modelos y la interfaz) es de una
 sola persona.
 
@@ -23,7 +23,9 @@ puede explicar todo lo que se entrega. Los recursos externos (fuentes, sprites d
 iconos de controles) están en [Créditos](#créditos); todos los modelos 3D son
 propios (scripts de `herramientas/`).
 
-**Video del recorrido:** `cargo run --release -- --demo` hace el recorrido solo (unos 35
+**Video:** <https://youtu.be/ScMwNl6MUDI>
+
+**Para repetir el recorrido:** `cargo run --release -- --demo` hace el recorrido solo (unos 35
 segundos), con piloto automático y un rótulo en cada parte: vuelo espacial a velocidad de crucero,
 acercamiento al Planeta Chapín por su lado de día (frenando poco a poco, sin pantalla de carga: es
 el mismo mundo), una vuelta completa en modo órbita (con cámara de cine: el planeta siempre en
@@ -38,7 +40,7 @@ control. Basta grabar la pantalla.
 | Sol, nave propia y planetas que orbitan y rotan con el tiempo | [src/escena.rs](src/escena.rs): `posicion(t)` y `matriz(t)` dependen de los segundos, no de los cuadros. La nave sale de `herramientas/generar_nave.py`. |
 | Acercarse a la superficie y alejarse sin cambiar de escena | En el espacio, con la cámara libre; el LOD pone el modelo detallado de cerca. |
 | Modelos con M, V, P y prueba de profundidad; fragment shader propio | [src/obj.rs](src/obj.rs) lee los `.obj`; `fragment_shader` en [src/pipeline.rs](src/pipeline.rs). |
-| Código, modelos, instrucciones y video | Este repositorio, [Correrlo](#correrlo) y el video grabado con `--demo`. |
+| Código, modelos, instrucciones y video | Este repositorio, [Correrlo](#correrlo) y el [video en YouTube](https://youtu.be/ScMwNl6MUDI). |
 
 ### Menú de puntos (200)
 
