@@ -621,6 +621,11 @@ struct Juego {
     ajustes: [planetas::Ajuste; CUERPOS.len()],
     /// A que velocidad corre el sistema solar: las orbitas y los giros (en vivo, con F3 y F4).
     rapidez_orbitas: f32,
+    /// Grados de mas en el lente (solo en las tomas de `--cine`).
+    fov_cine: f32,
+    /// Por cuanto se multiplica lo que mide un planeta al escoger su nivel de detalle (en el juego,
+    /// 1; las tomas de `--cine` piden voxels mas finos).
+    detalle: f32,
     /// Cuantas veces se ha saludado cada planeta, si ya saludo en esta visita, y hace cuanto que
     /// el piloto no toca nada (para que GLADAS opine).
     saludos: [u32; CUERPOS.len()],
@@ -724,6 +729,8 @@ impl Juego {
             params_chapin: chapin::PARAMETROS,
             ajustes: [planetas::Ajuste::default(); CUERPOS.len()],
             rapidez_orbitas: 1.0,
+            fov_cine: 0.0,
+            detalle: 1.0,
             saludos: [0; CUERPOS.len()],
             saludo_dicho: [false; CUERPOS.len()],
             ocio: 0.0,
@@ -1204,7 +1211,7 @@ impl Juego {
 
     /// Grados que se abre el FOV: con el salto, y un poco con la velocidad (se siente la rapidez).
     fn fov_extra(&self) -> f32 {
-        self.salto.fov_extra() + 16.0 * (self.nave.velocidad / nave::VELOCIDAD_CRUCERO).clamp(0.0, 1.0)
+        self.fov_cine + self.salto.fov_extra() + 16.0 * (self.nave.velocidad / nave::VELOCIDAD_CRUCERO).clamp(0.0, 1.0)
     }
 
     /// 1 si el turbo esta jalando ahorita (para las llamas).
@@ -1398,14 +1405,14 @@ fn dibujar_espacio(fb: &mut Framebuffer, post: &mut Post, rec: &Recursos, juego:
     // El nivel de detalle del Chapin: uno solo para la tierra, el agua y los objetos (la tierra
     // esconde las caras que dan al agua de SU rejilla: con otro nivel, quedarian huecos).
     let c_chapin = &CUERPOS[CHAPIN];
-    let radio_chapin = c_chapin.radio_visual() / (c_chapin.posicion(t) - ojo).length().max(0.1) * pixeles_por_unidad;
+    let radio_chapin = c_chapin.radio_visual() / (c_chapin.posicion(t) - ojo).length().max(0.1) * pixeles_por_unidad * juego.detalle;
     let nivel_chapin = planetas::nivel_para(radio_chapin);
     let mut llamadas: Vec<DrawCall> = CUERPOS
         .iter()
         .enumerate()
         .map(|(i, c)| {
             let distancia = (c.posicion(t) - ojo).length().max(0.1);
-            let radio_px = c.radio_visual() / distancia * pixeles_por_unidad;
+            let radio_px = c.radio_visual() / distancia * pixeles_por_unidad * juego.detalle;
             match i {
                 // El Sol: el plasma animado (brilla solo, sin luz de borde).
                 0 => llamada(rec.planeta(0, radio_px).0, Uniforms { shader: Shader::Plasma, borde: Vec3::zero(), ..de_planeta(c) }),
@@ -1631,8 +1638,9 @@ fn dibujar_espacio(fb: &mut Framebuffer, post: &mut Post, rec: &Recursos, juego:
             continue;
         }
         if let Some((x, y, _)) = proyectar(centro, &vista_proyeccion, fb) {
-            let radio = c.radio_visual() / distancia * (fb.alto as f32 * 0.5) / (fov * 0.5).tan();
-            let frente = centro + (ojo - centro).normalize() * (c.radio_visual() * 1.05);
+            // Del cuerpo, no de los anillos: si no, sale un aro flotando lejos del planeta.
+            let radio = c.radio_cuerpo() / distancia * (fb.alto as f32 * 0.5) / (fov * 0.5).tan();
+            let frente = centro + (ojo - centro).normalize() * (c.radio_cuerpo() * 1.05);
             let z_frente = proyectar(frente, &vista_proyeccion, fb).map_or(0.0, |p| p.2);
             post::atmosfera(fb, (x, y), radio, color, 0.55, z_frente);
         }
@@ -4278,6 +4286,160 @@ fn preparar(t: f32, resto: &[String]) -> (Juego, Escena) {
     (juego, escena)
 }
 
+/// Una toma del trailer: renderiza `segundos` a 1920x1080 y 30 cuadros por segundo, sin ventana ni
+/// interfaz, a `carpeta/<nombre>.mp4`. Cada renglon de la lista es `nombre clave=valor...`:
+/// `seg`, `modos=a,b` (los de `--captura`), `t` (calentar), `auto` (como en la grabacion), `ritmo`,
+/// `fov`. Con `centro=` (un planeta o gargantua, monolito, blip, gusano, huerto) la camara orbita:
+/// `d0 d1` distancia (en radios, o absoluta en las maravillas), `a0 a1` grados desde el lado del Sol,
+/// `h0 h1` altura, `mx my` a donde mira (corrido en radios) y `nave=dist,lado,alto,yaw` para que se vea
+/// la nave cerca de la camara. El movimiento frena suave al final.
+fn cine(lista: &str, carpeta: &str, solo: &[String]) {
+    let rec = Recursos::cargar();
+    let texto = std::fs::read_to_string(lista).expect("no se pudo leer la lista de tomas");
+    std::fs::create_dir_all(carpeta).expect("no se pudo crear la carpeta");
+    const FPS: f32 = 30.0;
+    let dt = 1.0 / FPS;
+    for renglon in texto.lines().map(str::trim).filter(|l| !l.is_empty() && !l.starts_with('#')) {
+        let mut piezas = renglon.split_whitespace();
+        let nombre = piezas.next().unwrap();
+        if !solo.is_empty() && !solo.iter().any(|s| s == nombre) {
+            continue;
+        }
+        let claves: std::collections::HashMap<&str, &str> = piezas.filter_map(|p| p.split_once('=')).collect();
+        let num = |k: &str, d: f32| claves.get(k).and_then(|v| v.parse::<f32>().ok()).unwrap_or(d);
+        let segundos = num("seg", 5.0);
+        let modos: Vec<String> = claves.get("modos").map_or(Vec::new(), |m| m.split(',').map(String::from).collect());
+        let (mut juego, mut escena) = preparar(num("t", 0.0), &modos);
+        if modos.is_empty() {
+            escena = Escena::Espacio;
+        }
+        juego.mensaje = None;
+        juego.rapidez_orbitas = num("ritmo", 1.0);
+        juego.fov_cine = num("fov", 0.0);
+        juego.detalle = num("detalle", 3.0);
+        if let Some(t) = claves.get("dia").and_then(|v| v.parse().ok()) {
+            juego.t = t;
+        }
+        let auto = claves.get("auto").copied().unwrap_or("nada");
+        let centro = claves.get("centro").copied();
+        let mut fb = Framebuffer::new(1920, 1080);
+        let mut post = Post::new(&fb);
+        let salida = format!("{carpeta}/{nombre}.mp4");
+        let mut ffmpeg = std::process::Command::new("ffmpeg")
+            .args(["-v", "error", "-y", "-f", "rawvideo", "-pix_fmt", "rgba", "-s", "1920x1080", "-r", "30", "-i", "-", "-c:v", "libx264", "-preset", "fast", "-crf", "13", "-pix_fmt", "yuv420p", &salida])
+            .stdin(std::process::Stdio::piped())
+            .spawn()
+            .expect("hace falta ffmpeg");
+        let mut tubo = ffmpeg.stdin.take().unwrap();
+        let cuadros = (segundos * FPS).round() as usize;
+        let inicio = std::time::Instant::now();
+        for k in 0..cuadros {
+            let reloj = k as f32 * dt;
+            let e = entrada_de_cine(auto, reloj, &mut juego, &escena);
+            avanzar_cine(&mut escena, &mut juego, &e, dt);
+            if let (Some(cual), Escena::Espacio) = (centro, &escena) {
+                let t = juego.t;
+                let planeta = CUERPOS.iter().find(|c| c.archivo == cual);
+                let (donde, radio) = match (planeta, cual) {
+                    (Some(c), _) => (c.posicion(t), c.radio_visual()),
+                    (_, "gargantua") => (maravillas::GARGANTUA, 1.0),
+                    (_, "monolito") => (maravillas::monolito_en(t) + Vec3::new(0.0, 4.0, 0.0), 1.0),
+                    (_, "blip") => (maravillas::blip_en(t) + Vec3::new(4.0, 0.0, 0.0), 1.0),
+                    (_, "gusano") => (maravillas::gusano_en(t), 1.0),
+                    _ => (maravillas::huerto_en(t), 1.0),
+                };
+                // Avanza rapido al principio y se asienta: una camara con peso.
+                let u = (k as f32 / (cuadros.max(2) - 1) as f32).clamp(0.0, 1.0);
+                let s = if claves.contains_key("parejo") { u } else { 1.0 - (1.0 - u) * (1.0 - u) };
+                let mezcla = |a: f32, b: f32| a + (b - a) * s;
+                let al_sol = (CUERPOS[0].posicion(t) - donde).normalize();
+                let base = al_sol.z.atan2(al_sol.x);
+                let a = base + mezcla(num("a0", 40.0), num("a1", 60.0)).to_radians();
+                let d = mezcla(num("d0", 3.0), num("d1", 2.5)) * radio;
+                let h = mezcla(num("h0", 0.15), num("h1", 0.15));
+                let lado_ojo = Vec3::new(a.cos(), h, a.sin()).normalize();
+                let ojo = donde + lado_ojo * d;
+                let derecha = (donde - ojo).normalize().cross(Vec3::new(0.0, 1.0, 0.0)).normalize();
+                let mira = donde + derecha * (num("mx", 0.0) * radio) + Vec3::new(0.0, num("my", 0.0) * radio, 0.0);
+                juego.camara = Camara::new(ojo, mira);
+                let adelante = (mira - ojo).normalize();
+                juego.nave.velocidad = 0.0;
+                if let Some(n) = claves.get("nave") {
+                    let v: Vec<f32> = n.split(',').filter_map(|x| x.parse().ok()).collect();
+                    // La distancia puede cambiar: `nave=desde,lado,alto,giro,hasta`.
+                    let dist = mezcla(v[0], v.get(4).copied().unwrap_or(v[0]));
+                    let (lado, alto, yaw) = (v[1], v[2], v[3]);
+                    juego.nave.pos = ojo + adelante * dist + derecha * lado + Vec3::new(0.0, alto, 0.0);
+                    (juego.nave.yaw, juego.nave.pitch) = salto::rumbo_hacia(adelante);
+                    juego.nave.yaw += yaw.to_radians();
+                } else {
+                    juego.nave.pos = ojo - adelante * 40.0;
+                }
+            }
+            let st = dibujar_escena(&mut fb, &mut post, &rec, &juego, &escena);
+            let _ = st;
+            std::io::Write::write_all(&mut tubo, fb.bytes()).expect("ffmpeg se cerro");
+        }
+        drop(tubo);
+        let _ = ffmpeg.wait();
+        println!("{nombre}: {cuadros} cuadros en {:.0} s", inicio.elapsed().as_secs_f32());
+    }
+}
+
+/// Lo que "aprieta" el piloto automatico de cada toma del trailer.
+fn entrada_de_cine(auto: &str, t: f32, juego: &mut Juego, escena: &Escena) -> Entrada {
+    let pulso = |cada: f32, desde: f32| t > desde && ((t - desde) / cada).fract() < 1.0 / 30.0 / cada;
+    match (auto, escena) {
+        ("orbita", Escena::Espacio) => Entrada { empuje: 0.6, ..Default::default() },
+        ("recoger", Escena::Espacio) => {
+            let nave = juego.nave.pos;
+            if let Some(hacia) = juego.coleccion.notas.iter().filter(|n| n.viva).map(|n| n.pos).min_by(|p, q| (*p - nave).length().total_cmp(&(*q - nave).length())) {
+                (juego.nave.yaw, juego.nave.pitch) = salto::rumbo_hacia(hacia - nave);
+            }
+            Entrada { empuje: 1.0, ..Default::default() }
+        }
+        ("dialogo", _) => Entrada { aceptar: pulso(2.4, 1.2), ..Default::default() },
+        ("camioneta", Escena::Camioneta(c)) => c.chofer(),
+        ("parkour", Escena::Vegetta(v)) if v.en_parkour() => v.entrada_parkour(),
+        ("tnt", Escena::Vegetta(_)) => Entrada { empuje: 1.0, girar: 0.55, disparando: true, ..Default::default() },
+        ("mina", Escena::Vegetta(v)) if v.en_mina() => Entrada { picar: true, ..Default::default() },
+        ("asteroides", Escena::Jupiter(_)) => Entrada { girar: (t * 0.7).sin(), cabecear: (t * 0.5).cos() * 0.6, disparando: true, ..Default::default() },
+        ("ritmo", Escena::Ritmo(r)) => {
+            let (piso, aire) = r.golpes_solos(1.0 / 30.0);
+            Entrada { piso, aire, ..Default::default() }
+        }
+        _ => Entrada::default(),
+    }
+}
+
+/// Un cuadro de la escena de una toma del trailer (sin sonido ni interfaz).
+fn avanzar_cine(escena: &mut Escena, juego: &mut Juego, e: &Entrada, dt: f32) {
+    juego.reloj += dt;
+    match escena {
+        Escena::Espacio => {
+            juego.actualizar(e, dt);
+            juego.eventos.clear();
+            juego.mensaje = None;
+        }
+        Escena::Entrega(x) => { x.actualizar(e, dt); x.eventos.clear(); }
+        Escena::Aula(x) => { x.actualizar(e, dt); x.eventos.clear(); }
+        Escena::Urano(x) => { x.actualizar(e, dt); x.eventos.clear(); }
+        Escena::Vegetta(x) => { x.actualizar(e, dt); x.eventos.clear(); }
+        Escena::Concierto(x) => { x.actualizar(e, dt); }
+        Escena::Ritmo(x) => { x.actualizar(e, dt); x.eventos.clear(); }
+        Escena::Junta(x) => { x.actualizar(e, dt); x.eventos.clear(); }
+        Escena::Cita(x) => { x.actualizar(e, dt); x.eventos.clear(); }
+        Escena::Neptuno(x) => { x.actualizar(e, dt); x.eventos.clear(); }
+        Escena::Mercurio(x) => { x.actualizar(e, dt); x.eventos.clear(); }
+        Escena::Divorcio(x) => { x.actualizar(e, dt); x.eventos.clear(); }
+        Escena::Jupiter(x) => { x.actualizar(e, dt); x.eventos.clear(); }
+        Escena::Luna(x) => { x.actualizar(e, dt); x.eventos.clear(); }
+        Escena::Camioneta(x) => { x.actualizar(e, dt); x.eventos.clear(); }
+        Escena::Fuente(x) => { x.actualizar(e, dt); x.eventos.clear(); }
+        _ => {}
+    }
+}
+
 fn captura(archivo: &str, t: f32, resto: &[String]) {
     let mut rec = Recursos::cargar();
     // `relieve:<x>` y `semilla:<n>` junto con `cerca:<planeta>`: el planeta con ese ajuste, como
@@ -4673,6 +4835,11 @@ fn main() {
     // Solo advertencias y errores de raylib (sin una linea por cada sonido que carga).
     unsafe { raylib::ffi::SetTraceLogLevel(raylib::ffi::TraceLogLevel::LOG_WARNING as i32) };
     let args: Vec<String> = std::env::args().collect();
+    // `--cine lista.txt carpeta [toma...]`: las tomas del trailer, sin ventana ni interfaz (ver `cine`).
+    if let Some(i) = args.iter().position(|a| a == "--cine") {
+        cine(&args[i + 1], &args[i + 2], &args[i + 3..]);
+        return;
+    }
     if let Some(i) = args.iter().position(|a| a == "--captura") {
         let archivo = args.get(i + 1).map_or("captura.ppm", |s| s.as_str());
         let t = args.get(i + 2).and_then(|s| s.parse().ok()).unwrap_or(0.0);
