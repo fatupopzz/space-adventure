@@ -1049,6 +1049,40 @@ impl Urano {
                 }
             }
         }
+        // El estante: un letrero sobre cada cosa, para saber donde esta todo. El que hace falta
+        // ahorita brilla y brinca (papel si alguien grita, destapacanos si hay un tapado, trapeador
+        // si hay charcos).
+        for (item, z) in ESTANTE {
+            let Some((x, y)) = self.en_ventana(Vec3::new(X_ESTANTE, 2.05, z)) else { continue };
+            let hace_falta = match item {
+                Item::Papel => self.aliens.iter().any(|a| matches!(a.hace, Hace::SinPapel(_))),
+                Item::Destapacanos => self.cubiculos.iter().any(|c| c.tapado),
+                Item::Trapeador => !self.charcos.is_empty(),
+            };
+            let lo_lleva = self.jugador.carga == Some(item);
+            let nombre = match item {
+                Item::Papel => "PAPEL",
+                Item::Destapacanos => "DESTAPACAÑOS",
+                Item::Trapeador => "TRAPEADOR",
+            };
+            let tam = 15;
+            let brinco = if hace_falta && !lo_lleva { ((self.total * 6.0).sin().abs() * 6.0) as i32 } else { 0 };
+            let w = ui::medir(nombre, tam) + 18;
+            let (bx, by) = (x as i32 - w / 2, y as i32 - 30 - brinco);
+            let (fondo, letra) = if lo_lleva {
+                (Color::new(40, 30, 70, 150), ui::TENUE)
+            } else if hace_falta {
+                (Color::new(255, 200, 70, 235), Color::new(40, 20, 10, 255))
+            } else {
+                (Color::new(30, 20, 60, 215), Color::WHITE)
+            };
+            d.draw_rectangle(bx, by, w, tam + 10, fondo);
+            d.draw_rectangle_lines(bx, by, w, tam + 10, Color::new(255, 255, 255, 120));
+            ui::subtitulo(d, nombre, bx + 9, by + 5, tam, letra);
+            // La flechita que apunta a la repisa.
+            let (fx, fy) = (x, (by + tam + 10) as f32);
+            d.draw_triangle(Vector2::new(fx - 7.0, fy), Vector2::new(fx, fy + 9.0), Vector2::new(fx + 7.0, fy), fondo);
+        }
         // Lo que lleva el jugador y lo que pasaria con el boton.
         let j = &self.jugador;
         if let Some((x, y)) = self.en_ventana(j.pos + Vec3::new(0.0, 1.7, 0.0)) {

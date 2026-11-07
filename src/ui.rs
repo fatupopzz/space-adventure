@@ -1608,12 +1608,14 @@ pub fn glifo_bloques(c: char) -> [u8; 7] {
 
 /// Lo que mide de ancho un texto de bloques con bloques de lado `u`.
 pub fn medir_bloques(texto: &str, u: f32) -> f32 {
-    (texto.chars().count() as f32 * 6.0 - 1.0) * u
+    (con_protagonista(texto).chars().count() as f32 * 6.0 - 1.0) * u
 }
 
 /// Un texto de letras de bloques centrado en (`cx`, `cy`): dos tonos, como un logo de arcade, con su
 /// contorno oscuro y su sombra.
 pub fn bloques(d: &mut RaylibDrawHandle, texto: &str, cx: f32, cy: f32, u: f32, arriba: Color, abajo: Color, alfa: u8) {
+    // Como todos los textos: "Miku" es el personaje que se este jugando.
+    let texto = &*con_protagonista(texto);
     let x0 = cx - medir_bloques(texto, u) * 0.5;
     let y0 = cy - 3.5 * u;
     let borde = Color::new(36, 8, 62, alfa);

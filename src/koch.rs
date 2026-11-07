@@ -185,6 +185,8 @@ pub struct Asomado {
     pub con_birrete: bool,
     /// Ya viene el mazo: ve para arriba, asustado, y no se puede ir.
     atrapado: bool,
+    /// Se le acabo el tiempo y se esta yendo (no porque le pegaron).
+    escapado: bool,
 }
 
 impl Asomado {
@@ -193,7 +195,7 @@ impl Asomado {
             Tipo::Birrete | Tipo::Fractal(1) => 2,
             _ => 1,
         };
-        Asomado { tipo, estado: Estado::Sube, t: 0.0, edad: 0.0, dura, vidas, impacto: 0.0, con_birrete: tipo == Tipo::Birrete, atrapado: false }
+        Asomado { tipo, estado: Estado::Sube, t: 0.0, edad: 0.0, dura, vidas, impacto: 0.0, con_birrete: tipo == Tipo::Birrete, atrapado: false, escapado: false }
     }
 
     fn golpeable(&self) -> bool {
@@ -331,7 +333,9 @@ struct Jefe {
     vidas_grande: u32,
     /// Cuanto falta para que el grande vuelva a salir.
     descansa: f32,
-    pendientes: Vec<u8>,
+    /// Lo que falta por salir: el nivel y los golpes que le quedan (un mediano que se escapo
+    /// golpeado regresa con el golpe ya dado).
+    pendientes: Vec<(u8, u32)>,
 }
 
 const VIDAS_GRANDE: u32 = 12;
@@ -347,6 +351,10 @@ pub struct Koch {
     corchea: i64,
     proxima: f32,
     jefe: Option<Jefe>,
+    ultimo_sacado: Option<usize>,
+    /// A que altura queda la cabeza de quien va a recibir el mazo (para que pegue encima, sea grande
+    /// o chico).
+    alto_golpe: f32,
     pub cursor: usize,
     /// El mazo: donde va (se acerca solo), desde cuando pego y si le dio a algo.
     pub mazo_pos: Vec3,
@@ -435,6 +443,8 @@ impl Koch {
             corchea: -1,
             proxima: 0.0,
             jefe: None,
+            ultimo_sacado: None,
+            alto_golpe: ALTO * ESCALA * ASOMA,
             cursor: 4,
             mazo_pos: hoyo(4),
             desde_golpe: 9.0,
@@ -754,6 +764,9 @@ impl Koch {
                 if self.t < dt * 1.5 {
                     self.eventos.push(Efecto::Sello);
                 }
+                if e.aterrizar && self.t > 0.5 {
+                    return AccionKoch::Despegar;
+                }
                 if (e.aceptar || e.clic) && self.t > 0.7 || self.t > 3.4 {
                     self.arrancar(n);
                 }
@@ -925,13 +938,19 @@ impl Koch {
         Tipo::Normal
     }
 
-    /// Saca uno en un hoyo libre (que no sea el que se acaba de pegar, si se puede).
+    /// Saca uno en un hoyo libre.
     fn sacar(&mut self, tipo: Tipo, dura: f32) -> bool {
-        let libres: Vec<usize> = (0..HOYOS).filter(|&k| self.hoyos[k].is_none()).collect();
+        self.sacar_en(tipo, dura, |_| true)
+    }
+
+    /// Saca uno en un hoyo libre de los que `vale` deja.
+    fn sacar_en(&mut self, tipo: Tipo, dura: f32, vale: impl Fn(usize) -> bool) -> bool {
+        let libres: Vec<usize> = (0..HOYOS).filter(|&k| self.hoyos[k].is_none() && vale(k)).collect();
         if libres.is_empty() {
             return false;
         }
         let k = libres[(self.azar() * libres.len() as f32) as usize % libres.len()];
+        self.ultimo_sacado = Some(k);
         self.hoyos[k] = Some(Asomado::nuevo(tipo, dura));
         self.eventos.push(Efecto::KochSale);
         true
@@ -950,18 +969,21 @@ impl Koch {
             if self.hoyos[4].is_none() && n % 2 == 0 {
                 let cual = (self.azar() * 3.0) as usize % 3;
                 let tipo = if self.azar() < 0.28 { Tipo::Companero(cual) } else { Tipo::Normal };
-                self.sacar(tipo, 0.85);
+                // El centro es del grande: los demas no se le meten mientras descansa.
+                self.sacar_en(tipo, 0.85, |k| k != 4);
             }
             return;
         }
         if n % 2 == 0 && hay_pendiente {
-            let nivel = self.jefe.as_mut().and_then(|j| j.pendientes.pop());
-            if let Some(nivel) = nivel {
+            let pendiente = self.jefe.as_mut().and_then(|j| j.pendientes.pop());
+            if let Some((nivel, vidas)) = pendiente {
                 let dura = if nivel == 1 { 2.0 } else { 1.05 };
-                if !self.sacar(Tipo::Fractal(nivel), dura) {
-                    if let Some(j) = &mut self.jefe {
-                        j.pendientes.push(nivel);
+                if let Some(k) = self.sacar_en(Tipo::Fractal(nivel), dura, |_| true).then_some(()).and(self.ultimo_sacado) {
+                    if let Some(a) = &mut self.hoyos[k] {
+                        a.vidas = vidas;
                     }
+                } else if let Some(j) = &mut self.jefe {
+                    j.pendientes.push((nivel, vidas));
                 }
             }
         } else if n % 8 == 5 && self.azar() < 0.55 {
@@ -971,7 +993,8 @@ impl Koch {
     }
 
     fn mover_asomados(&mut self, dt: f32) {
-        let mut escapan: Vec<(usize, Tipo)> = Vec::new();
+        let mut escapan: Vec<(usize, Tipo, u32)> = Vec::new();
+        let mut vuelven: Vec<(u8, u32)> = Vec::new();
         let mut reglazo: Option<usize> = None;
         let hacia = self.giro.map(|g| g.0);
         for (k, h) in self.hoyos.iter_mut().enumerate() {
@@ -998,7 +1021,8 @@ impl Koch {
                         a.estado = Estado::Regla;
                     } else {
                         a.estado = Estado::Baja;
-                        escapan.push((k, a.tipo));
+                        a.escapado = true;
+                        escapan.push((k, a.tipo, a.vidas));
                     }
                     a.t = 0.0;
                 }
@@ -1007,20 +1031,32 @@ impl Koch {
                     a.t = 0.0;
                     reglazo = Some(k);
                 }
-                Estado::Baja if a.t >= BAJA => *h = None,
+                Estado::Baja if a.t >= BAJA => {
+                    // El fractal que se escapo vuelve a la fila hasta que de veras se esconde: si le
+                    // pegaron en el ultimo momento, ya no regresa (y no sale repetido).
+                    if let (Tipo::Fractal(nivel @ 0..=1), true) = (a.tipo, a.escapado) {
+                        vuelven.push((nivel, a.vidas.max(1)));
+                    }
+                    *h = None;
+                }
                 Estado::Golpeado if a.t >= CAIDA + 0.06 => *h = None,
                 _ => {}
             }
         }
-        for (k, tipo) in escapan {
-            self.escapo(k, tipo);
+        for (k, tipo, vidas) in escapan {
+            self.escapo(k, tipo, vidas);
+        }
+        if let Some(j) = &mut self.jefe {
+            for v in vuelven {
+                j.pendientes.insert(0, v);
+            }
         }
         if let Some(k) = reglazo {
             self.dar_reglazo(k);
         }
     }
 
-    fn escapo(&mut self, k: usize, tipo: Tipo) {
+    fn escapo(&mut self, k: usize, tipo: Tipo, vidas: u32) {
         match tipo {
             // Dejar pasar a un companero esta bien: es lo correcto.
             Tipo::Companero(_) => {}
@@ -1029,11 +1065,9 @@ impl Koch {
                     j.descansa = 1.6;
                 }
             }
-            Tipo::Fractal(nivel) => {
-                // Se fue sin resolver: la llamada recursiva vuelve a salir.
-                if let Some(j) = &mut self.jefe {
-                    j.pendientes.insert(0, nivel);
-                }
+            Tipo::Fractal(_) => {
+                // Se fue sin resolver: la llamada recursiva vuelve a salir (cuando termine de esconderse).
+                let _ = vidas;
                 self.combo = 0;
                 self.letrero(k, "¡OTRA VEZ!", ui::ROJO, false);
             }
@@ -1076,6 +1110,7 @@ impl Koch {
         self.mazo_pos = hoyo(k);
         self.giro = Some((k, 0.0));
         self.mazo_vel = 0.0;
+        self.alto_golpe = self.hoyos[k].filter(|a| a.golpeable()).map_or(ALTO * ESCALA * ASOMA, |a| ALTO * a.tipo.escala() * ASOMA);
         self.eventos.push(Efecto::Aire);
         self.dio = false;
         if let Some(a) = &mut self.hoyos[k] {
@@ -1231,7 +1266,7 @@ impl Koch {
         if nivel == 2 {
             if let Some(j) = &mut self.jefe {
                 j.vidas_grande = 0;
-                j.pendientes = vec![1, 1, 1];
+                j.pendientes = vec![(1, 2), (1, 2), (1, 2)];
             }
             self.pausa = 0.16;
             self.sacudida = 1.0;
@@ -1241,7 +1276,7 @@ impl Koch {
             self.decir("¡Se parte! ¿Cuál es su caso base?", 2.6);
         } else if nivel == 1 {
             if let Some(j) = &mut self.jefe {
-                j.pendientes.extend([0u8, 0, 0]);
+                j.pendientes.extend([(0u8, 1), (0, 1), (0, 1)]);
             }
         }
     }
@@ -1417,7 +1452,9 @@ impl Koch {
                 0.0,
             ),
         };
-        let mano = Mat4::translation(self.mazo_pos + Vec3::new(0.0, MAZO_ALTO - baja, 1.75 * MAZO + hacia)) * Mat4::rotation_y(-lado) * Mat4::rotation_z(self.ladeo + lado * 0.5) * Mat4::rotation_x(angulo) * Mat4::scale(MAZO);
+        // Mas arriba para el grande, mas abajo para los chicos: el mazo cae justo en la cabeza.
+        let sube = if self.dio { self.alto_golpe - ALTO * ESCALA * ASOMA } else { 0.0 };
+        let mano = Mat4::translation(self.mazo_pos + Vec3::new(0.0, MAZO_ALTO - baja + sube, 1.75 * MAZO + hacia)) * Mat4::rotation_y(-lado) * Mat4::rotation_z(self.ladeo + lado * 0.5) * Mat4::rotation_x(angulo) * Mat4::scale(MAZO);
         let cabeza = mano * Mat4::translation(Vec3::new(0.0, 0.0, -1.75)) * Mat4::rotation_x(self.cabeza_ang * 0.35) * Mat4::rotation_z(self.ladeo * 1.6);
         (mano, cabeza)
     }
@@ -1487,14 +1524,17 @@ impl Koch {
 
     pub fn vida_jefe(&self) -> Option<f32> {
         let j = self.jefe.as_ref()?;
-        let chicos = j.pendientes.iter().map(|&n| if n == 1 { 4.0 } else { 1.0 }).sum::<f32>()
-            + self.hoyos.iter().flatten().filter(|a| a.golpeable()).map(|a| match a.tipo {
-                Tipo::Fractal(1) => 4.0,
-                Tipo::Fractal(0) => 1.0,
-                _ => 0.0,
-            }).sum::<f32>();
-        // El grande vale la mitad de la barra; la otra mitad, los doce que salen de el.
-        Some(if j.vidas_grande > 0 { 0.5 + 0.5 * j.vidas_grande as f32 / VIDAS_GRANDE as f32 } else { 0.5 * (chicos / 12.0).min(1.0) })
+        // Los golpes que faltan, contando los de adentro: cada golpe baja la barra lo mismo, y nada
+        // la sube (un mediano que se escapa regresa con su golpe ya dado).
+        let golpes = |nivel: u8, vidas: u32| if nivel == 1 { vidas as f32 + 3.0 } else { vidas as f32 };
+        let afuera: f32 = self.hoyos.iter().flatten().filter(|a| matches!(a.estado, Estado::Sube | Estado::Arriba | Estado::Regla) || (a.estado == Estado::Baja && a.escapado)).map(|a| match a.tipo {
+            Tipo::Fractal(n) if n < 2 => golpes(n, a.vidas),
+            _ => 0.0,
+        }).sum();
+        let faltan = j.pendientes.iter().map(|&(n, v)| golpes(n, v)).sum::<f32>() + afuera;
+        let partes = 3.0 * golpes(1, 2);
+        let total = VIDAS_GRANDE as f32 + partes;
+        Some(if j.vidas_grande > 0 { (j.vidas_grande as f32 + partes) / total } else { (faltan / total).min(partes / total) })
     }
 
     // -----------------------------------------------------------------------------------------
@@ -1600,7 +1640,7 @@ impl Koch {
         };
         let ancho_dato = ui::medir(dato, 18);
         ui::subtitulo(d, dato, ((ancho - ancho_dato) / 2).max(10), (h * 0.74) as i32, 18, ui::TENUE);
-        ui::ayudas(d, &[(e.nombre("aceptar"), "¡Ya!")], ancho, alto);
+        ui::ayudas(d, &[(e.nombre("aceptar"), "¡Ya!"), (e.nombre("aterrizar"), "Despegar")], ancho, alto);
     }
 
     /// El marcador: arriba, y que no tape el tablero.
@@ -1672,9 +1712,9 @@ impl Koch {
         }
         if self.parcial == 0 && self.reloj < 7.0 {
             let acciones: Vec<(&str, &str)> = if e.hay_control {
-                vec![(e.nombre("apuntar"), "Apuntar"), (e.nombre("aceptar"), "Pegar (o cualquier botón)")]
+                vec![(e.nombre("apuntar"), "Apuntar"), (e.nombre("aceptar"), "Pegar (o cualquier botón)"), (e.nombre("pausa"), "Pausa o despegar")]
             } else {
-                vec![("Q W E · A S D · Z X C", "Pegar en ese hoyo"), ("ratón", "Apuntar y clic")]
+                vec![("Q W E · A S D · Z X C", "Pegar en ese hoyo"), ("ratón", "Apuntar y clic"), (e.nombre("pausa"), "Pausa o despegar")]
             };
             ui::ayudas(d, &acciones, ancho, alto);
         }
@@ -1804,7 +1844,7 @@ impl Koch {
                 if modo == "koch_partido" {
                     if let Some(j) = &mut self.jefe {
                         j.vidas_grande = 0;
-                        j.pendientes = vec![0, 0, 1, 0, 1, 1];
+                        j.pendientes = vec![(0, 1), (0, 1), (1, 2), (0, 1), (1, 2), (1, 2)];
                     }
                 }
             }
@@ -1827,6 +1867,16 @@ impl Koch {
                 if modo == "koch_toque" {
                     self.golpear(4);
                 }
+            }
+            // El mazo tocando al grande (`koch_golpe_grande`) y a un chico (`koch_golpe_chico`).
+            "koch_golpe_grande" | "koch_golpe_chico" => {
+                self.arrancar(FINAL);
+                let tipo = if modo == "koch_golpe_grande" { Tipo::Fractal(2) } else { Tipo::Fractal(0) };
+                self.hoyos[4] = Some(Asomado { estado: Estado::Arriba, ..Asomado::nuevo(tipo, 9.0) });
+                self.total = 1.0;
+                self.arrancar_giro(4);
+                self.giro = Some((4, GIRO * 0.999));
+                self.mover_mazo(0.0);
             }
             "koch_final" => {
                 self.parcial = FINAL;
@@ -2378,6 +2428,162 @@ mod pruebas {
         assert!(k.hoyos[4].as_ref().is_none_or(|a| a.tipo == Tipo::Fractal(2)), "el hoyo del centro se libera para el Koch grande");
     }
 
+    /// (Exploratoria) Estadisticas del final con jugadores de todo tipo: busca estados raros.
+    #[test]
+    #[ignore]
+    fn explorar_el_final() {
+        let mut ganados = 0;
+        let mut tiempos = Vec::new();
+        let mut rarezas: std::collections::BTreeMap<&str, u32> = Default::default();
+        for semilla in 1..800u32 {
+            let mut k = Koch::new(semilla, 0);
+            k.arrancar(FINAL);
+            let mut azar = semilla.wrapping_mul(2654435761) | 1;
+            let mut dado = move || {
+                azar = azar.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+                (azar >> 8) as f32 / 16_777_216.0
+            };
+            let punteria = (semilla % 10) as f32 / 10.0;
+            let pega = 0.02 + (semilla % 7) as f32 * 0.03;
+            let mut t = 0.0f32;
+            let mut centro_tapado = 0.0f32;
+            let mut sin_grande = 0.0f32;
+            let mut maximo_pendientes = 0;
+            let mut fractales_muertos = 0;
+            let mut vida_antes = 1.0f32;
+            while k.fase == Fase::Jugando && t < 60.0 {
+                let mut e = Entrada::default();
+                if dado() < pega {
+                    let afuera: Vec<usize> = (0..HOYOS).filter(|&h| k.hoyos[h].is_some()).collect();
+                    let h = if !afuera.is_empty() && dado() < punteria { afuera[(dado() * afuera.len() as f32) as usize % afuera.len()] } else { (dado() * 9.0) as usize % 9 };
+                    e.celda = Some(h);
+                }
+                let antes = k.aciertos;
+                let fractales_antes: usize = k.hoyos.iter().flatten().filter(|a| matches!(a.tipo, Tipo::Fractal(_)) && !a.mareado()).count();
+                k.actualizar(&e, 1.0 / 60.0);
+                let fractales_despues: usize = k.hoyos.iter().flatten().filter(|a| matches!(a.tipo, Tipo::Fractal(_)) && !a.mareado()).count();
+                if k.aciertos > antes && fractales_despues < fractales_antes {
+                    fractales_muertos += 1;
+                }
+                k.eventos.clear();
+                t += 1.0 / 60.0;
+                let j = k.jefe.as_ref().unwrap();
+                maximo_pendientes = maximo_pendientes.max(j.pendientes.len());
+                let grande_afuera = k.hoyos[4].is_some_and(|a| a.tipo == Tipo::Fractal(2));
+                if j.vidas_grande > 0 && !grande_afuera {
+                    sin_grande += 1.0 / 60.0;
+                    if k.hoyos[4].is_some() && j.descansa <= 0.0 {
+                        centro_tapado += 1.0 / 60.0;
+                    }
+                } else {
+                    sin_grande = 0.0;
+                }
+                if sin_grande > 4.0 {
+                    *rarezas.entry("el grande tarda mas de 4 s en volver").or_default() += 1;
+                    sin_grande = -99.0;
+                }
+                if j.vidas_grande == 0 && k.hoyos.iter().flatten().any(|a| a.tipo == Tipo::Fractal(2) && !a.mareado()) {
+                    *rarezas.entry("grande vivo con 0 vidas").or_default() += 1;
+                }
+                if let Some(v) = k.vida_jefe() {
+                    if v > vida_antes + 0.02 {
+                        *rarezas.entry("la barra del jefe sube").or_default() += 1;
+                    }
+                    vida_antes = v;
+                }
+            }
+            if centro_tapado > 2.0 {
+                *rarezas.entry("otro tapa el hoyo del grande > 2 s en total").or_default() += 1;
+            }
+            if maximo_pendientes > 9 {
+                *rarezas.entry("mas de 9 pendientes").or_default() += 1;
+            }
+            if k.caso_base {
+                ganados += 1;
+                tiempos.push(k.reloj);
+                if fractales_muertos != 13 && fractales_muertos != 0 {
+                    *rarezas.entry("no se mataron 13 fractales").or_default() += 1;
+                }
+            }
+            if k.fase == Fase::Jugando {
+                *rarezas.entry("no termino").or_default() += 1;
+            }
+        }
+        tiempos.sort_by(|a, b| a.total_cmp(b));
+        eprintln!("ganados {ganados}/799, tiempos min {:?} mediana {:?} max {:?}", tiempos.first(), tiempos.get(tiempos.len() / 2), tiempos.last());
+        eprintln!("rarezas {rarezas:?}");
+    }
+
+    /// Lo que encontro la exploracion del final: el centro no se lo tapan al grande, la barra solo
+    /// baja, el mediano golpeado no se cura al escaparse y el mazo pega a la altura de cada uno.
+    #[test]
+    fn el_final_es_justo() {
+        for semilla in 1..300u32 {
+            let mut k = Koch::new(semilla, 0);
+            k.arrancar(FINAL);
+            let mut azar = semilla.wrapping_mul(2654435761) | 1;
+            let mut dado = move || {
+                azar = azar.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+                (azar >> 8) as f32 / 16_777_216.0
+            };
+            let mut barra = 1.0f32;
+            let mut t = 0.0f32;
+            while k.fase == Fase::Jugando && t < 50.0 {
+                let mut e = Entrada::default();
+                if dado() < 0.1 {
+                    let afuera: Vec<usize> = (0..HOYOS).filter(|&h| k.hoyos[h].is_some()).collect();
+                    e.celda = Some(if !afuera.is_empty() && dado() < 0.6 { afuera[(dado() * afuera.len() as f32) as usize % afuera.len()] } else { (dado() * 9.0) as usize % 9 });
+                }
+                k.actualizar(&e, 1.0 / 60.0);
+                k.eventos.clear();
+                t += 1.0 / 60.0;
+                let j = k.jefe.as_ref().unwrap();
+                if j.vidas_grande > 0 {
+                    assert!(k.hoyos[4].is_none_or(|a| a.tipo == Tipo::Fractal(2)), "semilla {semilla}: le taparon el centro al grande");
+                }
+                let v = k.vida_jefe().unwrap();
+                assert!(v <= barra + 1e-4, "semilla {semilla}: la barra subio de {barra} a {v}");
+                barra = v;
+            }
+        }
+        // El mediano golpeado que se escapa regresa con su golpe dado.
+        let mut k = Koch::new(5, 0);
+        k.arrancar(FINAL);
+        k.jefe.as_mut().unwrap().vidas_grande = 0;
+        k.hoyos[2] = Some(Asomado { vidas: 1, estado: Estado::Arriba, ..Asomado::nuevo(Tipo::Fractal(1), 0.05) });
+        for _ in 0..20 {
+            k.mover_asomados(1.0 / 60.0);
+        }
+        assert_eq!(k.jefe.as_ref().unwrap().pendientes, vec![(1, 1)]);
+        // Y si le pegan justo cuando se va, no regresa repetido.
+        let mut k = Koch::new(5, 0);
+        k.arrancar(FINAL);
+        k.jefe.as_mut().unwrap().vidas_grande = 0;
+        k.hoyos[2] = Some(Asomado { vidas: 1, estado: Estado::Arriba, ..Asomado::nuevo(Tipo::Fractal(1), 0.05) });
+        k.mover_asomados(0.06);
+        pegar(&mut k, 2);
+        for _ in 0..40 {
+            k.mover_asomados(1.0 / 60.0);
+        }
+        assert_eq!(k.jefe.as_ref().unwrap().pendientes.len(), 3, "solo sus tres chicos, sin el mediano repetido");
+        // Y el mazo sube para el grande y baja para el chico.
+        for (tipo, sube) in [(Tipo::Fractal(2), true), (Tipo::Fractal(0), false)] {
+            let mut k = Koch::new(5, 0);
+            k.arrancar(FINAL);
+            k.hoyos[4] = Some(Asomado { estado: Estado::Arriba, ..Asomado::nuevo(tipo, 9.0) });
+            k.arrancar_giro(4);
+            assert_eq!(k.alto_golpe > ALTO * ESCALA * ASOMA, sube, "{tipo:?}");
+        }
+    }
+
+    #[test]
+    fn entre_parciales_se_puede_despegar() {
+        let mut k = Koch::new(5, 0);
+        k.fase = Fase::Cartel(1);
+        k.t = 1.0;
+        assert!(matches!(k.actualizar(&Entrada { aterrizar: true, ..Default::default() }, 1.0 / 60.0), AccionKoch::Despegar));
+    }
+
     #[test]
     fn el_copo_multiplica_sus_lados_por_cuatro() {
         for n in 0..4 {
@@ -2500,7 +2706,7 @@ mod pruebas {
         let mut k = Koch::new(5, 0);
         k.arrancar(1);
         k.hoyos[3] = Some(Asomado::nuevo(Tipo::Companero(1), 0.1));
-        k.escapo(3, Tipo::Companero(1));
+        k.escapo(3, Tipo::Companero(1), 1);
         assert_eq!(k.escapes, 0);
     }
 
@@ -2559,7 +2765,7 @@ mod pruebas {
         let mut k = Koch::new(5, 0);
         k.arrancar(FINAL);
         k.romper_fractal(4, 2);
-        assert_eq!(k.jefe.as_ref().unwrap().pendientes, vec![1, 1, 1]);
+        assert_eq!(k.jefe.as_ref().unwrap().pendientes, vec![(1, 2), (1, 2), (1, 2)]);
         k.romper_fractal(0, 1);
         assert_eq!(k.jefe.as_ref().unwrap().pendientes.len(), 6, "de un mediano salen tres chicos");
         k.romper_fractal(0, 0);

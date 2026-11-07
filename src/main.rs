@@ -396,7 +396,7 @@ impl Recursos {
         let profe = cargar("modelos/profe.obj");
         let koch_tintes = {
             let mini = &elenco[personajes::indice("koch")].de_pie;
-            [koch::tenido(mini, [1.0, 0.2, 0.2], 0.3, 0.12), koch::tenido(mini, [1.0, 0.78, 0.2], 0.62, 0.3), koch::tenido(mini, [1.0, 0.35, 0.9], 0.55, 0.25), koch::tenido(mini, [1.0, 1.0, 1.0], 1.0, 1.0)]
+            [koch::tenido(mini, [1.0, 0.2, 0.2], 0.3, 0.12), koch::tenido(mini, [1.0, 0.78, 0.2], 0.62, 0.3), koch::tenido(mini, [0.72, 0.45, 1.0], 0.32, 0.1), koch::tenido(mini, [1.0, 1.0, 1.0], 1.0, 1.0)]
         };
         // Ningun planeta viene de un `.obj`: el juego los arma al arrancar, con voxels y su
         // deformacion con ruido (el Chapin en chapin.rs; los demas en planetas.rs), en paralelo.
@@ -4389,7 +4389,7 @@ fn preparar(t: f32, resto: &[String]) -> (Juego, Escena) {
             // `koch`: la llegada. Los demas (ver `Koch::preparar_captura`) juegan solos `t` segundos.
             let mut c = Koch::new(11, 14200);
             c.preparar_captura(modo);
-            let jugar = !matches!(modo, "koch" | "koch_cartel" | "koch_final" | "koch_giro" | "koch_giro2" | "koch_toque");
+            let jugar = !matches!(modo, "koch" | "koch_cartel" | "koch_final" | "koch_giro" | "koch_giro2" | "koch_toque" | "koch_golpe_grande" | "koch_golpe_chico");
             let mut ahora = 0.0;
             while ahora < t {
                 let e = if jugar { c.chofer() } else { Entrada::default() };
@@ -5816,10 +5816,10 @@ fn main() {
                     Some(true) => pausa = None,
                     Some(false) => {}
                     None if en_el_menu => {}
-                    None => pausa = Some(Pausa::new()),
+                    None => pausa = Some(if matches!(escena, Escena::Koch(_)) { Pausa::con_despegar() } else { Pausa::new() }),
                 }
             } else if pausa.is_none() && !en_el_menu && !rl.is_window_focused() {
-                pausa = Some(Pausa::new());
+                pausa = Some(if matches!(escena, Escena::Koch(_)) { Pausa::con_despegar() } else { Pausa::new() });
             }
         }
         // Si un menu estaba abierto en este cuadro, la tecla es suya: si no, el Enter con que se
@@ -5836,6 +5836,13 @@ fn main() {
             }
             Some(AccionPausa::PantallaCompleta) => unsafe { raylib::ffi::ToggleBorderlessWindowed() },
             Some(AccionPausa::Hud) => hud = !hud,
+            Some(AccionPausa::Despegar) => {
+                pausa = None;
+                if let Escena::Koch(c) = &escena {
+                    juego.despegar_de(KOCH, c.despedida());
+                    cambio = Some(Escena::Espacio);
+                }
+            }
             Some(AccionPausa::Menu) => {
                 pausa = None;
                 if !matches!(escena, Escena::Menu(_)) {

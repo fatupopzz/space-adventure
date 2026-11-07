@@ -84,7 +84,7 @@ pub struct Candidata {
     pub nombre: &'static str,
     descripcion: &'static str,
     /// Dos saludos: en cada cita sale uno.
-    saludos: [&'static str; 2],
+    saludos: [&'static str; 4],
     /// El banco de preguntas: en cada cita salen tres al azar.
     preguntas: [Pregunta; 7],
     /// Lo que dice al final, segun como salio la cita.
@@ -183,15 +183,43 @@ const IA: &str = ui::NOMBRE_IA;
 const CURIOSITY: &str = "CURIOSITY";
 const MIKU: &str = "MIKU";
 
-const INTRO: [(&str, &str, Voz); 5] = [
-    (IA, "Marte. Aquí vive Curiosity. Llegó en 2012. Amigos: cero. Seguidores: la NASA, por obligación.", Voz::Ia),
-    (CURIOSITY, "Ah... hola. No esperaba visitas. Nunca espero visitas. Así nunca me decepciono.", Voz::Rover),
-    (CURIOSITY, "En 2013 me canté feliz cumpleaños yo solito. Con el taladro. La NASA dijo que era \"para probar el instrumento\".", Voz::Rover),
-    (MIKU, "¡No puede ser! ¡Te vamos a conseguir una cita! Yo soy buenísima para esto. Creo. Nunca lo he hecho.", Voz::Miku),
-    (IA, "Bienvenidos a DOKI DOKI MARTE. Hay tres solteras en el planeta. Literal: solo hay tres robots.", Voz::Ia),
+/// Las llegadas a Marte: cuatro versiones (la cara de cada linea va igual en todas). Sale una al azar.
+const INTROS: [[(&str, &str, Voz); 5]; 4] = [
+    [
+        (IA, "Marte. Aquí vive Curiosity. Llegó en 2012. Amigos: cero. Seguidores: la NASA, por obligación.", Voz::Ia),
+        (CURIOSITY, "Ah... hola. No esperaba visitas. Nunca espero visitas. Así nunca me decepciono.", Voz::Rover),
+        (CURIOSITY, "En 2013 me canté feliz cumpleaños yo solito. Con el taladro. La NASA dijo que era \"para probar el instrumento\".", Voz::Rover),
+        (MIKU, "¡No puede ser! ¡Te vamos a conseguir una cita! Yo soy buenísima para esto. Creo. Nunca lo he hecho.", Voz::Miku),
+        (IA, "Bienvenidos a DOKI DOKI MARTE. Hay tres solteras en el planeta. Literal: solo hay tres robots.", Voz::Ia),
+    ],
+    [
+        (IA, "Marte. Polvo rojo, frío y un solo vecino: Curiosity. Lleva más de diez años sin una cita.", Voz::Ia),
+        (CURIOSITY, "¿Visitas? ¿Para mí? Perdón, el último que vino fue un meteorito. No se quedó.", Voz::Rover),
+        (CURIOSITY, "Los domingos le hablo a mis piedras. Les puse nombre. Esa es Carla. No contesta, pero escucha.", Voz::Rover),
+        (MIKU, "¡Curiosity, eso es demasiado triste! Hoy sales con alguien. No acepto un no. Ni un error 404.", Voz::Miku),
+        (IA, "Bienvenidos a DOKI DOKI MARTE. Tres solteras, cero restaurantes. Ojalá traigan conversación.", Voz::Ia),
+    ],
+    [
+        (IA, "Marte, otra vez. Curiosity sigue soltero. Revisé su agenda: dice «taladrar» todos los días.", Voz::Ia),
+        (CURIOSITY, "Hola... ¿Vinieron por mí o se perdieron? Está bien. La mayoría se pierde.", Voz::Rover),
+        (CURIOSITY, "Una vez casi tuve una cita, pero era una tormenta de arena. Duró meses. Me tapó las cámaras.", Voz::Rover),
+        (MIKU, "¡Nada de tormentas! Yo te arreglo una cita de verdad. Con luces, música y un poquito de suerte.", Voz::Miku),
+        (IA, "Bienvenidos a DOKI DOKI MARTE. En Marte el atardecer es azul. El amor, escaso.", Voz::Ia),
+    ],
+    [
+        (IA, "Marte. Gravedad: 38% de la de la Tierra. Probabilidad de que Curiosity tenga pareja: menos.", Voz::Ia),
+        (CURIOSITY, "Ay, no los vi. Estaba tomándome una selfie. Llevo miles. Todas con la misma cara.", Voz::Rover),
+        (CURIOSITY, "Voy a unos centímetros por segundo. Si alguien me deja plantado, ni lo alcanzo.", Voz::Rover),
+        (MIKU, "¡Pues que no te dejen plantado! Hoy te presento a alguien. Péinate las antenas.", Voz::Miku),
+        (IA, "Bienvenidos a DOKI DOKI MARTE. Escojan bien: la batería no alcanza para segundas citas.", Voz::Ia),
+    ],
 ];
 
-const ELEGIR: &str = "Elija a la candidata. Las tres son robots. Las tres tienen cámaras. Ninguna tiene filtro.";
+const ELEGIR: [&str; 3] = [
+    "Elija a la candidata. Las tres son robots. Las tres tienen cámaras. Ninguna tiene filtro.",
+    "Escoja con quién sale Curiosity. Todas tienen ruedas o hélices. Ninguna tiene paciencia.",
+    "Las solteras de Marte. Pocas, pero con mucha personalidad. Y paneles solares.",
+];
 
 pub const CANDIDATAS: [Candidata; 4] = [
     Candidata {
@@ -200,6 +228,8 @@ pub const CANDIDATAS: [Candidata; 4] = [
         saludos: [
             "¡Hola hola hola! ¿Tú eres Curiosity? ¡Te he visto desde arriba! Bueno, antes. Ya no vuelo.",
             "¡Llegué! Corriendo. Bueno, caminando. Bueno, me trajeron. ¡Hola, Curiosity!",
+            "¡Curiosity! ¿Sabías que soy la primera que voló en otro planeta? Te lo digo de una vez, para que no se te olvide.",
+            "¡Perdón, perdón! Me distraje viendo una piedra. Estaba bien bonita. ¡Hola!",
         ],
         preguntas: [
             Pregunta {
@@ -277,6 +307,8 @@ pub const CANDIDATAS: [Candidata; 4] = [
         saludos: [
             "Ah... hola. Me desperté solo para esto. Tengo 3% de batería. Usémoslo bien.",
             "Hola. Perdón la cara. Me acabo de despertar. Desde 2022. No me juzgues.",
+            "Mi trabajo era escuchar los temblores de Marte. Hoy solo escucho mi corazón. Y está en modo ahorro.",
+            "Hola. No me pidas que me mueva. No me muevo. Nunca me moví. Siéntate tú.",
         ],
         preguntas: [
             Pregunta {
@@ -354,6 +386,8 @@ pub const CANDIDATAS: [Candidata; 4] = [
         saludos: [
             "Hola. Soy Perseverance. Tengo 23 cámaras, dos micrófonos y la agenda llena. Tienes cinco minutos.",
             "Llego tarde porque estaba firmando autógrafos. A un helicóptero. Bueno, empecemos.",
+            "Mis muestras van a ir a la Tierra. Tú no. Pero bueno, te doy una oportunidad.",
+            "Tengo micrófono, así que si roncas en la cita, queda grabado. Para siempre.",
         ],
         preguntas: [
             Pregunta {
@@ -431,6 +465,8 @@ pub const CANDIDATAS: [Candidata; 4] = [
         saludos: [
             "¡Mijo! Pase adelante. Yo soy Sojourner. Llegué en el 97, cuando todo esto era desierto. Bueno, sigue siendo desierto.",
             "¿Usted es el muchacho de las selfies? Mire qué flaquito. ¿Sí le está llegando el sol?",
+            "Ay, mijo, en mis tiempos un rover cortejaba con antena y paciencia. Siéntese derechito.",
+            "Pase, pase. Le hice un cafecito de polvo marciano. Bueno, es solo polvo. Igual con cariño.",
         ],
         preguntas: [
             Pregunta {
@@ -554,6 +590,9 @@ pub enum AccionCita {
 }
 
 pub struct Cita {
+    /// Cual de las llegadas sale, y cual frase para escoger candidata.
+    intro: usize,
+    elegir: usize,
     fase: Fase,
     /// Segundos en la fase.
     t: f32,
@@ -617,7 +656,13 @@ impl Cita {
     }
 
     pub fn con_semilla(semilla: u32) -> Self {
+        let s = semilla | 1;
+        // Cual llegada y cual frase de eleccion: dos numeros sacados de la semilla, sin gastarle azar.
+        let intro = (s.wrapping_mul(2_654_435_761) >> 13) as usize % INTROS.len();
+        let elegir = (s.wrapping_mul(40_503) >> 9) as usize % ELEGIR.len();
         Cita {
+            intro,
+            elegir,
             fase: Fase::Intro(0),
             t: 0.0,
             total: 0.0,
@@ -656,7 +701,7 @@ impl Cita {
             }
             self.orden[k] = o;
         }
-        self.saludo = self.azar(2);
+        self.saludo = self.azar(4);
         // Tres de cada cuatro citas tienen un momento sorpresa a la mitad.
         self.momento = if self.azar(4) < 3 { Some(self.azar(MOMENTOS.len())) } else { None };
         self.regalo = None;
@@ -809,7 +854,7 @@ impl Cita {
             e.respuesta.filter(|&r| r < n).or(if e.aceptar { Some(*cursor) } else { None })
         };
         match self.fase {
-            Fase::Intro(i) if siguiente => self.cambiar(if i + 1 < INTRO.len() { Fase::Intro(i + 1) } else { Fase::Elegir }),
+            Fase::Intro(i) if siguiente => self.cambiar(if i + 1 < INTROS[self.intro].len() { Fase::Intro(i + 1) } else { Fase::Elegir }),
             Fase::Elegir if self.t > 0.3 => {
                 if let Some(c) = elegir(&mut self.cursor, CANDIDATAS.len()) {
                     self.candidata = c;
@@ -979,8 +1024,8 @@ impl Cita {
             Fase::RegaloReaccion(r) => (c.nombre, c.regalos[r].1, Voz::Robotina),
             Fase::Golpiza => return None,
             Fase::GameOver => (IA, "Curiosity entró en modo seguro. Le pasa cada que algo sale mal. Esta vez fueron dos cosas. Con ruedas.", Voz::Ia),
-            Fase::Intro(i) => INTRO[i],
-            Fase::Elegir => (IA, ELEGIR, Voz::Ia),
+            Fase::Intro(i) => INTROS[self.intro][i],
+            Fase::Elegir => (IA, ELEGIR[self.elegir], Voz::Ia),
             Fase::Saludo => (c.nombre, c.saludos[self.saludo], Voz::Robotina),
             Fase::Pregunta(k) => (c.nombre, self.pregunta(k).pregunta, Voz::Robotina),
             Fase::Respuesta(k, o) => (CURIOSITY, self.respuesta(k, o).0, Voz::Rover),
@@ -1540,5 +1585,26 @@ mod pruebas {
             c.actualizar(&aceptar, 1.0);
         }
         assert_eq!(c.fase, Fase::Elegir);
+    }
+}
+
+#[cfg(test)]
+mod pruebas_de_variedad {
+    use super::*;
+
+    /// Cada visita arranca distinto: con varias semillas salen todas las llegadas y todos los saludos.
+    #[test]
+    fn la_cita_no_arranca_siempre_igual() {
+        let mut intros = std::collections::BTreeSet::new();
+        let mut saludos = std::collections::BTreeSet::new();
+        for s in 0..400u32 {
+            let mut c = Cita::con_semilla(s.wrapping_mul(7919).wrapping_add(13));
+            intros.insert(c.intro);
+            c.sortear();
+            saludos.insert(c.saludo);
+        }
+        assert_eq!(intros.len(), INTROS.len(), "salen todas las llegadas");
+        assert_eq!(saludos.len(), 4, "salen los cuatro saludos");
+        assert!(INTROS.iter().all(|i| i.len() == 5));
     }
 }

@@ -57,6 +57,8 @@ pub enum AccionPausa {
     Ajustes,
     PantallaCompleta,
     Hud,
+    /// Irse del planeta (en los minijuegos que no tienen otra salida a media partida).
+    Despegar,
     /// Al menu principal del juego.
     Menu,
     Salir,
@@ -103,6 +105,7 @@ const FILAS: [Fila; 13] = [
 ];
 /// La pestana JUGAR del menu del juego (personajes, pase, tienda y ajustes son las otras pestanas).
 const PAUSA: [&str; 3] = ["Continuar", "Menú principal", "Salir del juego"];
+const PAUSA_EN_PLANETA: [&str; 4] = ["Continuar", "Despegar", "Menú principal", "Salir del juego"];
 
 pub struct Pausa {
     pantalla: Pantalla,
@@ -110,17 +113,28 @@ pub struct Pausa {
     /// Segundos desde que se movio el cursor (para la banda que entra deslizandose).
     desde: f32,
     reloj: f32,
+    /// Si tiene la fila de despegar.
+    despegar: bool,
 }
 
 impl Pausa {
     /// La pausa del juego.
     pub fn new() -> Self {
-        Pausa { pantalla: Pantalla::Pausa, cursor: 0, desde: 0.0, reloj: 0.0 }
+        Pausa { pantalla: Pantalla::Pausa, cursor: 0, desde: 0.0, reloj: 0.0, despegar: false }
+    }
+
+    /// La pausa de un minijuego del que no se puede salir a media partida: trae "Despegar".
+    pub fn con_despegar() -> Self {
+        Pausa { despegar: true, ..Pausa::new() }
+    }
+
+    fn opciones(&self) -> &'static [&'static str] {
+        if self.despegar { &PAUSA_EN_PLANETA } else { &PAUSA }
     }
 
     /// La pestana de ajustes.
     pub fn ajustes() -> Self {
-        Pausa { pantalla: Pantalla::Ajustes, cursor: 0, desde: 0.0, reloj: 0.0 }
+        Pausa { pantalla: Pantalla::Ajustes, cursor: 0, desde: 0.0, reloj: 0.0, despegar: false }
     }
 
     pub fn es_ajustes(&self) -> bool {
@@ -129,7 +143,7 @@ impl Pausa {
 
     fn filas(&self) -> usize {
         match self.pantalla {
-            Pantalla::Pausa => PAUSA.len(),
+            Pantalla::Pausa => self.opciones().len(),
             Pantalla::Ajustes => FILAS.len(),
         }
     }
@@ -155,9 +169,10 @@ impl Pausa {
             if !e.aceptar {
                 return AccionPausa::Nada;
             }
-            return match self.cursor {
-                0 => AccionPausa::Continuar,
-                1 => AccionPausa::Menu,
+            return match self.opciones()[self.cursor] {
+                "Continuar" => AccionPausa::Continuar,
+                "Despegar" => AccionPausa::Despegar,
+                "Menú principal" => AccionPausa::Menu,
                 _ => AccionPausa::Salir,
             };
         }
@@ -198,7 +213,7 @@ impl Pausa {
             Pantalla::Pausa => (
                 "PAUSA",
                 "la nave flota quietecita",
-                PAUSA.iter().map(|p| fila(p, String::new())).collect(),
+                self.opciones().iter().map(|p| fila(p, String::new())).collect(),
                 format!("{}: escoger     {}: aceptar     {}: volver al juego", ui::boton("flechas"), ui::boton(e.nombre("aceptar")), ui::boton(e.nombre("pausa"))),
             ),
             Pantalla::Ajustes => (
@@ -285,5 +300,22 @@ mod pruebas {
         assert_eq!(a.texto, 2);
         assert!(a.letras_por_segundo() > 38.0);
         assert_eq!(p.atras(), AccionPausa::Continuar);
+    }
+}
+
+#[cfg(test)]
+mod pruebas_de_despegar {
+    use super::*;
+
+    #[test]
+    fn en_un_planeta_la_pausa_deja_despegar() {
+        let mut a = Ajustes::default();
+        let mut p = Pausa::con_despegar();
+        p.actualizar(&Entrada { abajo: true, ..Default::default() }, &mut a, 0.1);
+        assert_eq!(p.actualizar(&Entrada { aceptar: true, ..Default::default() }, &mut a, 0.1), AccionPausa::Despegar);
+        // La pausa de siempre no la trae.
+        let mut p = Pausa::new();
+        p.actualizar(&Entrada { abajo: true, ..Default::default() }, &mut a, 0.1);
+        assert_eq!(p.actualizar(&Entrada { aceptar: true, ..Default::default() }, &mut a, 0.1), AccionPausa::Menu);
     }
 }
