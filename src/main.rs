@@ -4781,13 +4781,9 @@ impl Prologo {
     }
 
     fn dibujar(&self, fb: &mut Framebuffer, post: &mut Post, rec: &Recursos) -> Estadisticas {
-        if let Some(v) = &self.video {
-            let (w, h) = (fb.ancho, fb.alto);
-            for y in 0..h {
-                for x in 0..w {
-                    fb.pintar(y * w + x, v.pixel(x, y, w, h), 1.0);
-                }
-            }
+        if self.video.is_some() {
+            // La intro va en alta, directo en la pantalla (ver el dibujo de la ventana): aqui, negro.
+            fb.limpiar([0, 0, 0]);
             return Estadisticas::default();
         }
         let st = dibujar_escena_sin_trazo(fb, post, rec, &self.toma.juego, &self.toma.escena);
@@ -5519,6 +5515,8 @@ fn main() {
     // El retrato de GLADAS: su propio framebuffer y su propia textura.
     let mut fb_retrato = Framebuffer::new(RETRATO, RETRATO);
     let imagen_retrato = Image::gen_image_color(RETRATO as i32, RETRATO as i32, Color::BLACK);
+    // La intro dibujada a mano, en alta (se crea cuando hace falta).
+    let mut textura_intro: Option<Texture2D> = None;
     let mut textura_retrato = rl.load_texture_from_image(&thread, &imagen_retrato).expect("no se pudo crear la textura del retrato");
     textura_retrato.set_texture_filter(&thread, TextureFilter::TEXTURE_FILTER_BILINEAR);
     // Si GLADAS hablaba en el cuadro anterior (el retrato se dibuja antes que la interfaz).
@@ -6731,6 +6729,25 @@ fn main() {
             textura_retrato.update_texture(fb_retrato.bytes()).expect("no se pudo actualizar el retrato");
         }
 
+        // La intro: su cuadro de ahora, en alta.
+        let con_intro = matches!(&escena, Escena::Prologo(p) if p.video.is_some());
+        if let Escena::Prologo(p) = &escena {
+            if let Some(v) = &p.video {
+                if textura_intro.is_none() {
+                    let vacia = Image::gen_image_color(intro_video::ANCHO as i32, intro_video::ALTO as i32, Color::BLACK);
+                    textura_intro = rl.load_texture_from_image(&thread, &vacia).ok();
+                    if let Some(t) = &mut textura_intro {
+                        t.set_texture_filter(&thread, TextureFilter::TEXTURE_FILTER_BILINEAR);
+                    }
+                }
+                if let Some(t) = &mut textura_intro {
+                    let _ = t.update_texture(&v.actual);
+                }
+            }
+        } else if textura_intro.is_some() {
+            // Ya paso: se suelta la memoria.
+            textura_intro = None;
+        }
         let (ancho, alto) = (rl.get_screen_width(), rl.get_screen_height());
         let (pixeles_w, pixeles_h) = (rl.get_render_width(), rl.get_render_height());
         let mut d = rl.begin_drawing(&thread);
@@ -6748,6 +6765,9 @@ fn main() {
             0.0,
             Color::WHITE,
         );
+        if let (true, Some(t)) = (con_intro, &textura_intro) {
+            d.draw_texture_pro(t, Rectangle::new(0.0, 0.0, intro_video::ANCHO as f32, intro_video::ALTO as f32), imagen, Vector2::zero(), 0.0, Color::WHITE);
+        }
         // Los letreros gigantes y el confeti (la interfaz de cada minijuego va encima).
         if let Some(v) = vida_actual {
             v.dibujar(&mut d, imagen);

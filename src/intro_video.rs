@@ -11,8 +11,9 @@ use std::process::{Child, Command, Stdio};
 use std::sync::mpsc::{sync_channel, Receiver};
 
 pub const VIDEO: &str = "assets/intro/intro.mp4";
-pub const ANCHO: usize = 960;
-pub const ALTO: usize = 540;
+/// En alta: se dibuja directo en la pantalla, sin pasar por la imagen interna del juego.
+pub const ANCHO: usize = 1920;
+pub const ALTO: usize = 1080;
 const CUADROS_POR_SEGUNDO: f32 = 30.0;
 /// Lo que dura la intro, en segundos.
 pub const DURACION: f32 = 32.4;
@@ -36,7 +37,7 @@ impl IntroVideo {
             .into_iter()
             .find(|f| !f.starts_with('/') || std::path::Path::new(f).exists())?;
         let mut proceso = Command::new(ffmpeg)
-            .args(["-v", "error", "-i", VIDEO, "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", &format!("{ANCHO}x{ALTO}"), "-"])
+            .args(["-v", "error", "-i", VIDEO, "-f", "rawvideo", "-pix_fmt", "rgba", "-s", &format!("{ANCHO}x{ALTO}"), "-"])
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
             .stderr(Stdio::null())
@@ -46,12 +47,12 @@ impl IntroVideo {
         // Unos cuantos cuadros de adelanto, para que nunca se trabe.
         let (manda, cuadros) = sync_channel::<Vec<u8>>(12);
         std::thread::spawn(move || loop {
-            let mut cuadro = vec![0u8; ANCHO * ALTO * 3];
+            let mut cuadro = vec![0u8; ANCHO * ALTO * 4];
             if salida.read_exact(&mut cuadro).is_err() || manda.send(cuadro).is_err() {
                 break;
             }
         });
-        Some(IntroVideo { proceso, cuadros, actual: vec![0; ANCHO * ALTO * 3], mostrados: 0, t: 0.0, se_acabo: false })
+        Some(IntroVideo { proceso, cuadros, actual: vec![0; ANCHO * ALTO * 4], mostrados: 0, t: 0.0, se_acabo: false })
     }
 
     /// Avanza el reloj y trae los cuadros que tocan. Devuelve si ya se acabo.
@@ -68,13 +69,6 @@ impl IntroVideo {
             }
         }
         self.se_acabo || self.t >= DURACION
-    }
-
-    /// El color del pixel (x, y) de una imagen de `ancho` x `alto` (se estira si es de otro tamano).
-    pub fn pixel(&self, x: usize, y: usize, ancho: usize, alto: usize) -> [f32; 3] {
-        let (vx, vy) = (x * ANCHO / ancho.max(1), y * ALTO / alto.max(1));
-        let i = (vy.min(ALTO - 1) * ANCHO + vx.min(ANCHO - 1)) * 3;
-        [self.actual[i] as f32 / 255.0, self.actual[i + 1] as f32 / 255.0, self.actual[i + 2] as f32 / 255.0]
     }
 }
 
@@ -102,9 +96,9 @@ mod pruebas {
         }
         assert!(!acabo, "a los 5 s todavia no termina");
         assert!(v.mostrados >= 150);
+        assert_eq!(v.actual.len(), ANCHO * ALTO * 4);
         let brillo: u32 = v.actual.iter().step_by(97).map(|&b| b as u32).sum();
         assert!(brillo > 0, "el cuadro salio negro");
-        assert!(v.pixel(959, 539, 960, 540).iter().all(|c| (0.0..=1.0).contains(c)));
         while !v.actualizar(1.0 / 30.0) {}
         assert!(v.t >= DURACION - 0.5, "se acabo antes de tiempo: {}", v.t);
     }
