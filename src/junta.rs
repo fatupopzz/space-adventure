@@ -13,6 +13,7 @@
 //!
 //! Todo esta en las coordenadas de Pluton: radio 1 en el origen.
 
+use crate::vida::{Tam, Tono, Vida};
 use crate::entrada::Entrada;
 use crate::escena::CUERPOS;
 use crate::matematica::{Mat4, Vec3};
@@ -90,6 +91,8 @@ pub struct Junta {
     cursor: usize,
     voto: Option<Voto>,
     resultado: Option<Voto>,
+    /// Los letreros gigantes, el confeti y las sacudidas (ver vida.rs).
+    pub vida: Vida,
     pub eventos: Vec<Efecto>,
 }
 
@@ -100,7 +103,7 @@ fn suave(x: f32) -> f32 {
 
 impl Junta {
     pub fn new() -> Self {
-        Junta { fase: Fase::Alarma, t: 0.0, total: 0.0, cursor: 0, voto: None, resultado: None, eventos: vec![Efecto::Alarma] }
+        Junta { vida: Vida::sin_cartel(), fase: Fase::Alarma, t: 0.0, total: 0.0, cursor: 0, voto: None, resultado: None, eventos: vec![Efecto::Alarma] }
     }
 
     fn cambiar(&mut self, fase: Fase) {
@@ -141,11 +144,18 @@ impl Junta {
                 let antes = ((self.t - dt) / PASO_CONTEO) as usize;
                 let ahora = (self.t / PASO_CONTEO) as usize;
                 if ahora > antes && ahora <= CONSEJO.len() + 1 {
+                    self.vida.grito("¡VOTO!", Tono::Blanco, Tam::Medio);
+                    self.vida.golpe(0.2, Tono::Blanco);
                     self.eventos.push(Efecto::Acierto);
                 }
                 if self.t > PASO_CONTEO * (CONSEJO.len() as f32 + 2.0) + 0.8 {
                     let r = self.contar();
                     self.resultado = Some(r);
+                    match r {
+                        Voto::Si => self.vida.exito("¡PLUTÓN ES PLANETA!", "Se vuelve a rellenar", Tono::Oro),
+                        Voto::No => self.vida.desastre("¡RECHAZADO!", "Plutón sigue en disputa"),
+                        Voto::Saltar => self.vida.grito_con("¡SE SALTARON EL VOTO!", "Nadie decidió nada", Tono::Lila, Tam::Grande),
+                    }
                     self.eventos.push(match r {
                         Voto::Si => Efecto::Perfecto,
                         Voto::No => Efecto::Fallo,

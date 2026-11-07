@@ -48,8 +48,9 @@ const PLUTON: Option<usize> = Some(10);
 const HADA: Option<usize> = Some(11);
 const VEGETTA: Option<usize> = Some(12);
 const CHAPIN: Option<usize> = Some(13);
+const KOCH: Option<usize> = Some(14);
 
-pub const LOGROS: [Logro; 77] = [
+pub const LOGROS: [Logro; 83] = [
     logro("tarot_lectura", MERCURIO, "Lectura completa", "Que Madame Mercurio le lea las tres cartas."),
     logro("tarot_invertidas", MERCURIO, "Todo al revés", "Que salgan las tres cartas invertidas."),
     logro("tarot_bendicion", MERCURIO, "Bendecida", "Que las tres cartas den BENDICIÓN."),
@@ -76,10 +77,10 @@ pub const LOGROS: [Logro; 77] = [
     logro("cita_drama", MARTE, "Golpiza en Marte", "Sálgale bien a dos en la misma visita. A ver qué pasa."),
     logro("urano_juega", URANO, "Primer turno", "Trabaje un día en el baño de Doña Chepa, en Urano."),
     logro("urano_campeon", URANO, "Empleado del mes", "Pase los tres días en el baño de Doña Chepa (hasta el domingo de feria)."),
-    logro("ritmo_termino", SATURNO, "Primera canción", "Termine una canción de Saturno Ritmo."),
-    logro("ritmo_s", SATURNO, "Nota S", "Saque S en Saturno Ritmo."),
-    logro("ritmo_dificil", SATURNO, "Terminar en DIFÍCIL", "Termine la canción en DIFÍCIL."),
-    logro("ritmo_sin_fallos", SATURNO, "Cero fallos", "Termine una canción sin fallar ni una nota."),
+    logro("ritmo_termino", SATURNO, "Novios", "Aguante 10 segundos en ¡Anillazo!"),
+    logro("ritmo_s", SATURNO, "Anillos libres", "Llegue al último nivel de ¡Anillazo!: 70 segundos."),
+    logro("ritmo_dificil", SATURNO, "Divorciados", "Aguante un minuto en ¡Anillazo!"),
+    logro("ritmo_sin_fallos", SATURNO, "Al ras", "Encadene 10 roces seguidos en ¡Anillazo!"),
     logro("uno_gana", NEPTUNO, "¡NEPTUNO!", "Gánele a tres héroes de videojuego."),
     logro("uno_pierde", NEPTUNO, "Derrota épica", "Pierda contra un héroe de videojuego."),
     logro("uno_canela", NEPTUNO, "Tom Nook lo busca", "Que Canela se meta a la partida."),
@@ -95,6 +96,12 @@ pub const LOGROS: [Logro; 77] = [
     logro("camioneta_terminal", CHAPIN, "¡Capital, capital!", "Llegue a la terminal manejando la camioneta."),
     logro("camioneta_llena", CHAPIN, "Siempre hay campo", "Llegue a la terminal con 40 pasajeros o más."),
     logro("camioneta_tumulos", CHAPIN, "Chofer con cuidado", "Pase cinco túmulos frenando en un solo viaje."),
+    logro("koch_juega", KOCH, "Alumno regular", "Termine una partida de Wack a Koch."),
+    logro("koch_aprobo", KOCH, "Pasó con 61", "Saque 61 o más en Wack a Koch."),
+    logro("koch_100", KOCH, "Enmárquelo", "Saque 100 en Wack a Koch."),
+    logro("koch_caso_base", KOCH, "Caso base", "Gane el examen final: parta al Koch fractal hasta el final."),
+    logro("koch_recursion", KOCH, "Recursión", "Llene el medidor y entre a la recursión."),
+    logro("koch_compa", KOCH, "Buen compañero", "Gane el final sin pegarle a ningún compañero."),
     // Las maravillas (homenajes; ver maravillas.rs).
     logro("gusano", SATURNO, "Atajo por el gusano", "Entre al agujero de gusano que está junto a Saturno."),
     logro("teseracto", None, "Más allá del horizonte", "Cruce el horizonte de Gargantúa (y salga del teseracto)."),
@@ -200,7 +207,7 @@ pub enum Hecho {
 }
 
 /// Los planetas con escena (para los encargos de aterrizar).
-const CON_ESCENA: [usize; 13] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13];
+const CON_ESCENA: [usize; 14] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14];
 
 /// Las estelas de la nave: id, nombre y precio en notas.
 pub const ESTELAS: [(&str, &str, u32); 16] = [
@@ -318,7 +325,7 @@ pub fn nombre_del_premio(p: Premio) -> String {
 }
 
 /// Los cuerpos que tienen sello en el pasaporte (todos menos el Sol).
-pub const CON_SELLO: [usize; 13] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13];
+pub const CON_SELLO: [usize; 14] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14];
 
 pub struct Progreso {
     pub logros: BTreeSet<String>,
@@ -330,6 +337,10 @@ pub struct Progreso {
     pub datos: u32,
     /// El record de Jupiter Asteroids.
     pub record_jupiter: u32,
+    /// El record de Wack a Koch.
+    pub record_koch: u32,
+    /// El record de ¡Anillazo!, en centesimas de segundo.
+    pub record_anillos: u32,
     /// La mochila: las lunas de Galileo que se trajeron de Jupiter (Io, Europa, Ganimedes, Calisto).
     /// En el espacio se usan: turbo, escudo, iman y cometa.
     pub mochila: [u32; 4],
@@ -379,6 +390,8 @@ impl Progreso {
             cometas: 0,
             datos: 0,
             record_jupiter: 0,
+            record_koch: 0,
+            record_anillos: 0,
             cartas_tarot: 0,
             mochila: [0; 4],
             encargos: Vec::new(),
@@ -415,6 +428,8 @@ impl Progreso {
                     Some("cometas") => p.cometas = num(1),
                     Some("datos") => p.datos = num(1),
                     Some("record_jupiter") => p.record_jupiter = num(1),
+                    Some("record_koch") => p.record_koch = num(1),
+                    Some("record_anillos") => p.record_anillos = num(1),
                     Some("cartas_tarot") => p.cartas_tarot = num(1),
                     Some("mochila") => p.mochila = [num(1), num(2), num(3), num(4)],
                     Some("encargos_cumplidos") => p.encargos_cumplidos = num(1),
@@ -714,6 +729,7 @@ impl Progreso {
         if let Some(ruta) = &self.ruta {
             let mut s = String::from("# Space Adventure: el pasaporte (se puede borrar para empezar de cero)\n");
             s += &format!("notas {}\nnotas_totales {}\ncometas {}\nencargos_cumplidos {}\ndatos {}\n", self.notas, self.notas_totales, self.cometas, self.encargos_cumplidos, self.datos);
+            s += &format!("record_koch {}\nrecord_anillos {}\n", self.record_koch, self.record_anillos);
             s += &format!("record_jupiter {}\nmochila {} {} {} {}\ncartas_tarot {}\n", self.record_jupiter, self.mochila[0], self.mochila[1], self.mochila[2], self.mochila[3], self.cartas_tarot);
             let a = &self.ajustes;
             s += &format!("volumen {}\nmusica {}\nefectos {}\ncalidad_rapida {}\ninvertir {}\nraton {}\n", a.volumen, a.musica, a.efectos, a.calidad_rapida as u8, a.invertir as u8, a.raton as u8);
@@ -854,6 +870,7 @@ fn color_sello(i: usize) -> Color {
         "neptuno" => Color::new(90, 120, 255, 255),
         "pluton" => Color::new(240, 200, 170, 255),
         "planeta_vegetta" => Color::new(170, 110, 240, 255),
+        "koch" => Color::new(255, 150, 225, 255),
         _ => Color::new(255, 140, 230, 255),
     }
 }

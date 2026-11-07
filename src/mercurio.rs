@@ -18,6 +18,7 @@
 //!
 //! Todo esta en las coordenadas de la carpa: el centro de la mesa en el piso.
 
+use crate::vida::{Tam, Tono, Vida};
 use crate::entrada::Entrada;
 use crate::framebuffer::Framebuffer;
 use crate::matematica::{Mat4, Vec3};
@@ -441,6 +442,8 @@ pub struct Mercurio {
     pub descubiertas: u32,
     /// Si la carta que se esta leyendo es la primera vez que sale (para el letrero de "nueva").
     nueva: bool,
+    /// Los letreros gigantes, el confeti y las sacudidas (ver vida.rs).
+    pub vida: Vida,
     pub eventos: Vec<Efecto>,
 }
 
@@ -483,6 +486,7 @@ impl Mercurio {
             notas: 0,
             descubiertas: 0,
             nueva: false,
+            vida: Vida::sin_cartel(),
             eventos: Vec::new(),
         };
         m.barajar();
@@ -571,16 +575,24 @@ impl Mercurio {
         match d {
             Destino::Bendicion => {
                 self.regalo = Some(self.azar(4));
+                self.vida.exito("¡BENDICIÓN!", "Las cartas están de su lado", Tono::Oro);
                 self.eventos.push(Efecto::Perfecto);
             }
             Destino::BuenaSuerte => {
                 self.propina = 10;
+                self.vida.grito_con("¡BUENA SUERTE!", "Hoy sí le sale algo", Tono::Verde, Tam::Grande);
+                self.vida.golpe(0.3, Tono::Verde);
+                self.vida.confeti(35, Tono::Verde);
                 self.eventos.push(Efecto::Acierto);
             }
-            Destino::NiFuNiFa => self.eventos.push(Efecto::Carta),
+            Destino::NiFuNiFa => {
+                self.vida.grito_con("NI FU NI FA", "Ni bien ni mal. Como siempre", Tono::Lila, Tam::Grande);
+                self.eventos.push(Efecto::Carta);
+            }
             Destino::Salazon | Destino::SalazonTotal => {
                 self.maldicion = d.maldicion();
                 self.relampago = 1.0;
+                self.vida.desastre(if d == Destino::SalazonTotal { "¡SALAZÓN TOTAL!" } else { "¡SALAZÓN!" }, "Mejor no salga de su casa");
                 self.eventos.push(Efecto::Alarma);
             }
         }
@@ -691,6 +703,7 @@ impl Mercurio {
                 }
             }
             Fase::Interrumpida if self.t > INTERRUMPIR => {
+                self.vida.desastre("¡RETRÓGRADO!", "Mercurio se lleva su carta");
                 self.eventos.push(Efecto::Alarma);
                 self.eventos.push(Efecto::Rebobinar);
                 self.rebobinada = self.sacadas.pop();
@@ -708,6 +721,8 @@ impl Mercurio {
                 if self.comenta(self.sacadas.len() - 1) {
                     if self.humor == Humor::Dramatica {
                         self.relampago = 0.8;
+                        self.vida.grito("¡UUUUH!", Tono::Lila, Tam::Grande);
+                        self.vida.golpe(0.45, Tono::Lila);
                         self.eventos.push(Efecto::Protesto);
                     }
                     self.cambiar(Fase::Comentario);

@@ -35,22 +35,6 @@ pub fn mapa(compas: usize) -> &'static str {
     }
 }
 
-/// Las notas del minijuego: (segundo, es del aire).
-pub fn notas() -> Vec<(f32, bool)> {
-    let mut v = Vec::new();
-    for compas in 0..COMPASES {
-        for (s, c) in mapa(compas).chars().enumerate() {
-            let t = (compas * 8 + s) as f32 * CORCHEA;
-            match c {
-                'P' => v.push((t, false)),
-                'A' => v.push((t, true)),
-                _ => {}
-            }
-        }
-    }
-    v
-}
-
 fn midi(n: i32) -> f32 {
     440.0 * 2f32.powf((n - 69) as f32 / 12.0)
 }
@@ -725,4 +709,214 @@ pub fn sintetizar_marimba() -> Vec<f32> {
         *m = *m / pico * 0.8;
     }
     pista
+}
+
+/// Whack-a-Koch: chiptune de feria a 150 BPM (el juego saca a cada Koch en estas corcheas). Mi menor,
+/// con bajo que camina, arpegios, una melodia que brinca y bateria en cada tiempo.
+pub fn sintetizar_koch() -> Vec<f32> {
+    const ACORDES: [(i32, [i32; 3]); 8] = [(40, [0, 3, 7]), (36, [0, 4, 7]), (45, [0, 3, 7]), (47, [0, 4, 7]), (40, [0, 3, 7]), (43, [0, 4, 7]), (45, [0, 3, 7]), (47, [0, 4, 7])];
+    // Una nota por corchea; 0 = silencio.
+    const MELODIA: [i32; 64] = [
+        76, 0, 79, 76, 83, 0, 81, 79, 76, 0, 79, 81, 84, 83, 79, 0, 81, 0, 84, 81, 88, 0, 86, 84, 83, 81, 79, 78, 75, 0, 78, 0,
+        76, 0, 79, 76, 83, 0, 81, 79, 79, 0, 83, 86, 91, 0, 86, 83, 84, 0, 88, 84, 81, 84, 88, 91, 90, 88, 87, 88, 90, 0, 83, 0,
+    ];
+    let corchea = 60.0 / 150.0 / 2.0;
+    let compas = corchea * 8.0;
+    // Dos vueltas, con la melodia solo en la segunda (asi el arranque no satura).
+    let total = compas * ACORDES.len() as f32 * 2.0;
+    let mut pista = vec![0.0f32; (total * FRECUENCIA as f32) as usize];
+    let mut ruido = Ruido(0x7E57_4011);
+    for vuelta in 0..2 {
+        let desde = vuelta as f32 * compas * ACORDES.len() as f32;
+        for (c, (raiz, acorde)) in ACORDES.iter().enumerate() {
+            let inicio = desde + c as f32 * compas;
+            for k in 0..8usize {
+                let t0 = inicio + k as f32 * corchea;
+                // El bajo: raiz, octava, raiz, quinta...
+                let n = raiz + [0, 12, 0, 12, 7, 12, 0, 10][k];
+                let f = midi(n);
+                sumar(&mut pista, t0, corchea * 0.85, |t| 0.17 * cuadrada(f * t, 0.5) * (-t * 7.0).exp());
+                // El arpegio de arriba, muy rapidito.
+                let nota = raiz + 24 + acorde[k % 3];
+                let f = midi(nota);
+                sumar(&mut pista, t0, corchea * 0.6, |t| 0.05 * cuadrada(f * t, 0.25) * (-t * 12.0).exp());
+                // El hi-hat en cada corchea.
+                let semilla = ruido.sig();
+                let mut r = Ruido((semilla.to_bits()) | 1);
+                let fuerza = if k % 2 == 0 { 0.055 } else { 0.095 };
+                sumar(&mut pista, t0, 0.04, |t| fuerza * r.sig() * (-t * 120.0).exp());
+            }
+            for tiempo in 0..4usize {
+                let t0 = inicio + tiempo as f32 * corchea * 2.0;
+                if tiempo % 2 == 0 {
+                    // El bombo.
+                    sumar(&mut pista, t0, 0.14, |t| 0.5 * (TAU * (120.0 - 500.0 * t) * t).sin() * (-t * 26.0).exp());
+                } else {
+                    // La caja.
+                    let mut r = Ruido((tiempo as u32 + c as u32 * 17) * 77 + 5);
+                    sumar(&mut pista, t0, 0.13, |t| 0.26 * r.sig() * (-t * 28.0).exp() + 0.12 * (TAU * 210.0 * t).sin() * (-t * 34.0).exp());
+                }
+            }
+        }
+        for (k, &nota) in MELODIA.iter().enumerate() {
+            if nota > 0 {
+                let f = midi(nota);
+                let t0 = desde + k as f32 * corchea;
+                let fuerza = if vuelta == 0 { 0.07 } else { 0.13 };
+                sumar(&mut pista, t0, corchea * 1.1, |t| fuerza * cuadrada(f * t, 0.5) * (-t * 4.5).exp() * (1.0 + 0.004 * (TAU * 6.0 * t).sin()));
+            }
+        }
+    }
+    let pico = pista.iter().fold(0.0f32, |m, v| m.max(v.abs())).max(1e-6);
+    for m in &mut pista {
+        *m = *m / pico * 0.8;
+    }
+    pista
+}
+
+/// ¡Anillazo!: el reloj de la cancion. 140 BPM (y se acelera con cada nivel, hasta 186).
+pub const CORCHEA_ANILLOS: f32 = 60.0 / 140.0 / 2.0;
+
+/// La cancion de ¡Anillazo!: dance de feria espacial, original. Bombo en cada tiempo y todo lo demas
+/// "respira" con el (el bombeo que hace que el dance empuje), bajo a contratiempo, arpegio en
+/// semicorcheas, y a los 16 compases entra la melodia con todo, despues de un redoble y un barrido.
+pub fn sintetizar_anillos() -> Vec<f32> {
+    const ACORDES: [(i32, [i32; 3]); 4] = [(45, [0, 3, 7]), (41, [0, 4, 7]), (48, [0, 4, 7]), (40, [0, 4, 7])];
+    // Una nota por corchea; 0: silencio. Dos frases de cuatro compases.
+    const GANCHO: [i32; 64] = [
+        81, 0, 84, 81, 88, 0, 86, 84, 77, 0, 81, 84, 89, 0, 88, 86, 79, 0, 84, 88, 91, 0, 88, 86, 88, 0, 86, 84, 83, 80, 83, 88,
+        81, 0, 84, 81, 88, 0, 86, 88, 89, 0, 88, 89, 93, 0, 89, 88, 91, 0, 88, 91, 96, 0, 91, 88, 92, 91, 88, 86, 88, 0, 93, 0,
+    ];
+    const COMPASES: usize = 32;
+    let corchea = CORCHEA_ANILLOS;
+    let compas = corchea * 8.0;
+    let total = compas * COMPASES as f32;
+    let n = (total * FRECUENCIA as f32) as usize;
+    // Lo que respira con el bombo y lo que no.
+    let mut respira = vec![0.0f32; n];
+    let mut seco = vec![0.0f32; n];
+    let sierra = |f: f32, t: f32| 2.0 * (f * t).fract() - 1.0;
+    // Cinco sierras apenas desafinadas: el sonido ancho de los sintetizadores de dance.
+    let ancho = |f: f32, t: f32| [-0.012f32, -0.005, 0.0, 0.006, 0.013].iter().map(|d| sierra(f * (1.0 + d), t)).sum::<f32>() * 0.2;
+    let mut ruido = Ruido(0x5A70_0B1D);
+    for c in 0..COMPASES {
+        let inicio = c as f32 * compas;
+        let (raiz, acorde) = ACORDES[c % 4];
+        let drop = c >= 16;
+        // Los ultimos dos compases de cada ocho van subiendo la tension.
+        let fin_de_frase = c % 8 >= 6;
+        // El bombo, en cada tiempo.
+        for k in 0..4 {
+            let bombo = if drop { 0.8 } else { 0.62 };
+            sumar(&mut seco, inicio + k as f32 * corchea * 2.0, 0.2, |t| bombo * (TAU * (150.0 * (-t * 22.0).exp() + 48.0) * t).sin() * (-t * 15.0).exp());
+        }
+        // Aplauso en el 2 y el 4; con un eco de mas en los compases finales.
+        for k in [1usize, 3] {
+            let mut r = Ruido((c as u32 * 31 + k as u32) * 991 + 7);
+            sumar(&mut seco, inicio + k as f32 * corchea * 2.0, 0.14, |t| 0.3 * r.sig() * ((-t * 30.0).exp() + 0.5 * (-(t - 0.012).abs() * 90.0).exp()));
+        }
+        for k in 0..16 {
+            let t0 = inicio + k as f32 * corchea * 0.5;
+            // El hi-hat en semicorcheas, abierto a contratiempo.
+            let abierto = k % 4 == 2;
+            let mut r = Ruido(ruido.sig().to_bits() | 1);
+            let (fuerza, cae) = if abierto { (0.11, 28.0) } else { (0.05, 90.0) };
+            sumar(&mut seco, t0, 0.09, |t| fuerza * r.sig() * (-t * cae).exp());
+            // El arpegio: sube y baja por el acorde, abriendose en los ultimos compases.
+            let nota = raiz + 24 + [0, 12, 24, 12][k % 4] + acorde[(k / 2) % 3];
+            let f = midi(nota);
+            let brillo = if drop { 0.075 } else { 0.06 } + if fin_de_frase { 0.02 } else { 0.0 };
+            sumar(&mut respira, t0, corchea * 0.48, |t| brillo * cuadrada(f * t, 0.3) * (-t * 11.0).exp());
+        }
+        // El bajo a contratiempo: en cada "y" del tiempo, con la octava a veces.
+        for k in 0..4 {
+            let t0 = inicio + (k as f32 * 2.0 + 1.0) * corchea;
+            let f = midi(raiz - 12 + if k == 3 { 12 } else { 0 });
+            let cuerpo = if drop { 0.3 } else { 0.2 };
+            sumar(&mut respira, t0, corchea * 0.95, |t| cuerpo * (sierra(f, t) * 0.7 + (TAU * f * t).sin() * 0.6) * (-t * 3.2).exp());
+        }
+        // El colchon de acordes, ancho, que entra de a poco.
+        let colchon = if drop { 0.1 } else { 0.05 };
+        for &i in &acorde {
+            let f = midi(raiz + 12 + i);
+            sumar(&mut respira, inicio, compas, |t| colchon * ancho(f, t) * (t / 0.02).min(1.0) * ((compas - t) / 0.03).min(1.0));
+        }
+        // La melodia: suave y sola en la primera parte (a partir del compas 8), con todo despues.
+        if c >= 8 {
+            let fuerza = if drop { 0.27 } else { 0.08 };
+            let frase = c % 8;
+            for k in 0..8usize {
+                let nota = GANCHO[frase * 8 + k];
+                if nota > 0 {
+                    let f = midi(nota);
+                    sumar(&mut respira, inicio + k as f32 * corchea, corchea * 1.05, |t| fuerza * ancho(f, t) * (-t * 3.0).exp() * (t / 0.004).min(1.0));
+                    if drop {
+                        // Una octava arriba, brillando.
+                        let f2 = f * 2.0;
+                        sumar(&mut respira, inicio + k as f32 * corchea, corchea * 0.9, |t| 0.05 * cuadrada(f2 * t, 0.5) * (-t * 7.0).exp());
+                    }
+                }
+            }
+        }
+        // El redoble y el barrido que suben antes de cada ocho.
+        if c % 8 == 7 {
+            for k in 0..16 {
+                let mut r = Ruido(k as u32 * 77 + c as u32 + 3);
+                let fuerza = 0.09 + 0.17 * k as f32 / 15.0;
+                sumar(&mut seco, inicio + k as f32 * corchea * 0.5, 0.09, |t| fuerza * r.sig() * (-t * 34.0).exp());
+            }
+            let mut r = Ruido(c as u32 * 13 + 11);
+            sumar(&mut seco, inicio, compas, |t| 0.17 * (t / compas).powi(3) * r.sig());
+        }
+        // El platillo cuando entra algo nuevo.
+        if c % 8 == 0 {
+            let mut r = Ruido(c as u32 * 5 + 29);
+            sumar(&mut seco, inicio, 1.3, |t| 0.26 * r.sig() * (-t * 3.0).exp());
+        }
+    }
+    // Lo que respira baja justo con cada bombo y regresa: eso es lo que empuja.
+    let negra = corchea * 2.0;
+    let mut pista: Vec<f32> = respira
+        .iter()
+        .zip(&seco)
+        .enumerate()
+        .map(|(i, (a, b))| {
+            let t = (i as f32 / FRECUENCIA as f32) % negra;
+            let bombeo = 1.0 - 0.62 * (-t * 9.5).exp();
+            a * bombeo + b
+        })
+        .collect();
+    let pico = pista.iter().fold(0.0f32, |m, v| m.max(v.abs())).max(1e-6);
+    for m in &mut pista {
+        // Un poco de saturacion suave: le da cuerpo y no deja que nada sobresalga.
+        let x = *m / pico * 1.25;
+        *m = x.tanh() * 0.86;
+    }
+    pista
+}
+
+#[cfg(test)]
+mod pruebas_de_anillos {
+    use super::*;
+
+    #[test]
+    fn la_cancion_de_anillos_empuja_y_sube() {
+        let p = sintetizar_anillos();
+        let f = FRECUENCIA as f32;
+        assert_eq!(p.len(), (CORCHEA_ANILLOS * 8.0 * 32.0 * f) as usize);
+        assert!(p.iter().all(|m| m.is_finite() && m.abs() <= 1.0));
+        let energia = |a: f32, b: f32| {
+            let t = &p[(a * f) as usize..(b * f) as usize];
+            (t.iter().map(|x| x * x).sum::<f32>() / t.len() as f32).sqrt()
+        };
+        let compas = CORCHEA_ANILLOS * 8.0;
+        // Con la melodia entra mas fuerte.
+        let (antes, despues) = (energia(compas, compas * 7.0), energia(compas * 17.0, compas * 23.0));
+        assert!(despues > antes * 1.05, "con la melodia {despues} contra {antes}");
+        // Y el bombo se oye en cada tiempo: al principio de la negra suena mas que en el medio.
+        let negra = CORCHEA_ANILLOS * 2.0;
+        let golpe: f32 = (0..32).map(|k| energia(compas + k as f32 * negra, compas + k as f32 * negra + 0.03)).sum();
+        let hueco: f32 = (0..32).map(|k| energia(compas + k as f32 * negra + negra * 0.75, compas + k as f32 * negra + negra * 0.75 + 0.03)).sum();
+        assert!(golpe > hueco * 1.15, "bombo {golpe} contra {hueco}");
+    }
 }

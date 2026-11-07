@@ -33,6 +33,8 @@ pub enum Auto {
     Dialogo,
     /// El chofer automatico de la camioneta.
     Camioneta,
+    /// Whack-a-Koch: jugando solo.
+    Koch,
     /// El parkour de Planeta Vegetta.
     Parkour,
     /// TNT Run: corriendo en circulos.
@@ -41,8 +43,8 @@ pub enum Auto {
     Mina,
     /// Jupiter Asteroids: girando y disparando.
     Asteroides,
-    /// Saturno Ritmo: cada nota a tiempo.
-    Ritmo,
+    /// ¡Anillazo!: siempre al hueco.
+    Anillos,
     /// En un menu: bajando por la lista.
     Abajo,
     /// En un menu: pasando a la derecha.
@@ -93,6 +95,13 @@ pub const GUION: &[Toma] = &[
     toma(&["camioneta_antigua"], 0.0, 8.0, Auto::Camioneta, Some(("ANTIGUA", "adoquín, papel picado y el Arco de Santa Catalina"))),
     toma(&["camioneta_capital"], 0.0, 7.0, Auto::Camioneta, Some(("LA CAPITAL", "cae la noche: edificios, vallas y la Torre del Reformador"))),
     toma(&["camioneta_llegada"], 0.0, 6.0, Auto::Camioneta, None),
+    toma(&["cerca:koch"], 0.0, 5.0, Auto::Nada, Some(("PLANETA KOCH", "con el contorno de un copo de nieve de Koch, y su mazo clavado"))),
+    toma(&["koch"], 0.5, 4.0, Auto::Nada, None),
+    toma(&["koch_primero"], 0.0, 10.0, Auto::Koch, Some(("WACK A KOCH", "idea original del profe Koch"))),
+    toma(&["koch_recursion"], 0.0, 5.0, Auto::Koch, Some(("¡RECURSIÓN!", "seis segundos, por el triple"))),
+    toma(&["koch_jefe"], 0.0, 7.0, Auto::Koch, Some(("EL KOCH FRACTAL", "se parte en tres hasta el caso base"))),
+    toma(&["koch_partido"], 0.0, 6.0, Auto::Koch, None),
+    toma(&["koch_final"], 0.0, 4.5, Auto::Nada, None),
     toma(&["vegetta"], 0.5, 4.0, Auto::Nada, None),
     toma(&["vegetta_carrera"], 0.5, 9.0, Auto::Parkour, None),
     toma(&["vegetta_tnt"], 0.0, 7.0, Auto::Tnt, Some(("TNT RUN", "el piso se cae atrás de uno"))),
@@ -100,7 +109,9 @@ pub const GUION: &[Toma] = &[
     toma(&["urano"], 0.5, 4.0, Auto::Nada, None),
     toma(&["urano_juego"], 0.0, 9.0, Auto::Nada, Some(("URANO", "el baño de la Chepa: papel, destapacaños y fila"))),
     toma(&["urano_final"], 0.0, 4.0, Auto::Nada, None),
-    toma(&["ritmo"], 0.0, 13.0, Auto::Ritmo, Some(("SATURNO RITMO", "un juego de ritmo con su propia canción, sintetizada"))),
+    toma(&["anillos"], 0.0, 7.0, Auto::Anillos, Some(("¡ANILLAZO!", "Venus le manda los anillos de vuelta"))),
+    toma(&["anillos_rapido"], 0.0, 9.0, Auto::Anillos, Some(("ANILLOS LIBRES", "la canción se acelera con cada nivel"))),
+    toma(&["anillos_caido"], 0.0, 6.5, Auto::Nada, Some(("¡A CHOCAR!", "el hueco estaba ahí, y otra vez en menos de medio segundo"))),
     toma(&["concierto"], 2.0, 6.0, Auto::Nada, Some(("EL CONCIERTO", "Miku en los anillos de Saturno"))),
     toma(&["divorcio"], 1.0, 8.0, Auto::Dialogo, Some(("EL DIVORCIO", "Saturno contra sus anillos: ¡PROTESTO!"))),
     toma(&["jupiter"], 2.0, 9.0, Auto::Asteroides, Some(("JUPITER ASTEROIDS", "arcade en la Gran Mancha Roja"))),

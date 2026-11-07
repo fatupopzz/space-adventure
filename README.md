@@ -282,14 +282,10 @@ planeta. Todos tienen escena (los once planetas, la Luna y el Planeta Vegetta):
   ¡PAF! ¡POW! de historieta): **GAME OVER**, Curiosity en modo seguro.
 - **Saturno**: Saturno Ritmo en vivo. Miku canta sentada en una luna que se
   mece sobre el escenario hexagonal, con reflectores, el ecualizador latiendo
-  y los anillos girando como un vinil. Desde ahí se juega el **minijuego de
-  ritmo**: la nave se para en la puerta de juicio sobre el anillo y los
-  bichitos-nota llegan en dos carriles (piso y aire) al ritmo de la canción.
-  Como en Project DIVA, Taiko u osu!: se elige dificultad (FÁCIL con un solo
-  botón y solo las notas fuertes, NORMAL, o DIFÍCIL con la partitura
-  completa), cada golpe suena (el "don" del piso y el "ka" del aire), sobre
-  la puerta hay anillos que se encogen hasta el momento justo, y cada acierto
-  dice si fue temprano o tarde.
+  y los anillos girando como un vinil. Desde ahí se juega **¡Anillazo!**: Venus le manda a
+  Saturno sus anillos de vuelta y la nave tiene que meterse por el hueco de
+  cada uno, con la canción acelerándose ([src/anillos.rs](src/anillos.rs)). Ver
+  la sección de ¡Anillazo!.
 - **Neptuno**: noche de cartas. Se juega **¡NEPTUNO!** (como UNO, pero con
   viento): Miku contra el Doom Slayer, el Master Chief y Cloud Strife en
   versión chibi, con Neptuno de anfitrión gigante flotando detrás de la mesa.
@@ -385,6 +381,59 @@ cuelga, los ojos amarillos). Cada vez que habla sale su retrato animado, que
 es **render to texture**: el mismo pipeline la dibuja en un framebuffer
 propio de 160×160 con su propia cámara, y esa imagen se pega en la interfaz.
 
+## La vida de los minijuegos
+
+Diez minijuegos comparten la misma estética de arcade ([src/vida.rs](src/vida.rs), letras en
+`ui::bloques`): un cartel de entrada con destellos en los que no traían título, letreros gigantes que revientan con lo que pasa
+(¡PESCADO!, ¡SALAZÓN!, ¡SE TAPÓ!, ¡UN ÓSCAR!, ¡GANÓ MIKU!), confeti al ganar, sacudida de pantalla y
+destello. Son Mercurio, Venus, la Luna, Marte, Júpiter, Urano, Neptuno, Plutón, el Hada y Vegetta;
+ninguno cambió sus reglas. El Planeta Chapín y la Tierra se quedan con su estilo propio.
+
+## Saturno: ¡Anillazo!
+
+Venus le manda a Saturno los anillos de vuelta, de uno en uno. Se juega con izquierda y derecha: la
+nave siempre va abajo y el mundo gira alrededor de ella, así que izquierda siempre es izquierda
+([src/anillos.rs](src/anillos.rs)). Se diseñó primero para quien juega:
+
+- **Se empieza jugando.** Sin menú ni tutorial: el primer anillo trae un hueco enorme que obliga a
+  moverse poquito, y una flecha y la línea de mira (roja o verde) enseñan lo demás.
+- **Chocar no castiga.** La música no para: se traba como un disco y sigue. Se ve dónde estaba el
+  hueco y cuánto faltó para el récord, y cualquier botón reinicia en menos de medio segundo.
+- **Siempre se puede.** Cada hueco queda al alcance del anterior y la nave choca con menos de lo que
+  se ve. Las pruebas lo juegan en todos los niveles con varias semillas.
+- **Si cuesta, ayuda y lo dice.** Tras varias muertes rápidas seguidas los huecos se abren un poco y
+  GLADAS avisa. Al volver de la pausa el tiempo arranca despacio.
+- **Vicioso.** Los anillos llegan en la corchea de su propia canción de dance
+  (`sintetizar_anillos`, 140 BPM con bombeo y una melodía que entra a los 16 compases), que se acelera
+  con cada nivel, de NOVIOS a ANILLOS LIBRES. Pasar rozando da puntos que se encadenan, y el récord está marcado en la
+  barra para verlo venir.
+
+## El Planeta Koch: WACK A KOCH
+
+Idea original del profe Koch. Su planeta tiene el contorno de un **copo de nieve de Koch** alrededor
+del ecuador (iteración 3, calculado de verdad), hoyos con neón y un mazo clavado en el polo. Al
+aterrizar se juega una máquina de arcade de nueve hoyos, con los mini Koch
+([src/koch.rs](src/koch.rs), `sintetizar_koch` en [src/cancion.rs](src/cancion.rs)):
+
+- **Tres parciales y un final.** Como en la máquina original, al avanzar cada uno dura menos afuera
+  y salen más a la vez. Cada cuánto salen y cuánto duran son valores separados.
+- **Todo cae en la corchea** de la música (150 BPM), y en la recursión la música y el reloj se
+  aceleran juntos.
+- **Los que salen:** el normal, el del birrete (dos golpes), el enojado (si se escapa, reglazo), el
+  dorado (rapidísimo) y el compañero, al que no hay que pegarle. Tres reglazos y reprueba.
+- **El martillo gira** desde atrás con su estela y rebota con resortes. El acierto se decide al
+  apretar, y el golpe se siente al tocar: congelada de 40 a 160 ms, sacudida, chispas de tiza, ondas,
+  el mini Koch aplastado y los demás asustados.
+- **El sonido:** soplido del giro, «¡WACK!» sintetizado con formantes (una voz por dos resonancias),
+  mazazo y una nota que sube con el combo (como en Peggle). Pegarle al aire corta el combo a la mitad.
+- **La recursión:** al llenar el medidor, seis segundos en que salen de todos lados, por el triple.
+- **El Koch fractal:** el final. El grande se parte en tres medianos, y cada uno en tres chicos,
+  hasta el caso base.
+
+| | teclado | ratón | control |
+|---|---|---|---|
+| pegar en un hoyo | `Q` `W` `E` / `A` `S` `D` / `Z` `X` `C` | apuntar y clic | stick o cruceta para apuntar (cada dirección es un hoyo, soltar es el centro) y cualquier botón para pegar: los cuatro de la derecha, `L1`, `R1` o `R2` |
+
 ## El Planeta Chapín: «¡Hay campo!» (la camioneta)
 
 Al aterrizar en el Chapín se maneja una **camioneta extraurbana** (el bus escolar gringo pintado
@@ -462,7 +511,7 @@ Para que den ganas de volver a cada planeta:
   | El baño de Doña Chepa (Urano) | 8 por día jugado, 15 por día cumplido, 30 si gana la semana |
   | Examen de Koch (Tierra) | 10 + 6 por respuesta buena, 20 más con 5 de 5 |
   | La entrega (Tierra) | el 45% del promedio, 20 más con los tres al 100 |
-  | Saturno Ritmo | S 50, A 38, B 26, C 15 (×1.5 en difícil), 10 más sin fallos |
+  | ¡Anillazo! (Saturno) | según la mejor marca: 60 s da 50, 40 s da 38, 20 s da 26, menos da 15; más 1 por cada roce de la mejor racha (hasta 20) |
   | La cita de Marte | boda 50, éxito 40, amigos 25, drama 20, solo 10 |
   | Cartas de Neptuno | ganar 40, perder 12 |
   | Set de la Luna | 7 por acierto |
@@ -654,7 +703,7 @@ Funciona con teclado o con control (Xbox, PlayStation o genérico).
 | el baño de Urano: moverse / usar, agarrar o cobrar (trapear: mantener) | `W` `A` `S` `D` o flechas / `espacio` | stick / `A` |
 | Planeta Vegetta (lobby, parkour y TNT Run): correr / girar / más rápido / saltar | `W` `S` / `A` `D` / `shift` / `espacio` | stick / stick / `RB` / `A` |
 | Planeta Vegetta (minería): moverse de lado / picar (mantener) / saltar | `A` `D` / `F` (o clic) / `espacio` | stick / `R2` (`RT`, `ZR`) / `A` |
-| Saturno Ritmo: piso / aire | `F` / `J` | `A` o `LB` / `B` o `RB` |
+| ¡Anillazo!: girar / otra vez | `←` `→` (o `A` `D`, o el ratón) / `espacio` | stick o cruceta / cualquier botón |
 | votar en la junta, contestar en la cita | `1` a `3`, o flechas + `espacio` | cruceta + `A` |
 | cartas: elegir / jugar / robar o pasar / ¡NEPTUNO! | `←` `→` / `espacio` / `↓` / `Q` | cruceta / `A` / `↓` / `Y` |
 | set de la Luna: del set / así es la Luna | `1` `2`, o flechas + `espacio` | cruceta + `A` |

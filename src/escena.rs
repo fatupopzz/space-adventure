@@ -72,11 +72,12 @@ pub const JUPITER: usize = 6;
 pub const URANO: usize = 8;
 pub const VEGETTA: usize = 12;
 pub const CHAPIN: usize = 13;
+pub const KOCH: usize = 14;
 
 /// Cuantas veces el radio de la tabla mide cada cuerpo ahorita (en vivo, con F1 y F2): en bits de f32.
-static FACTOR_RADIO: [AtomicU32; 14] = {
+static FACTOR_RADIO: [AtomicU32; 15] = {
     const UNO: AtomicU32 = AtomicU32::new(0x3f80_0000);
-    [UNO; 14]
+    [UNO; 15]
 };
 
 /// Cambia el radio del cuerpo `i` (1 es el de la tabla). El dibujo y las colisiones lo siguen.
@@ -88,7 +89,7 @@ pub fn factor_radio(i: usize) -> f32 {
     f32::from_bits(FACTOR_RADIO[i].load(Ordering::Relaxed))
 }
 
-pub const CUERPOS: [Cuerpo; 14] = [
+pub const CUERPOS: [Cuerpo; 15] = [
     planeta("Sol", "sol", 6.0, 0.0, 1.0, 60.0, 0.0, 0.0),
     // Mercurio: el que orbita mas rapido.
     planeta("Mercurio", "mercurio", 0.7, 16.0, 24.0, 30.0, 0.0, 0.6),
@@ -122,6 +123,9 @@ pub const CUERPOS: [Cuerpo; 14] = [
     // Planeta Chapin: Guatemala hecha planeta, entre Marte y Jupiter. Su malla no es un `.obj`: la
     // arma el juego (voxels con relieve de ruido, ver chapin.rs); con montanas llega mas lejos.
     Cuerpo { radio_modelo: 1.15, ..planeta("Planeta Chapín", "chapin", 1.4, 56.0, 165.0, 45.0, 14.0, 3.6) },
+    // Planeta Koch: visto desde el polo es un copo de nieve de Koch, con hoyos y su mazo clavado
+    // (llega mas lejos que su radio: las puntas y el mazo). Entre Jupiter y Saturno.
+    Cuerpo { radio_modelo: 1.65, ..planeta("Planeta Koch", "koch", 1.35, 78.0, 255.0, 18.0, 58.0, 1.9) },
 ];
 
 impl Cuerpo {

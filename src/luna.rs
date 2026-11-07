@@ -12,6 +12,7 @@
 //! Cada toma escoge seis sospechas al azar. Todo esta en las coordenadas del
 //! set: el centro, en el piso.
 
+use crate::vida::{Tam, Tono, Vida};
 use crate::baile::Paso;
 use crate::entrada::Entrada;
 use crate::framebuffer::Framebuffer;
@@ -213,6 +214,8 @@ pub struct Luna {
     pub estrellas_pintadas: bool,
     pub huellas_barridas: bool,
     pub cables: bool,
+    /// Los letreros gigantes, el confeti y las sacudidas (ver vida.rs).
+    pub vida: Vida,
     pub eventos: Vec<Efecto>,
 }
 
@@ -235,6 +238,7 @@ impl Luna {
             estrellas_pintadas: false,
             huellas_barridas: false,
             cables: false,
+            vida: Vida::sin_cartel(),
             eventos: Vec::new(),
         };
         l.escoger();
@@ -321,6 +325,8 @@ impl Luna {
         let siguiente = (e.aceptar && self.t > 0.4) || self.t > 2.8 + largo / 20.0;
         match self.fase {
             Fase::Llegada if self.t > LLEGADA || (e.aceptar && self.t > 0.5) => {
+                self.vida.grito("¡ACCIÓN!", Tono::Oro, Tam::Grande);
+                self.vida.golpe(0.3, Tono::Blanco);
                 self.eventos.push(Efecto::Claqueta);
                 self.cambiar(Fase::Intro(0));
             }
@@ -341,6 +347,8 @@ impl Luna {
                     self.eleccion = false;
                     self.cambiar(Fase::Pregunta(i + 1));
                 } else {
+                    self.vida.grito("¡RUEDA CÁMARA!", Tono::Oro, Tam::Grande);
+                    self.vida.golpe(0.3, Tono::Blanco);
                     self.eventos.push(Efecto::Claqueta);
                     self.cambiar(Fase::Accion);
                 }
@@ -348,6 +356,11 @@ impl Luna {
             Fase::Accion if self.t > ACCION => self.cambiar(Fase::Revelacion(0)),
             Fase::Revelacion(0) if self.t > REVELAR && siguiente => self.cambiar(Fase::Revelacion(1)),
             Fase::Revelacion(1) if siguiente => {
+                if self.aciertos() >= 4 {
+                    self.vida.exito("¡UN ÓSCAR!", "Nadie va a sospechar", Tono::Oro);
+                } else {
+                    self.vida.desastre("¡SE NOTA EL SET!", "La gente va a dudar por siglos");
+                }
                 self.eventos.push(if self.aciertos() >= 4 { Efecto::Perfecto } else { Efecto::Fallo });
                 self.cambiar(Fase::Calificacion);
             }
@@ -355,6 +368,8 @@ impl Luna {
             Fase::Libre if e.aceptar && self.t > 0.6 => {
                 // Otra toma: otras sospechas, el set como nuevo.
                 self.escoger();
+                self.vida.grito("¡OTRA TOMA!", Tono::Blanco, Tam::Grande);
+                self.vida.golpe(0.3, Tono::Blanco);
                 self.eventos.push(Efecto::Claqueta);
                 self.cambiar(Fase::Pregunta(0));
                 self.eleccion = false;
@@ -381,6 +396,13 @@ impl Luna {
                 SALTOS => self.cables = true,
                 _ => {}
             }
+        }
+        if bien {
+            self.vida.grito("¡BIEN!", Tono::Verde, Tam::Medio);
+            self.vida.golpe(0.2, Tono::Verde);
+        } else {
+            self.vida.grito("¡CORTE!", Tono::Rojo, Tam::Grande);
+            self.vida.golpe(0.5, Tono::Rojo);
         }
         self.eventos.push(if bien { Efecto::Acierto } else { Efecto::Fallo });
         self.cambiar(Fase::Respuesta(i, 0));

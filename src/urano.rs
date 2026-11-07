@@ -17,6 +17,7 @@
 //!
 //! Camara fija desde arriba (como en Overcooked); el bano esta en metros, con el frente hacia +Z.
 
+use crate::vida::{Tam, Tono, Vida};
 use crate::entrada::Entrada;
 use crate::matematica::{Mat4, Vec3, Vec4};
 use crate::sonido::{Efecto, Voz};
@@ -235,6 +236,8 @@ pub struct Urano {
     pub dias_ganados: u32,
     pub campeon: bool,
     pub record: u32,
+    /// Los letreros gigantes, el confeti y las sacudidas (ver vida.rs).
+    pub vida: Vida,
     pub eventos: Vec<Efecto>,
 }
 
@@ -272,6 +275,7 @@ impl Urano {
             dias_ganados: 0,
             campeon: false,
             record: 0,
+            vida: Vida::new("EL BAÑO DE DOÑA CHEPA", "Q1, papel incluido", Tono::Cian),
             eventos: Vec::new(),
         };
         u.abrir_dia(0);
@@ -417,7 +421,10 @@ impl Urano {
                 if (e.aceptar || e.clic) && self.t > 1.2 {
                     match (gano, self.dia + 1 < DIAS.len()) {
                         (true, true) => self.abrir_dia(self.dia + 1),
-                        (true, false) => self.cambiar(Fase::Final),
+                        (true, false) => {
+                            self.vida.exito("¡EMPLEADO DEL MES!", "Doña Chepa casi llora", Tono::Oro);
+                            self.cambiar(Fase::Final);
+                        }
                         (false, _) => self.abrir_dia(self.dia),
                     }
                 }
@@ -512,6 +519,8 @@ impl Urano {
                 self.enojados += 1;
                 self.reputacion = (self.reputacion - 0.8).max(0.0);
                 self.dano = 1.0;
+                self.vida.grito("¡SE FUE ENOJADO!", Tono::Rojo, Tam::Medio);
+                self.vida.golpe(0.35, Tono::Rojo);
                 self.eventos.push(Efecto::Fallo);
                 let nombre = a.nombre;
                 self.chepa(format!("¡Se fue {nombre}, bien enojado! Eso me cuesta una estrella en la app."));
@@ -534,6 +543,7 @@ impl Urano {
                     self.resbalones += 1;
                     self.reputacion = (self.reputacion - 0.5).max(0.0);
                     self.sacudida = 0.6;
+                    self.vida.grito("¡SE RESBALÓ!", Tono::Rojo, Tam::Grande);
                     self.eventos.push(Efecto::Choque);
                     let nombre = a.nombre;
                     self.chepa(format!("¡AY! ¡Se me resbaló {nombre}! ¡El trapeador, mijo, el trapeador!"));
@@ -544,6 +554,8 @@ impl Urano {
                     Hace::AlCubiculo(n) => {
                         if self.cubiculos[n].papel == 0 {
                             a.hace = Hace::SinPapel(n);
+                            self.vida.grito("¡NO HAY PAPEL!", Tono::Oro, Tam::Grande);
+                            self.vida.golpe(0.25, Tono::Oro);
                             self.eventos.push(Efecto::Alarma);
                             self.chepa(format!("¡Gritan del {}! ¡NO HAY PAPEL! Del estante, rápido.", n + 1));
                         } else {
@@ -567,6 +579,8 @@ impl Urano {
                         if self.azar() < DIAS[self.dia].tapado {
                             self.cubiculos[n].tapado = true;
                             self.cubiculos[n].destape = 0.0;
+                            self.vida.grito("¡SE TAPÓ!", Tono::Rojo, Tam::Grande);
+                            self.vida.golpe(0.25, Tono::Rojo);
                             self.eventos.push(Efecto::Alarma);
                             let nombre = a.nombre;
                             self.chepa(format!("¡Se tapó el {}! ¿Qué le darían de comer a {nombre}? ¡Destapacaños!", n + 1));
@@ -581,6 +595,7 @@ impl Urano {
                         self.atendidos += 1;
                         self.quetzales += a.propina;
                         if a.propina > 0 {
+                            self.vida.grito("¡PROPINA!", Tono::Oro, Tam::Medio);
                             self.eventos.push(Efecto::Sello);
                         }
                         self.reputacion = (self.reputacion + 0.25).min(5.0);
@@ -727,6 +742,7 @@ impl Urano {
                 self.charcos.remove(i);
                 self.jugo.estallar(p + Vec3::new(0.0, 0.2, 0.0), [0.5, 0.95, 1.0], 18, 4.0);
                 self.jugo.onda(p, [0.5, 0.95, 1.0], 2.0);
+                self.vida.grito("¡LIMPIO!", Tono::Cian, Tam::Chico);
                 self.eventos.push(Efecto::Acierto);
             }
             return;
@@ -750,6 +766,7 @@ impl Urano {
                         self.quetzales += 1;
                         let p = self.jugador.pos + Vec3::new(0.0, 1.2, 0.0);
                         self.jugo.estallar(p, [1.0, 0.84, 0.25], 14, 3.5);
+                        self.vida.grito("¡Q1!", Tono::Verde, Tam::Chico);
                         self.eventos.push(Efecto::Acierto);
                     }
                     (Some(_), None) => {
@@ -776,6 +793,9 @@ impl Urano {
                         let p = Vec3::new(x_cubiculo(n), 0.8, Z_PUERTA);
                         self.jugo.estallar(p, [0.55, 1.0, 0.7], 30, 6.0);
                         self.jugo.onda(p, [0.55, 1.0, 0.7], 3.0);
+                        self.vida.grito("¡GLUP!", Tono::Verde, Tam::Grande);
+                        self.vida.golpe(0.35, Tono::Verde);
+                        self.vida.confeti(20, Tono::Verde);
                         self.eventos.push(Efecto::Acierto);
                         self.chepa(format!("¡GLUP! Destapado el {}. Usted tiene futuro en esto.", n + 1));
                     }
@@ -783,6 +803,7 @@ impl Urano {
                     c.papel = ROLLOS;
                     self.jugador.carga = None;
                     self.jugo.estallar(Vec3::new(x_cubiculo(n), 1.0, Z_PUERTA), [1.0, 1.0, 1.0], 16, 3.5);
+                    self.vida.grito("¡PAPEL!", Tono::Blanco, Tam::Medio);
                     self.eventos.push(Efecto::Sello);
                     // Si alguien esperaba el papel adentro, sigue en lo suyo.
                     if let Some(a) = self.aliens.iter_mut().find(|a| a.hace == Hace::SinPapel(n)) {
@@ -813,6 +834,11 @@ impl Urano {
             (false, false) => "No llegamos a la meta. Mañana otra vez... bueno, hoy otra vez.",
         });
         self.aliens.clear();
+        if gano {
+            self.vida.exito("¡DÍA SUPERADO!", "Ni un charco y la caja llena", Tono::Oro);
+        } else {
+            self.vida.desastre("¡CERRADO!", "Doña Chepa cuenta el pisto");
+        }
         self.cambiar(Fase::FinDia(gano));
     }
 

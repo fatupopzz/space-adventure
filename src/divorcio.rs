@@ -17,6 +17,7 @@
 //!
 //! Todo esta en las coordenadas de la sala: el centro, en el piso.
 
+use crate::vida::{Tam, Tono, Vida};
 use crate::baile::Paso;
 use crate::entrada::Entrada;
 use crate::framebuffer::Framebuffer;
@@ -424,6 +425,8 @@ pub struct Divorcio {
     mal: usize,
     suda: usize,
     pierde: usize,
+    /// Los letreros gigantes, el confeti y las sacudidas (ver vida.rs).
+    pub vida: Vida,
     pub eventos: Vec<Efecto>,
 }
 
@@ -452,6 +455,7 @@ impl Divorcio {
             mal: 0,
             suda: 0,
             pierde: 0,
+            vida: Vida::sin_cartel(),
             eventos: Vec::new(),
         };
         for i in (1..3).rev() {
@@ -524,6 +528,8 @@ impl Divorcio {
         let siguiente = (e.aceptar && self.t > 0.4) || self.t > 2.8 + largo / 20.0;
         match self.fase {
             Fase::Llegada if siguiente || self.t > 7.0 => {
+                self.vida.grito("¡ORDEN EN LA SALA!", Tono::Oro, Tam::Medio);
+                self.vida.golpe(0.35, Tono::Oro);
                 self.eventos.push(Efecto::Mazo);
                 self.cambiar(Fase::Apertura(0));
             }
@@ -551,6 +557,7 @@ impl Divorcio {
                     self.eventos.push(Efecto::Carta);
                 } else if e.barrel {
                     self.protesta_buena = self.cursor == self.testimonio().mentira && self.prueba == self.testimonio().prueba;
+                    self.vida.golpe(0.7, Tono::Rojo);
                     self.eventos.push(Efecto::Protesto);
                     self.cambiar(Fase::Protesto);
                 } else if e.aceptar {
@@ -562,14 +569,19 @@ impl Divorcio {
             Fase::Presion(_) if siguiente => self.cambiar(Fase::Interrogatorio),
             Fase::Protesto if self.t > PROTESTO => {
                 if self.protesta_buena {
+                    self.vida.grito_con("¡PESCADO!", "Ahí está la mentira", Tono::Verde, Tam::Grande);
+                    self.vida.golpe(0.4, Tono::Verde);
                     self.eventos.push(Efecto::Acierto);
                     self.cambiar(Fase::Acierto(0));
                 } else {
+                    self.vida.grito_con("¡NO HA LUGAR!", "El juez hace ¡HONK!", Tono::Rojo, Tam::Grande);
+                    self.vida.golpe(0.5, Tono::Rojo);
                     self.eventos.push(Efecto::Fallo);
                     self.cambiar(Fase::Error(0));
                 }
             }
             Fase::Acierto(3) if siguiente => {
+                self.vida.exito("¡ANILLO SALVADO!", "Saturno se lo queda", Tono::Oro);
                 self.eventos.push(Efecto::Mazo);
                 self.eventos.push(Efecto::Perfecto);
                 self.anillos[EXES[self.ex()].anillo] = Some(Destino::Saturno);
@@ -579,6 +591,7 @@ impl Divorcio {
             Fase::Acierto(i) if siguiente && i < 3 => self.cambiar(Fase::Acierto(i + 1)),
             Fase::Error(0) if siguiente => {
                 self.paciencia = self.paciencia.saturating_sub(1);
+                self.vida.golpe(0.4, Tono::Rojo);
                 self.eventos.push(Efecto::Mazo);
                 self.cambiar(Fase::Error(1));
             }
@@ -587,6 +600,7 @@ impl Divorcio {
                     // El juez decide: o gana el ex, o el ganso se roba el anillo.
                     let destino = if self.azar(2) == 0 { Destino::Ex } else { Destino::Ganso };
                     self.anillos[EXES[self.ex()].anillo] = Some(destino);
+                    self.vida.desastre("¡ANILLO PERDIDO!", if destino == Destino::Ganso { "Se lo robó el ganso" } else { "Se lo queda su ex" });
                     self.eventos.push(Efecto::Mazo);
                     self.cambiar(Fase::Perdido(0));
                 } else {
@@ -613,6 +627,8 @@ impl Divorcio {
         if self.caso < 3 {
             self.cambiar(Fase::Entra(0));
         } else {
+            self.vida.grito("¡VEREDICTO!", Tono::Oro, Tam::Enorme);
+            self.vida.golpe(0.6, Tono::Oro);
             self.eventos.push(Efecto::Mazo);
             self.cambiar(Fase::Veredicto(0));
         }

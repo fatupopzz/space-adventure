@@ -13,6 +13,7 @@
 //!
 //! Todo esta en las coordenadas de la fuente: el piso de la plaza en y = 0.
 
+use crate::vida::{Tam, Tono, Vida};
 use crate::entrada::Entrada;
 use crate::framebuffer::Framebuffer;
 use crate::matematica::{Mat4, Vec3};
@@ -99,6 +100,8 @@ pub struct Fuente {
     desde_nota: f32,
     /// Segundos desde que salio la Gran Hada (para su baile).
     desde_hada: f32,
+    /// Los letreros gigantes, el confeti y las sacudidas (ver vida.rs).
+    pub vida: Vida,
     pub eventos: Vec<Efecto>,
 }
 
@@ -109,7 +112,7 @@ fn suave(x: f32) -> f32 {
 
 impl Fuente {
     pub fn new() -> Self {
-        Fuente { fase: Fase::Llegada, t: 0.0, total: 0.0, progreso: 0, tocadas: Vec::new(), desde_nota: 9.0, desde_hada: 0.0, eventos: Vec::new() }
+        Fuente { vida: Vida::sin_cartel(), fase: Fase::Llegada, t: 0.0, total: 0.0, progreso: 0, tocadas: Vec::new(), desde_nota: 9.0, desde_hada: 0.0, eventos: Vec::new() }
     }
 
     fn cambiar(&mut self, fase: Fase) {
@@ -176,6 +179,7 @@ impl Fuente {
             Fase::Hada(0) if self.t > SALIR => self.cambiar(Fase::Hada(1)),
             Fase::Hada(i) if i > 0 && siguiente => self.cambiar(if i + 1 < LUKA_DICE.len() { Fase::Hada(i + 1) } else { Fase::Bendicion }),
             Fase::Bendicion if self.t > BENDICION => {
+                self.vida.exito("¡BENDICIÓN!", "Un corazón más", Tono::Rosa);
                 self.eventos.push(Efecto::Perfecto);
                 self.cambiar(Fase::Objeto);
             }
@@ -200,14 +204,19 @@ impl Fuente {
         if CANCION[self.progreso] == n {
             self.progreso += 1;
             if self.progreso % 2 == 0 {
+                let palabra = ["¡ESO!", "¡AFINADA!", "¡QUÉ VOZ!", "¡SIGA!"][self.progreso / 2 % 4];
+                self.vida.grito(palabra, Tono::Rosa, Tam::Medio);
                 self.eventos.push(Efecto::Acierto);
             }
             if self.progreso == CANCION.len() {
+                self.vida.exito("¡CANCIÓN COMPLETA!", "La Gran Hada sale", Tono::Rosa);
                 self.eventos.push(Efecto::Fuego);
                 self.desde_hada = 0.0;
                 self.cambiar(Fase::Hada(0));
             }
         } else {
+            self.vida.grito("¡DESAFINÓ!", Tono::Rojo, Tam::Grande);
+            self.vida.golpe(0.45, Tono::Rojo);
             self.eventos.push(Efecto::Fallo);
             self.cambiar(Fase::Error);
         }

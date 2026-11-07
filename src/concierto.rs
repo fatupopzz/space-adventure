@@ -38,7 +38,7 @@ const COMENTARIOS: [&str; 5] = [
     "Bienvenidos a Saturno Ritmo. Miku en vivo. Sin playback, supuestamente. Yo no metería las manos al fuego.",
     "Los anillos son un vinil de 280,000 km. El DJ cobra por hora de Saturno: diez horas y media. Ni modo.",
     "Saturno flotaría en una piscina. El público también, si hubiera. Son doce alienígenas y vinieron por la refa.",
-    "El ecualizador sigue el ritmo. Usted no. {aceptar}: jugar, para que lo compruebe.",
+    "El ecualizador sigue el ritmo. Venus le manda los anillos de vuelta. {aceptar}: esquivarlos.",
     "La tormenta del polo es hexagonal de verdad. Producción barata, idea cara. Como todo proyecto final.",
 ];
 
@@ -82,7 +82,7 @@ impl Concierto {
         Concierto { t: 0.0, chispas }
     }
 
-    /// Avanza. Devuelve que se pidio: despegar o jugar Saturno Ritmo.
+    /// Avanza. Devuelve que se pidio: despegar o jugar a ¡Anillazo!.
     pub fn actualizar(&mut self, e: &Entrada, dt: f32) -> Option<AccionConcierto> {
         self.t += dt;
         if e.aterrizar {

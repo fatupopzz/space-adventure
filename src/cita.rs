@@ -19,6 +19,7 @@
 //! Todo esta en coordenadas de la escena: el piso en y = 0, el mantel del
 //! picnic en el centro y la camara del lado de -Z.
 
+use crate::vida::{Tam, Tono, Vida};
 use crate::entrada::Entrada;
 use crate::matematica::{Mat4, Vec3};
 use crate::sonido::{Efecto, Voz};
@@ -576,6 +577,8 @@ pub struct Cita {
     /// Con quienes ya salio bien en esta visita (para el drama).
     exitos: Vec<usize>,
     semilla: u32,
+    /// Los letreros gigantes, el confeti y las sacudidas (ver vida.rs).
+    pub vida: Vida,
     pub eventos: Vec<Efecto>,
 }
 
@@ -591,6 +594,23 @@ fn mirando(pos: Vec3, dir: Vec3, escala: f32) -> Mat4 {
 
 impl Cita {
     /// Cada visita sale distinta: la semilla viene del reloj.
+    /// Como le cayo lo que dijo: se le ve en grande.
+    fn gritar_reaccion(&mut self, puntos: i32) {
+        match puntos {
+            2.. => {
+                self.vida.grito("¡LE ENCANTÓ!", Tono::Rosa, Tam::Grande);
+                self.vida.golpe(0.25, Tono::Rosa);
+                self.vida.confeti(30, Tono::Rosa);
+            }
+            1 => self.vida.grito("¡BIEN!", Tono::Verde, Tam::Medio),
+            0 => self.vida.grito("MMM...", Tono::Lila, Tam::Medio),
+            _ => {
+                self.vida.grito("¡UY!", Tono::Rojo, Tam::Grande);
+                self.vida.golpe(0.45, Tono::Rojo);
+            }
+        }
+    }
+
     pub fn new() -> Self {
         let ahora = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(7, |d| d.subsec_nanos());
         Cita::con_semilla(ahora)
@@ -613,6 +633,7 @@ impl Cita {
             regalo: None,
             exitos: Vec::new(),
             semilla: semilla | 1,
+            vida: Vida::new("LA CITA DE CURIOSITY", "Marte · mesa para dos", Tono::Rosa),
             eventos: Vec::new(),
         }
     }
@@ -676,6 +697,13 @@ impl Cita {
         self.t = 0.0;
         if let Fase::Final(0) = fase {
             let f = self.final_();
+            match f {
+                Final::Boda => self.vida.exito("¡BODA EN MARTE!", "Los declaro rover y esposa", Tono::Rosa),
+                Final::Exito => self.vida.exito("¡CITA PERFECTA!", "Primer romance interplanetario", Tono::Rosa),
+                Final::Amigos => self.vida.grito_con("FRIENDZONE", "Rojo como la cara de Curiosity", Tono::Lila, Tam::Enorme),
+                Final::Solo => self.vida.grito_con("SOLO EN MARTE", "Se canta feliz cumpleaños", Tono::Cian, Tam::Enorme),
+                Final::Drama(_) => self.vida.desastre("¡LLEGÓ LA EX!", "Esto se va a poner feo"),
+            }
             self.eventos.push(match f {
                 Final::Boda | Final::Exito => Efecto::Fuego,
                 Final::Amigos => Efecto::Choque,
@@ -801,6 +829,7 @@ impl Cita {
                     self.regalo = Some(r);
                     let puntos = self.cand().regalos[r].0;
                     self.afinidad = (self.afinidad + puntos).clamp(0, AFINIDAD_MAX);
+                    self.gritar_reaccion(puntos);
                     self.eventos.push(match puntos {
                         2 => Efecto::Perfecto,
                         1 | 0 => Efecto::Acierto,
@@ -820,6 +849,7 @@ impl Cita {
                 let puntos = self.respuesta(k, o).1;
                 self.afinidad = (self.afinidad + puntos).clamp(0, AFINIDAD_MAX);
                 self.puntos.push(puntos);
+                self.gritar_reaccion(puntos);
                 self.eventos.push(match puntos {
                     2 => Efecto::Perfecto,
                     1 => Efecto::Acierto,
@@ -844,6 +874,7 @@ impl Cita {
             Fase::Golpiza => {
                 // Un golpe cada tantito, con su vibracion.
                 if ((self.t - dt) / 0.28) as i32 != (self.t / 0.28) as i32 {
+                    self.vida.golpe(0.55, Tono::Rojo);
                     self.eventos.push(if (self.t / 0.28) as i32 % 3 == 0 { Efecto::Mazo } else { Efecto::Choque });
                 }
                 if self.t > GOLPIZA {

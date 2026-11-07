@@ -359,6 +359,15 @@ pub fn de_efecto(e: crate::sonido::Efecto) -> Option<(f32, f32, u32)> {
         Teclas => (0.0, 0.25, 60),
         Chorro => (0.05, 0.12, 40),
         Pop => (0.2, 0.5, 70),
+        // El mazo se siente en las manos; pegarle al aire, apenas.
+        Mazazo => (0.75, 0.55, 70),
+        // El soplido del giro, apenitas: avisa en las manos que ya viene el golpe.
+        Aire => (0.0, 0.14, 40),
+        Tablero => (0.45, 0.2, 60),
+        // Cada anillo se siente pasar, apenas; el roce, mas.
+        Pase => (0.06, 0.1, 25),
+        Roce => (0.2, 0.55, 80),
+        Recursion => (1.0, 0.9, 500),
         Puerta => (0.3, 0.1, 250),
         Alarma => (0.5, 0.6, 300),
         _ => return None,

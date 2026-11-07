@@ -43,6 +43,7 @@ mod intro;
 mod jupiter;
 mod junta;
 mod camioneta;
+mod koch;
 mod luna;
 mod maravillas;
 mod matematica;
@@ -63,7 +64,8 @@ mod polvo;
 mod post;
 mod progreso;
 mod grabacion;
-mod ritmo;
+mod anillos;
+mod vida;
 mod salto;
 mod sonido;
 mod tienda;
@@ -83,7 +85,7 @@ use baile::Baile;
 use cielo::Cielo;
 use concierto::{AccionConcierto, Concierto, OCULTAR_HAZ};
 use entrada::Entrada;
-use escena::{CHAPIN, CUERPOS, HADA, JUPITER, LUNA, MARTE, MERCURIO, NEPTUNO, PLUTON, SATURNO, TIERRA, URANO, VEGETTA, VENUS};
+use escena::{CHAPIN, CUERPOS, HADA, JUPITER, KOCH, LUNA, MARTE, MERCURIO, NEPTUNO, PLUTON, SATURNO, TIERRA, URANO, VEGETTA, VENUS};
 use framebuffer::Framebuffer;
 use intro::{Intro, OCULTAR_FAN};
 use cita::{AccionCita, Cita, Final};
@@ -94,6 +96,7 @@ use mercurio::{AccionMercurio, Mercurio};
 use jupiter::{AccionJupiter, Jupiter};
 use divorcio::{AccionDivorcio, Divorcio};
 use camioneta::{AccionCamioneta, Camioneta};
+use koch::{AccionKoch, Koch};
 use luna::{AccionLuna, Luna};
 use notas::Coleccionables;
 use progreso::{sello, Hecho, Progreso};
@@ -110,7 +113,7 @@ use pipeline::{proyectar, DrawCall, Estadisticas, ModoDibujo, Opciones, Shader, 
 use polvo::Polvo;
 use post::Post;
 use raylib::prelude::*;
-use ritmo::{Accion, Ritmo};
+use anillos::{AccionAnillos, Anillazo};
 use salto::Salto;
 use sonido::{Dialogo, Efecto, Pista, Sonidos, Voz};
 
@@ -232,6 +235,10 @@ struct Recursos {
     charco: Modelo,
     /// El Planeta Chapin: los modelos de la camioneta y de su carretera (ver camioneta.rs).
     camioneta: camioneta::Modelos,
+    /// El Planeta Koch: la maquina de Whack-a-Koch, y el profe en sus otros colores (enojado,
+    /// dorado, fractal y el blanco del destello).
+    koch: koch::Modelos,
+    koch_tintes: [Modelo; 4],
     /// Los fondos de bloques de los minijuegos (ver decorado.rs).
     decorado: decorado::Decorado,
     /// Las maravillas (ver maravillas.rs): Rocky, la Blip-A, la Endurance, el monolito y el disco de
@@ -259,7 +266,8 @@ struct Recursos {
     asiento_luna: Vec3,
     haz: Modelo,
     fans: Modelo,
-    notas_ritmo: Modelo,
+    /// Saturno: ¡ANILLAZO!, los anillos que manda Venus.
+    anillos: anillos::Modelos,
     tripulantes: Modelo,
     mesa_junta: Modelo,
     curiosity: Modelo,
@@ -385,6 +393,11 @@ impl Recursos {
         let bano_chepa = cargar("modelos/bano_chepa.obj");
         let atlas_bloques = obj::Textura::cargar("modelos/texturas/bloques.png").ok().map(std::sync::Arc::new);
         let alien = cargar("modelos/alien_urano.obj");
+        let profe = cargar("modelos/profe.obj");
+        let koch_tintes = {
+            let mini = &elenco[personajes::indice("koch")].de_pie;
+            [koch::tenido(mini, [1.0, 0.2, 0.2], 0.3, 0.12), koch::tenido(mini, [1.0, 0.78, 0.2], 0.62, 0.3), koch::tenido(mini, [1.0, 0.35, 0.9], 0.55, 0.25), koch::tenido(mini, [1.0, 1.0, 1.0], 1.0, 1.0)]
+        };
         // Ningun planeta viene de un `.obj`: el juego los arma al arrancar, con voxels y su
         // deformacion con ruido (el Chapin en chapin.rs; los demas en planetas.rs), en paralelo.
         // Lo que no es el planeta sigue siendo modelo: las caras de Neptuno y Pluton y el
@@ -495,18 +508,20 @@ impl Recursos {
             atlas_bloques,
             diamante_mc: cargar("modelos/diamante_mc.obj"),
             camioneta: camioneta::modelos(),
+            koch: koch::modelos(),
+            koch_tintes,
             decorado: decorado::armar(),
             rocky: cargar("modelos/rocky.obj"),
             blip_a: cargar("modelos/blip_a.obj"),
             endurance: cargar("modelos/endurance.obj"),
             monolito: cargar("modelos/monolito.obj"),
             disco_gargantua: maravillas::disco(),
-            profe: cargar("modelos/profe.obj"),
+            profe,
             aula: cargar("modelos/aula_uvg.obj"),
             luna,
             asiento_luna,
             haz: cargar("modelos/haz_luz.obj"),
-            notas_ritmo: cargar("modelos/notas_ritmo.obj"),
+            anillos: anillos::modelos(),
             tripulantes: cargar("modelos/tripulantes.obj"),
             mesa_junta: cargar("modelos/mesa_junta.obj"),
             curiosity: cargar("modelos/curiosity.obj"),
@@ -1296,7 +1311,7 @@ fn semilla_del_reloj() -> u32 {
     std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(7, |d| d.subsec_nanos())
 }
 
-const CON_ATERRIZAJE: [usize; 13] = [MERCURIO, VENUS, TIERRA, LUNA, MARTE, JUPITER, SATURNO, URANO, NEPTUNO, PLUTON, HADA, VEGETTA, CHAPIN];
+const CON_ATERRIZAJE: [usize; 14] = [MERCURIO, VENUS, TIERRA, LUNA, MARTE, JUPITER, SATURNO, URANO, NEPTUNO, PLUTON, HADA, VEGETTA, CHAPIN, KOCH];
 
 /// En que planeta se puede aterrizar desde aqui, si en alguno. Si hay uno con
 /// aterrizaje en rango gana ese, aunque otro quede mas cerca: junto a la
@@ -1359,7 +1374,7 @@ fn base_uniforms(vista: Mat4, proyeccion: Mat4, luz: Vec3, camara: Vec3, (ambien
 }
 
 /// El color del aire de cada planeta (para el anillo de su atmosfera en el espacio).
-const ATMOSFERAS: [(usize, [f32; 3]); 10] = [
+const ATMOSFERAS: [(usize, [f32; 3]); 11] = [
     (VENUS, [0.95, 0.75, 0.35]),
     (TIERRA, [0.35, 0.65, 1.0]),
     (MARTE, [1.0, 0.5, 0.3]),
@@ -1370,6 +1385,7 @@ const ATMOSFERAS: [(usize, [f32; 3]); 10] = [
     (HADA, [1.0, 0.55, 0.9]),
     (VEGETTA, [0.55, 0.95, 0.5]),
     (CHAPIN, [0.40, 0.90, 0.85]),
+    (KOCH, [0.85, 0.55, 1.0]),
 ];
 
 /// Un cuadro del espacio. Con `intro`, la nave esta en la plataforma y Miku
@@ -2485,48 +2501,113 @@ fn dibujar_concierto(fb: &mut Framebuffer, post: &mut Post, rec: &Recursos, c: &
 }
 
 /// Un cuadro de Saturno Ritmo (en las coordenadas de Saturno, como el concierto).
-fn dibujar_ritmo(fb: &mut Framebuffer, post: &mut Post, rec: &Recursos, r: &Ritmo, opciones: &Opciones) -> Estadisticas {
-    let (ojo, mira) = r.camara();
-    let fov = (FOV + r.fov_extra()).to_radians();
-    let vista = Mat4::look_at(ojo, mira, Vec3::new(0.0, 1.0, 0.0));
-    let proyeccion = Mat4::perspective(fov, fb.ancho as f32 / fb.alto as f32, 0.05, 200.0);
-    let golpe = r.golpe();
-    let luz = (LUZ_CONCIERTO.0 * (1.0 + 0.6 * golpe), LUZ_CONCIERTO.1);
-    let base = base_uniforms(vista, proyeccion, Vec3::new(3.0, 8.0, -6.0), ojo, luz);
-    let anim = EstadoAnim { t: r.t(), ritmo: golpe, giro_turbinas: r.t() * 6.0, empuje: 0.6, ..Default::default() };
-    let t = r.t();
+/// La vida de la escena de ahora, si es de las que la llevan (ver vida.rs).
+fn vida_de(escena: &Escena) -> Option<&vida::Vida> {
+    match escena {
+        Escena::Mercurio(x) => Some(&x.vida),
+        Escena::Divorcio(x) => Some(&x.vida),
+        Escena::Luna(x) => Some(&x.vida),
+        Escena::Cita(x) => Some(&x.vida),
+        Escena::Jupiter(x) => Some(&x.vida),
+        Escena::Urano(x) => Some(&x.vida),
+        Escena::Neptuno(x) => Some(&x.vida),
+        Escena::Junta(x) => Some(&x.vida),
+        Escena::Fuente(x) => Some(&x.vida),
+        Escena::Vegetta(x) => Some(&x.vida),
+        _ => None,
+    }
+}
+
+fn vida_de_mut(escena: &mut Escena) -> Option<&mut vida::Vida> {
+    match escena {
+        Escena::Mercurio(x) => Some(&mut x.vida),
+        Escena::Divorcio(x) => Some(&mut x.vida),
+        Escena::Luna(x) => Some(&mut x.vida),
+        Escena::Cita(x) => Some(&mut x.vida),
+        Escena::Jupiter(x) => Some(&mut x.vida),
+        Escena::Urano(x) => Some(&mut x.vida),
+        Escena::Neptuno(x) => Some(&mut x.vida),
+        Escena::Junta(x) => Some(&mut x.vida),
+        Escena::Fuente(x) => Some(&mut x.vida),
+        Escena::Vegetta(x) => Some(&mut x.vida),
+        _ => None,
+    }
+}
+
+/// Un cuadro de ¡ANILLAZO!: Saturno y su concierto a lo lejos, los anillos que vienen, y la nave abajo,
+/// con el mundo girando alrededor de ella.
+fn dibujar_anillos(fb: &mut Framebuffer, post: &mut Post, rec: &Recursos, a: &Anillazo, opciones: &Opciones) -> Estadisticas {
+    let (ojo, mira, arriba) = a.camara();
+    let fov = a.fov().to_radians();
+    let vista = Mat4::look_at(ojo, mira, arriba);
+    let proyeccion = Mat4::perspective(fov, fb.ancho as f32 / fb.alto as f32, 0.1, 400.0);
+    let t = a.total;
+    let golpe = a.pulso * a.pulso;
+    let m = &rec.anillos;
+    let base = base_uniforms(vista, proyeccion, Vec3::new(3.0, 8.0, 10.0), ojo, (LUZ_CONCIERTO.0 * (1.0 + 0.4 * golpe), LUZ_CONCIERTO.1));
+    let anim = EstadoAnim { t, ritmo: golpe, giro_turbinas: t * 6.0, empuje: 1.0, ..Default::default() };
+    // Saturno, gigante, gira despacio con su concierto.
+    // Va arriba y a un lado: el centro queda limpio, que es donde se mira para ver los huecos.
+    let saturno = Mat4::rotation_z(a.angulo * -0.6) * Mat4::translation(Vec3::new(-70.0, 46.0, -190.0)) * Mat4::rotation_x(0.42) * Mat4::rotation_y(t * 0.1) * Mat4::scale(11.0);
+    let partes_saturno = rec.planeta_normal(SATURNO);
     let mut llamadas = vec![
-        // Los bichitos del modelo se ocultan: los del minijuego van aparte.
-        DrawCall { animacion: Some((rec.planeta_normal(SATURNO).1, anim)), ocultar: &["microfono", "nota_"], ..llamada(rec.planeta_normal(SATURNO).0, base) },
-        // Miku canta arriba en su luna mientras la nave juega.
-        llamada(&rec.luna, Uniforms { modelo: concierto::columpio_en(t), ..base }),
+        DrawCall { animacion: Some((partes_saturno.1, anim)), ocultar: &["microfono", "nota_"], ..llamada(partes_saturno.0, Uniforms { modelo: saturno, ..base }) },
+        llamada(&rec.luna, Uniforms { modelo: saturno * concierto::columpio_en(t), ..base }),
         DrawCall {
             expresion: Some("feliz"),
             animacion: Some((rec.anim_piloto(), anim)),
             ocultar: &SIN_NAVE,
-            ..llamada(rec.piloto(), Uniforms { modelo: concierto::miku_en(t, rec.asiento_luna), ..base })
-        },
-        DrawCall {
-            expresion: Some(r.expresion_miku()),
-            animacion: Some((rec.anim_nave(), anim)),
-            ..llamada(rec.nave(), Uniforms { modelo: r.nave(), ..base })
+            ..llamada(rec.piloto(), Uniforms { modelo: saturno * concierto::miku_en(t, rec.asiento_luna), ..base })
         },
     ];
-    for (m, aire) in r.notas_visibles() {
-        let ocultar: &[&str] = if aire { &["nota_piso"] } else { &["nota_aire"] };
-        llamadas.push(DrawCall { ocultar, ..llamada(&rec.notas_ritmo, Uniforms { modelo: m, ..base }) });
+    // El letrero gigante, con sus foquitos de feria y sus brillos.
+    llamadas.push(llamada(&m.letrero_fondo, base));
+    llamadas.push(llamada(&m.foquitos[(a.total / anillos::CORCHEA) as usize % 2], base));
+    for (k, (modelo, color)) in a.titulo().into_iter().enumerate() {
+        llamadas.push(llamada(&m.letras[k][color], Uniforms { modelo, ..base }));
     }
-    for (m, color) in concierto::haces_en(t) {
-        llamadas.push(DrawCall { ocultar: &OCULTAR_HAZ[color], ..llamada(&rec.haz, Uniforms { modelo: m, ..base }) });
+    for (p, tam) in a.brillos() {
+        llamadas.push(llamada(&m.brillo, Uniforms { modelo: Mat4::translation(p) * Mat4::scale(tam), ..base }));
     }
+    // El tunel: aros que pasan, girando con el mundo.
+    for (modelo, color) in a.aros_tunel() {
+        llamadas.push(llamada(&m.aros_tunel[color], Uniforms { modelo, ..base }));
+    }
+    for modelo in a.rayas() {
+        llamadas.push(llamada(&m.raya, Uniforms { modelo, ..base }));
+    }
+    // Por donde va la nave y hacia donde apunta: se pone verde cuando va a caber en el hueco.
+    llamadas.push(llamada(&m.pista, Uniforms { modelo: a.giro_pista(), ..base }));
+    let mira_nave = Mat4::translation(Vec3::new(0.0, -anillos::RADIO, 0.0));
+    if a.jugando() {
+        llamadas.push(llamada(if a.alineada() { &m.mira_bien } else { &m.mira_mal }, Uniforms { modelo: mira_nave, ..base }));
+    }
+    for (modelo, nivel, culpa) in a.bloques() {
+        let bloque = if culpa { &m.bloque_rojo } else { &m.bloques[nivel.min(m.bloques.len() - 1)] };
+        llamadas.push(llamada(bloque, Uniforms { modelo, ..base }));
+    }
+    for modelo in a.orillas() {
+        llamadas.push(llamada(&m.orilla, Uniforms { modelo, ..base }));
+    }
+    for modelo in a.puertas() {
+        llamadas.push(llamada(&m.puerta, Uniforms { modelo, ..base }));
+    }
+    if a.jugando() || a.t > 0.0 {
+        llamadas.push(DrawCall { animacion: Some((rec.anim_nave(), anim)), expresion: Some(if a.jugando() { "feliz" } else { "espiral" }), ..llamada(rec.nave(), Uniforms { modelo: a.nave(), ..base }) });
+    }
+    for c in &a.chispas {
+        llamadas.push(llamada(&m.cubos[c.color], Uniforms { modelo: Mat4::translation(c.pos) * Mat4::rotation_z(c.vida * 9.0) * Mat4::scale(c.tam), ..base }));
+    }
+    // El cielo de color del nivel, con estrellas: nada de espacio oscuro.
+    cielo_degradado(fb, (mira - ojo).normalize(), fov, a.cielo());
     fb.limpiar_profundidad();
-    rec.cielo.dibujar_fondo(fb, &vista, fov);
     rec.cielo.dibujar_estrellas(fb, &vista, &proyeccion, t, 0.0);
-    rec.cielo.dibujar_adornos(fb, &vista, &proyeccion, t, 0.0);
+    fb.limpiar_profundidad();
     let st = pipeline::render(fb, &llamadas, opciones);
-    r.dibujar_efectos(fb, &(proyeccion * vista));
-    post.bloom(fb, 0.6 + 0.35 * golpe);
-    post::terminar(fb, [1.0, 0.4, 0.8], 0.2 * golpe, 0.0);
+    post.bloom(fb, BLOOM * (0.5 + 0.28 * golpe));
+    post::gradacion(fb, 1.12, 0.1, [0.006, 0.0, 0.02], [0.012, 0.004, 0.0]);
+    let (tinte, fuerza) = if a.jugando() { ([1.0, 0.35, 0.85], 0.06 + 0.12 * golpe) } else { ([1.0, 0.1, 0.12], 0.5 * a.sacudida) };
+    post::terminar(fb, tinte, fuerza, a.destello);
     st
 }
 
@@ -3666,6 +3747,151 @@ fn dibujar_camioneta(fb: &mut Framebuffer, post: &mut Post, rec: &Recursos, c: &
     st
 }
 
+/// Un cuadro de Wack a Koch: el cielo del planeta, la maquina, el titulo gigante, los que estan afuera
+/// y el mazo. Todo late con la musica.
+fn dibujar_koch(fb: &mut Framebuffer, post: &mut Post, rec: &Recursos, c: &Koch, opciones: &Opciones) -> Estadisticas {
+    let (ojo, mira, arriba) = c.camara();
+    let fov = koch::FOV.to_radians();
+    let (cerca, lejos) = (0.1, 120.0);
+    let vista = Mat4::look_at(ojo, mira, arriba);
+    let proyeccion = Mat4::perspective(fov, fb.ancho as f32 / fb.alto as f32, cerca, lejos);
+    let fiebre = c.en_recursion();
+    let cielo = if fiebre {
+        let h = (c.total * 1.6).sin() * 0.5 + 0.5;
+        [[0.75 + 0.2 * h, 0.2, 0.62 - 0.2 * h], [0.34, 0.08 + 0.1 * h, 0.5], [0.08, 0.03, 0.2]]
+    } else {
+        [[0.42, 0.20, 0.62], [0.17, 0.09, 0.38], [0.04, 0.03, 0.14]]
+    };
+    cielo_degradado(fb, (mira - ojo).normalize(), fov, cielo);
+    fb.limpiar_profundidad();
+    rec.cielo.dibujar_estrellas(fb, &vista, &proyeccion, c.total, 0.0);
+    fb.limpiar_profundidad();
+    // La luz sube un poquito en cada tiempo.
+    let late = 1.0 + c.pulso * c.pulso * 0.14 + if fiebre { 0.12 } else { 0.0 };
+    let base = base_uniforms(vista, proyeccion, Vec3::new(-4.0, 12.0, 7.0), ojo, (Vec3::new(0.40, 0.34, 0.56) * late, Vec3::new(0.30, 0.18, 0.48) * late));
+    let m = &rec.koch;
+    let en = |p: Vec3| Mat4::translation(p);
+    let brinco = Mat4::translation(Vec3::new(0.0, -c.brinco * c.brinco * 0.05, 0.0));
+    let mut llamadas = vec![llamada(&m.suelo, base), llamada(&m.torres, base), llamada(&m.mueble, Uniforms { modelo: brinco, ..base }), llamada(&m.letrero_fondo, base), llamada(&m.foquitos[(c.total / koch::CORCHEA) as usize % 2], base)];
+    // El titulo gigante: cada letra brinca y se enciende con la musica.
+    for (k, (modelo, color)) in c.titulo().into_iter().enumerate() {
+        llamadas.push(llamada(&m.letras[k][color], Uniforms { modelo, ..base }));
+    }
+    for (p, tam) in c.brillos() {
+        llamadas.push(llamada(&m.brillo, Uniforms { modelo: en(p) * Mat4::scale(tam), ..base }));
+    }
+    // Los copos de nieve de Koch flotando alrededor.
+    for k in 0..12 {
+        let s = k as f32 * 2.399;
+        let x = (s * 1.7).sin() * 13.0 + if k % 2 == 0 { 7.0 } else { -7.0 };
+        let p = Vec3::new(x, 1.5 + (s * 0.9).cos().abs() * 7.0 + (c.total * 0.6 + s).sin() * 0.3, -9.0 + (s * 2.3).cos() * 6.0);
+        let modelo = en(p) * Mat4::rotation_y(c.total * 0.5 + s) * Mat4::rotation_z(c.total * 0.3 + s) * Mat4::scale(0.5 + (s * 3.1).sin().abs() * 0.5);
+        llamadas.push(llamada(&m.copo_suelto, Uniforms { modelo, ..base }));
+    }
+    // Los aros: el del color de quien esta adentro, y uno fino que se cierra con su tiempo.
+    let aros = c.aros();
+    for (k, &(color, queda)) in aros.iter().enumerate() {
+        let p = koch::hoyo(k);
+        llamadas.push(llamada(&m.aros[color], Uniforms { modelo: en(p), ..base }));
+        if queda > 0.0 {
+            let modelo = en(p + Vec3::new(0.0, 0.17, 0.0)) * Mat4::scale_xyz(Vec3::new(1.0 + queda * 0.72, 1.0, 1.0 + queda * 0.72));
+            llamadas.push(llamada(&m.aros_finos[color], Uniforms { modelo, ..base }));
+        }
+    }
+    if c.jugando() {
+        let modelo = en(koch::hoyo(c.cursor) + Vec3::new(0.0, 0.16, 0.0)) * Mat4::scale_xyz(Vec3::new(1.1, 1.0, 1.1));
+        llamadas.push(llamada(&m.aros_finos[5], Uniforms { modelo, ..base }));
+    }
+    // Las ondas de cada golpe, y el brillo del hoyo.
+    for &(k, edad) in &c.ondas {
+        let e = 1.0 + (edad / 0.17).sqrt() * 0.55;
+        let modelo = en(koch::hoyo(k) + Vec3::new(0.0, 0.1, 0.0)) * Mat4::scale_xyz(Vec3::new(e, 1.0, e));
+        llamadas.push(llamada(&m.aros_finos[3], Uniforms { modelo, ..base }));
+    }
+    // Los mini Koch (y sus companeros): bailan con el esqueleto de los personajes.
+    const SIN_SONRISA: [&str; 1] = ["sonrisa"];
+    const SIN_NADA: [&str; 2] = ["lentes", "sonrisa"];
+    const COMPANEROS: [&str; 3] = ["miku", "chavo", "steve"];
+    let poses = c.poses();
+    let bailes: Vec<Vec<Mat4>> = poses
+        .iter()
+        .map(|pose| {
+            let e = match pose.tipo {
+                koch::Tipo::Companero(cual) => &rec.elenco[personajes::indice(COMPANEROS[cual % 3])],
+                _ => &rec.elenco[personajes::indice("koch")],
+            };
+            e.baile.matrices(pose.t, pose.paso, pose.paso, 1.0, pose.brazos)
+        })
+        .collect();
+    let mini = &rec.elenco[personajes::indice("koch")];
+    let mano = mini.de_pie.partes.iter().position(|p| p.nombre == "mano_der");
+    let pelo = mini.de_pie.partes.iter().position(|p| p.nombre == "pelo");
+    for (pose, baile) in poses.iter().zip(&bailes) {
+        let u = Uniforms { modelo: pose.modelo, ..base };
+        if let koch::Tipo::Companero(cual) = pose.tipo {
+            let e = &rec.elenco[personajes::indice(COMPANEROS[cual % 3])];
+            llamadas.push(DrawCall { expresion: Some(pose.expresion), por_parte: Some(baile), ..llamada(&e.de_pie, u) });
+            continue;
+        }
+        let modelo = if pose.destello {
+            &rec.koch_tintes[3]
+        } else {
+            match pose.tipo {
+                koch::Tipo::Enojado => &rec.koch_tintes[0],
+                koch::Tipo::Dorado => &rec.koch_tintes[1],
+                koch::Tipo::Fractal(_) => &rec.koch_tintes[2],
+                _ => &mini.de_pie,
+            }
+        };
+        // La sonrisa de fabrica solo va con la cara contenta.
+        let ocultar: &[&str] = if pose.sin_lentes { &SIN_NADA } else if pose.expresion == "feliz" { &[] } else { &SIN_SONRISA };
+        llamadas.push(DrawCall { expresion: Some(pose.expresion), por_parte: Some(baile), ocultar, ..llamada(modelo, u) });
+        // La reglita sigue a la mano derecha; el birrete, a la cabeza.
+        if !pose.sin_lentes {
+            if let Some(j) = mano {
+                let modelo = pose.modelo * baile[j] * en(Vec3::new(0.16, 0.3, -0.02));
+                llamadas.push(llamada(&m.regla, Uniforms { modelo, ..base }));
+            }
+        }
+        if let (Some(b), Some(j)) = (pose.birrete, pelo) {
+            let modelo = b * baile[j] * en(Vec3::new(0.0, 1.12, 0.0)) * Mat4::rotation_y((c.total * 2.0).sin() * 0.1);
+            llamadas.push(llamada(&m.birrete, Uniforms { modelo, ..base }));
+        }
+        // Las estrellitas de mareado.
+        if let Some(cabeza) = pose.mareo {
+            for k in 0..4 {
+                let a = c.total * 9.0 + k as f32 * 1.57;
+                let modelo = en(cabeza + Vec3::new(a.cos() * 0.55, 0.05 + (a * 2.0).sin() * 0.06, a.sin() * 0.55)) * Mat4::rotation_y(a) * Mat4::scale(0.12);
+                llamadas.push(llamada(&m.cubos[3], Uniforms { modelo, ..base }));
+            }
+        }
+    }
+    for ch in &c.chispas {
+        llamadas.push(llamada(&m.cubos[ch.color], Uniforms { modelo: en(ch.pos) * Mat4::rotation_y(ch.gira) * Mat4::rotation_x(ch.gira * 0.7) * Mat4::scale(ch.tam), ..base }));
+    }
+    for v in &c.vuelan {
+        let modelo = en(v.pos) * Mat4::rotation_y(v.gira) * Mat4::rotation_x(v.gira * 0.6);
+        llamadas.push(llamada(if v.cual == 0 { &m.lentes } else { &m.birrete }, Uniforms { modelo, ..base }));
+    }
+    if matches!(c.fase, koch::Fase::Jugando | koch::Fase::Cartel(_)) {
+        // El mazo, con su estela en el cuadro del golpe.
+        let (mango, cabeza) = c.mazo();
+        llamadas.push(llamada(&m.mazo_mango, Uniforms { modelo: mango, ..base }));
+        llamadas.push(llamada(&m.mazo_cabeza, Uniforms { modelo: cabeza, ..base }));
+        for modelo in c.estela() {
+            llamadas.push(llamada(&m.mazo_estela, Uniforms { modelo, ..base }));
+        }
+    }
+    let st = pipeline::render(fb, &llamadas, opciones);
+    post::sombras_de_contacto(fb, 5, 0.45);
+    post::niebla(fb, cerca, lejos, 22.0, 62.0, [cielo[0][0] * 0.9, cielo[0][1] * 0.9, cielo[0][2] * 0.9], true);
+    post.bloom(fb, BLOOM * (0.42 + c.pulso * 0.2 + if fiebre { 0.3 } else { 0.0 }));
+    post::gradacion(fb, 1.14, 0.12, [0.006, 0.0, 0.02], [0.012, 0.004, 0.0]);
+    let (tinte, fuerza) = if c.rojo > 0.0 { ([1.0, 0.08, 0.1], c.rojo * 1.3) } else if fiebre { ([1.0, 0.25, 0.8], 0.42) } else { ([0.5, 0.2, 0.9], 0.08) };
+    post::terminar(fb, tinte, fuerza, c.destello);
+    st
+}
+
 fn dibujar_luna(fb: &mut Framebuffer, post: &mut Post, rec: &Recursos, l: &Luna, opciones: &Opciones) -> Estadisticas {
     let (ojo, mira) = l.camara();
     let fov = FOV.to_radians();
@@ -3802,7 +4028,8 @@ enum Escena {
     Urano(Box<Urano>),
     Vegetta(Box<Vegetta>),
     Concierto(Concierto),
-    Ritmo(Ritmo),
+    /// Saturno: ¡ANILLAZO!
+    Anillos(Box<Anillazo>),
     Junta(Junta),
     Cita(Cita),
     Neptuno(Neptuno),
@@ -3813,6 +4040,8 @@ enum Escena {
     Luna(Luna),
     /// El Planeta Chapin: la camioneta extraurbana.
     Camioneta(Box<Camioneta>),
+    /// El Planeta Koch: Whack-a-Koch.
+    Koch(Box<Koch>),
     Mirador(Mirador),
     Historia(Historia),
     /// El menu principal (lo primero que se ve).
@@ -4141,6 +4370,35 @@ fn preparar(t: f32, resto: &[String]) -> (Juego, Escena) {
             let atras = (desde - m).normalize();
             juego.rastro = (0..50).rev().map(|k| desde + atras * (k as f32 * 0.35) + Vec3::new(0.0, 0.6 * (k as f32 * 0.3).sin(), 0.0)).collect();
         }
+        Some(modo) if modo.starts_with("anillos") => {
+            // `anillos`: el arranque. `anillos_juego` y `anillos_rapido`: jugando solo `t` segundos.
+            // `anillos_caido`: recien chocado (sin mover nada, el primer anillo lo tumba).
+            let mut a = Anillazo::new(11, 3120);
+            a.preparar_captura(modo);
+            let jugar = modo != "anillos_caido";
+            let mut ahora = 0.0;
+            while ahora < t && (jugar || a.jugando()) {
+                let e = if jugar { a.chofer() } else { Entrada::default() };
+                a.actualizar(&e, 1.0 / 60.0);
+                a.eventos.clear();
+                ahora += 1.0 / 60.0;
+            }
+            escena = Escena::Anillos(Box::new(a));
+        }
+        Some(modo) if modo.starts_with("koch") => {
+            // `koch`: la llegada. Los demas (ver `Koch::preparar_captura`) juegan solos `t` segundos.
+            let mut c = Koch::new(11, 14200);
+            c.preparar_captura(modo);
+            let jugar = !matches!(modo, "koch" | "koch_cartel" | "koch_final" | "koch_giro" | "koch_giro2" | "koch_toque");
+            let mut ahora = 0.0;
+            while ahora < t {
+                let e = if jugar { c.chofer() } else { Entrada::default() };
+                c.actualizar(&e, 1.0 / 60.0);
+                c.eventos.clear();
+                ahora += 1.0 / 60.0;
+            }
+            escena = Escena::Koch(Box::new(c));
+        }
         Some(modo) if modo.starts_with("camioneta") => {
             // `camioneta`: la llegada. `camioneta_juego`: a media ruta, con gente.
             let mut c = Camioneta::new(11);
@@ -4214,20 +4472,6 @@ fn preparar(t: f32, resto: &[String]) -> (Juego, Escena) {
                 ahora += 1.0 / 60.0;
             }
             escena = Escena::Mercurio(m);
-        }
-        Some("ritmo") => {
-            // Juega solo: aprieta cada nota justo a tiempo.
-            let mut r = Ritmo::new();
-            r.empezar(ritmo::Dificultad::Normal);
-            let notas = ritmo::notas_del_juego(r.dificultad);
-            let paso = 1.0 / 120.0;
-            let mut ahora = 0.0f32;
-            while ahora < t {
-                let toca = |aire: bool| notas.iter().any(|&(tn, a)| a == aire && tn > ahora && tn <= ahora + paso);
-                r.actualizar(&Entrada { piso: toca(false), aire: toca(true), ..Default::default() }, paso);
-                ahora += paso;
-            }
-            escena = Escena::Ritmo(r);
         }
         Some("concierto") => {
             let mut c = Concierto::new();
@@ -4631,14 +4875,12 @@ fn entrada_de_cine(auto: &str, t: f32, juego: &mut Juego, escena: &Escena) -> En
         }
         ("dialogo", _) => Entrada { aceptar: pulso(2.4, 1.2), ..Default::default() },
         ("camioneta", Escena::Camioneta(c)) => c.chofer(),
+        ("anillos", Escena::Anillos(a)) => a.chofer(),
+        ("koch", Escena::Koch(c)) => c.chofer(),
         ("parkour", Escena::Vegetta(v)) if v.en_parkour() => v.entrada_parkour(),
         ("tnt", Escena::Vegetta(_)) => Entrada { empuje: 1.0, girar: 0.55, disparando: true, ..Default::default() },
         ("mina", Escena::Vegetta(v)) if v.en_mina() => Entrada { picar: true, ..Default::default() },
         ("asteroides", Escena::Jupiter(_)) => Entrada { girar: (t * 0.7).sin(), cabecear: (t * 0.5).cos() * 0.6, disparando: true, ..Default::default() },
-        ("ritmo", Escena::Ritmo(r)) => {
-            let (piso, aire) = r.golpes_solos(1.0 / 30.0);
-            Entrada { piso, aire, ..Default::default() }
-        }
         _ => Entrada::default(),
     }
 }
@@ -4657,7 +4899,7 @@ fn avanzar_cine(escena: &mut Escena, juego: &mut Juego, e: &Entrada, dt: f32) {
         Escena::Urano(x) => { x.actualizar(e, dt); x.eventos.clear(); }
         Escena::Vegetta(x) => { x.actualizar(e, dt); x.eventos.clear(); }
         Escena::Concierto(x) => { x.actualizar(e, dt); }
-        Escena::Ritmo(x) => { x.actualizar(e, dt); x.eventos.clear(); }
+        Escena::Anillos(x) => { x.actualizar(e, dt); x.eventos.clear(); }
         Escena::Junta(x) => { x.actualizar(e, dt); x.eventos.clear(); }
         Escena::Cita(x) => { x.actualizar(e, dt); x.eventos.clear(); }
         Escena::Neptuno(x) => { x.actualizar(e, dt); x.eventos.clear(); }
@@ -4666,6 +4908,7 @@ fn avanzar_cine(escena: &mut Escena, juego: &mut Juego, e: &Entrada, dt: f32) {
         Escena::Jupiter(x) => { x.actualizar(e, dt); x.eventos.clear(); }
         Escena::Luna(x) => { x.actualizar(e, dt); x.eventos.clear(); }
         Escena::Camioneta(x) => { x.actualizar(e, dt); x.eventos.clear(); }
+        Escena::Koch(x) => { x.actualizar(e, dt); x.eventos.clear(); }
         Escena::Fuente(x) => { x.actualizar(e, dt); x.eventos.clear(); }
         _ => {}
     }
@@ -4843,20 +5086,6 @@ fn logros_de_escena(escena: &Escena) -> Vec<&'static str> {
             Final::Solo => "cita_solo",
             Final::Drama(_) => "cita_drama",
         }),
-        Escena::Ritmo(r) => {
-            if let Some((dificultad, nota, fallos)) = r.resultado() {
-                v.push("ritmo_termino");
-                if nota == "S" {
-                    v.push("ritmo_s");
-                }
-                if dificultad == ritmo::Dificultad::Dificil {
-                    v.push("ritmo_dificil");
-                }
-                if fallos == 0 {
-                    v.push("ritmo_sin_fallos");
-                }
-            }
-        }
         Escena::Neptuno(n) => {
             match n.ganador {
                 Some(neptuno::MIKU) => v.push("uno_gana"),
@@ -4922,6 +5151,41 @@ fn logros_de_escena(escena: &Escena) -> Vec<&'static str> {
                 v.push("camioneta_tumulos");
             }
         }
+        Escena::Anillos(a) => {
+            // (Los logros conservan su identificador viejo, para no perder lo que ya se tenia.)
+            if a.mejor_vivo >= 10.0 {
+                v.push("ritmo_termino");
+            }
+            if a.mejor_vivo >= 60.0 {
+                v.push("ritmo_dificil");
+            }
+            if a.mejor_vivo >= 70.0 {
+                v.push("ritmo_s");
+            }
+            if a.mejor_racha >= 10 {
+                v.push("ritmo_sin_fallos");
+            }
+        }
+        Escena::Koch(c) => {
+            if c.recursiones > 0 {
+                v.push("koch_recursion");
+            }
+            if c.partidas > 0 {
+                v.push("koch_juega");
+            }
+            if c.mejor_nota >= 61 {
+                v.push("koch_aprobo");
+            }
+            if c.mejor_nota >= 100 {
+                v.push("koch_100");
+            }
+            if c.caso_base {
+                v.push("koch_caso_base");
+            }
+            if c.aprobo_final && c.a_companeros == 0 {
+                v.push("koch_compa");
+            }
+        }
         Escena::Luna(l) if l.calificada() => {
             match l.aciertos() {
                 6 => v.push("luna_oscar"),
@@ -4965,17 +5229,6 @@ fn pago_de_escena(escena: &Escena) -> Option<(u32, String)> {
             };
             (n, format!("la cita de Marte: {que}"))
         }
-        Escena::Ritmo(r) => {
-            let (dificultad, nota, fallos) = r.resultado()?;
-            let base = match nota {
-                "S" => 50,
-                "A" => 38,
-                "B" => 26,
-                _ => 15,
-            };
-            let n = base * if dificultad == ritmo::Dificultad::Dificil { 3 } else { 2 } / 2 + if fallos == 0 { 10 } else { 0 };
-            (n, format!("Saturno Ritmo: nota {nota}"))
-        }
         Escena::Neptuno(n) => match n.ganador {
             Some(neptuno::MIKU) => (40, "¡le ganó a los héroes en cartas!".to_string()),
             Some(_) => (12, "las cartas de Neptuno (por participar)".to_string()),
@@ -4987,6 +5240,16 @@ fn pago_de_escena(escena: &Escena) -> Option<(u32, String)> {
         Escena::Divorcio(d) if d.terminado() => (15 + 8 * d.cuantos(divorcio::Destino::Saturno) as u32, "el divorcio de Venus".to_string()),
         Escena::Luna(l) if l.calificada() => (l.aciertos() as u32 * 7, format!("el set de la Luna: {} de 6", l.aciertos())),
         Escena::Camioneta(c) if c.partidas > 0 => (c.partidas * 5 + c.mejor_pasajeros + if c.llegadas > 0 { 15 } else { 0 }, format!("la camioneta: {} pasajeros a la capital", c.mejor_pasajeros)),
+        Escena::Anillos(a) if a.partidas > 0 => {
+            let base = match a.nota() {
+                "S" => 50,
+                "A" => 38,
+                "B" => 26,
+                _ => 15,
+            };
+            (base + a.mejor_racha.min(20), format!("¡Anillazo!: {:.1} segundos", a.mejor_vivo))
+        }
+        Escena::Koch(c) if c.partidas > 0 => (c.partidas * 5 + c.mejor_nota / 2 + if c.caso_base { 20 } else { 0 }, format!("Wack a Koch: nota {}", c.mejor_nota)),
         Escena::Vegetta(v) if v.terminadas > 0 => (v.terminadas * 5 + v.ganadas * 15, format!("el servidor de Vegetta: {} de {} ganados", v.ganadas, v.terminadas)),
         _ => return None,
     };
@@ -5012,7 +5275,7 @@ fn dibujar_escena_sin_trazo(fb: &mut Framebuffer, post: &mut Post, rec: &Recurso
         Escena::Urano(u) => dibujar_urano(fb, post, rec, u, &juego.opciones),
         Escena::Vegetta(v) => dibujar_vegetta(fb, post, rec, v, &juego.opciones),
         Escena::Concierto(c) => dibujar_concierto(fb, post, rec, c, &juego.opciones),
-        Escena::Ritmo(r) => dibujar_ritmo(fb, post, rec, r, &juego.opciones),
+        Escena::Anillos(a) => dibujar_anillos(fb, post, rec, a, &juego.opciones),
         Escena::Junta(j) => dibujar_junta(fb, post, rec, j, &juego.opciones),
         Escena::Cita(c) => dibujar_cita(fb, post, rec, c, &juego.opciones),
         Escena::Neptuno(n) => dibujar_neptuno(fb, post, rec, n, &juego.opciones),
@@ -5022,6 +5285,7 @@ fn dibujar_escena_sin_trazo(fb: &mut Framebuffer, post: &mut Post, rec: &Recurso
         Escena::Jupiter(j) => dibujar_jupiter(fb, post, rec, j, &juego.opciones),
         Escena::Luna(l) => dibujar_luna(fb, post, rec, l, &juego.opciones),
         Escena::Camioneta(c) => dibujar_camioneta(fb, post, rec, c, &juego.opciones),
+        Escena::Koch(c) => dibujar_koch(fb, post, rec, c, &juego.opciones),
         Escena::Mirador(m) => dibujar_mirador(fb, post, rec, m, &juego.opciones),
         Escena::Historia(h) => dibujar_historia(fb, post, rec, h, &juego.opciones),
         // Atras del menu principal, el sistema solar girando (con la camara dando vueltas a la Tierra).
@@ -5599,6 +5863,10 @@ fn main() {
         if pausa.is_some() || submenu.is_some() || menu_abierto {
             e = Entrada { hay_control: e.hay_control, control: e.control, ..Default::default() };
         }
+        // En Whack-a-Koch, Z X C son hoyos: no le cambian el modo de dibujo a nadie.
+        if matches!(escena, Escena::Koch(_)) {
+            e.culling = false;
+        }
         // La calidad: el tamano del framebuffer (rapida = menos pixeles que pintar).
         let (rw, rh) = if grabar.is_some() {
             GRABAR_RENDER
@@ -5623,7 +5891,7 @@ fn main() {
             }
             raton_atrapado = quiere_raton;
         }
-        let ocultar = !raton_atrapado && matches!(&escena, Escena::Urano(u) if u.jugando()) && pausa.is_none() && foto.is_none();
+        let ocultar = !raton_atrapado && (matches!(&escena, Escena::Urano(u) if u.jugando()) || matches!(&escena, Escena::Koch(c) if c.jugando()) || matches!(&escena, Escena::Anillos(a) if a.jugando())) && pausa.is_none() && foto.is_none();
         if ocultar != cursor_oculto {
             if ocultar {
                 rl.hide_cursor();
@@ -5856,6 +6124,7 @@ fn main() {
                     }
                     Some(HADA) => cambio = Some(Escena::Fuente(Fuente::new())),
                     Some(LUNA) => cambio = Some(Escena::Luna(Luna::new(semilla_del_reloj() ^ (juego.t * 1000.0) as u32))),
+                    Some(KOCH) => cambio = Some(Escena::Koch(Box::new(Koch::new(semilla_del_reloj() ^ (juego.t * 1000.0) as u32, prog.record_koch)))),
                     Some(CHAPIN) => cambio = Some(Escena::Camioneta(Box::new(Camioneta::new(semilla_del_reloj() ^ (juego.t * 1000.0) as u32)))),
                     Some(VENUS) => cambio = Some(Escena::Divorcio(Divorcio::new(semilla_del_reloj() ^ (juego.t * 1000.0) as u32))),
                     Some(JUPITER) => cambio = Some(Escena::Jupiter(Jupiter::new(semilla_del_reloj(), prog.record_jupiter))),
@@ -5929,7 +6198,7 @@ fn main() {
                         juego.despegar_de(SATURNO, "Despegue de Saturno. Fin del concierto. Nadie pidió otra, pero igual volvemos.".into());
                         cambio = Some(Escena::Espacio);
                     }
-                    Some(AccionConcierto::Jugar) => cambio = Some(Escena::Ritmo(Ritmo::new())),
+                    Some(AccionConcierto::Jugar) => cambio = Some(Escena::Anillos(Box::new(Anillazo::new(semilla_del_reloj(), prog.record_anillos)))),
                     None => {}
                 }
             }
@@ -6077,6 +6346,23 @@ fn main() {
                     tocar(ev);
                 }
             }
+            Escena::Koch(c) => {
+                juego.t += dt;
+                if let AccionKoch::Despegar = c.actualizar(&e, dt) {
+                    juego.despegar_de(KOCH, c.despedida());
+                    cambio = Some(Escena::Espacio);
+                }
+                prog.record_koch = prog.record_koch.max(c.record);
+                if let Some(s) = son {
+                    if std::mem::take(&mut c.musica_de_nuevo) {
+                        s.reiniciar(Pista::Koch);
+                    }
+                    s.ritmo(Pista::Koch, c.rapidez());
+                }
+                for ev in c.eventos.drain(..) {
+                    tocar(ev);
+                }
+            }
             Escena::Camioneta(c) => {
                 juego.t += dt;
                 if let AccionCamioneta::Despegar = c.actualizar(&e, dt) {
@@ -6215,26 +6501,30 @@ fn main() {
                     tocar(ev);
                 }
             }
-            Escena::Ritmo(r) => {
+            Escena::Anillos(a) => {
                 juego.t += dt;
-                match r.actualizar(&e, dt) {
-                    Accion::OtraVez => *r = r.otra_vez(),
-                    Accion::Despegar => {
-                        juego.despegar_de(SATURNO, "Despegue de Saturno. Los bichitos-nota se despiden. Algunos con rencor.".into());
-                        cambio = Some(Escena::Espacio);
-                    }
-                    Accion::Nada => {}
+                if let AccionAnillos::Despegar = a.actualizar(&e, dt) {
+                    juego.despegar_de(SATURNO, a.despedida());
+                    cambio = Some(Escena::Espacio);
                 }
-                // La cancion arranca desde cero justo cuando empieza la partida (las notas van con ella).
-                if std::mem::take(&mut r.empezar_cancion) {
-                    if let Some(s) = son {
-                        s.reiniciar(Pista::Cancion);
+                prog.record_anillos = prog.record_anillos.max(a.record);
+                // La cancion va con el juego: se acelera con cada nivel y se traba al chocar.
+                if let Some(s) = son {
+                    if std::mem::take(&mut a.musica_de_nuevo) {
+                        s.reiniciar(Pista::Anillos);
                     }
+                    s.ritmo(Pista::Anillos, if dt > 0.0 { a.rapidez() } else { 1.0 });
                 }
-                for ev in r.eventos.drain(..) {
+                for ev in a.eventos.drain(..) {
                     tocar(ev);
                 }
             }
+        }
+        if let Some(v) = vida_de_mut(&mut escena) {
+            if grabar.is_some() {
+                v.quitar_cartel();
+            }
+            v.actualizar(dt);
         }
         // El pasaporte: sellos al posarse, finales de cada escena, notas y logros de volar.
         let antes = (prog.logros.len(), prog.encargos_cumplidos);
@@ -6333,8 +6623,7 @@ fn main() {
             let (pista, bucle) = match &escena {
                 Escena::Intro(_) => (Some(Pista::Cancion), false),
                 // Mientras se elige la dificultad suena la musica tranquila; la cancion arranca al jugar.
-                Escena::Ritmo(r) if !r.jugando() => (Some(Pista::Espacio), true),
-                Escena::Ritmo(_) => (Some(Pista::Cancion), false),
+                Escena::Anillos(_) => (Some(Pista::Anillos), true),
                 Escena::Concierto(_) => (Some(Pista::Cancion), true),
                 Escena::Espacio => (Some(Pista::Espacio), true),
                 Escena::Entrega(_) | Escena::Aula(_) => (Some(Pista::Lofi), true),
@@ -6353,6 +6642,7 @@ fn main() {
                 // El juicio, tenso; en el veredicto ya suena la fiesta.
                 Escena::Luna(_) => (Some(Pista::Espacio), true),
                 Escena::Camioneta(_) => (Some(Pista::Marimba), true),
+                Escena::Koch(_) => (Some(Pista::Koch), true),
                 // En el Mirador, el arpa tranquila (como junto a una fogata); la historia, con la musica del espacio.
                 Escena::Mirador(_) => (Some(Pista::Fuente), true),
                 Escena::Historia(_) => (Some(Pista::Espacio), true),
@@ -6409,14 +6699,22 @@ fn main() {
         let mut d = rl.begin_drawing(&thread);
         d.clear_background(Color::BLACK);
         let imagen = rect_imagen(ancho, alto);
+        // La sacudida de pantalla: la imagen se corre, un poquito mas grande para no enseñar orillas.
+        let vida_actual = vida_de(&escena);
+        let (corre_x, corre_y) = vida_actual.map_or((0.0, 0.0), |v| v.corrimiento(imagen.height));
+        let margen = corre_x.abs().max(corre_y.abs());
         d.draw_texture_pro(
             &textura,
             Rectangle::new(0.0, 0.0, fb.ancho as f32, fb.alto as f32),
-            imagen,
+            Rectangle::new(imagen.x + corre_x - margen, imagen.y + corre_y - margen, imagen.width + margen * 2.0, imagen.height + margen * 2.0),
             Vector2::zero(),
             0.0,
             Color::WHITE,
         );
+        // Los letreros gigantes y el confeti (la interfaz de cada minijuego va encima).
+        if let Some(v) = vida_actual {
+            v.dibujar(&mut d, imagen);
+        }
         // La caja de dialogo de GLADAS avisa (en `ui`) donde va su retrato.
         ui::reiniciar_retrato();
         ui::reiniciar_registro();
@@ -6499,10 +6797,6 @@ fn main() {
                 let ia = dialogo_ia.mostrar(c.comentario(), Voz::Ia, dt, son);
                 c.dibujar_ui(&mut d, &e, ia, ancho, alto);
             }
-            Escena::Ritmo(r) => {
-                let ia = dialogo_ia.mostrar(r.ia(), Voz::Ia, dt, son);
-                r.dibujar_ui(&mut d, &e, ia, ancho, alto);
-            }
             Escena::Junta(j) => {
                 let (texto, voz) = j.hablante().map_or(("", Voz::Ia), |(_, t, v)| (t, v));
                 let visible = dialogo_ia.mostrar(texto, voz, dt, son);
@@ -6542,6 +6836,12 @@ fn main() {
                     ui::caja_dialogo(&mut d, nombre, ui::LILA, visible, (ancho - w) / 2, alto - alto_caja - 20, w);
                 }
                 h.dibujar_ui(&mut d, &e, ancho, alto);
+            }
+            Escena::Anillos(a) => a.dibujar_ui(&mut d, &e, imagen, ancho, alto),
+            Escena::Koch(c) => {
+                let (texto, voz) = c.hablante().map_or((String::new(), Voz::Profe), |(_, t, v)| (t, v));
+                let visible = dialogo_ia.mostrar(&texto, voz, dt, son);
+                c.dibujar_ui(&mut d, &e, visible, imagen, ancho, alto);
             }
             Escena::Camioneta(c) => {
                 let (texto, voz) = c.hablante().map_or((String::new(), Voz::Ia), |(_, t, v)| (t, v));
@@ -6780,14 +7080,12 @@ fn entrada_grabada(g: &grabacion::Grabacion, juego: &mut Juego, escena: &Escena)
         (Auto::Orbita, Escena::Espacio) => Entrada { empuje: 0.6, ..Default::default() },
         (Auto::Dialogo, _) => Entrada { aceptar: g.pulso(2.4, 1.2), ..Default::default() },
         (Auto::Camioneta, Escena::Camioneta(c)) => c.chofer(),
+        (Auto::Koch, Escena::Koch(c)) => c.chofer(),
+        (Auto::Anillos, Escena::Anillos(a)) => a.chofer(),
         (Auto::Parkour, Escena::Vegetta(v)) if v.en_parkour() => v.entrada_parkour(),
         (Auto::Tnt, Escena::Vegetta(_)) => Entrada { empuje: 1.0, girar: 0.55, disparando: true, ..Default::default() },
         (Auto::Mina, Escena::Vegetta(v)) if v.en_mina() => Entrada { picar: true, ..Default::default() },
         (Auto::Asteroides, Escena::Jupiter(_)) => Entrada { girar: (t * 0.7).sin(), cabecear: (t * 0.5).cos() * 0.6, disparando: true, ..Default::default() },
-        (Auto::Ritmo, Escena::Ritmo(r)) => {
-            let (piso, aire) = r.golpes_solos(grabacion::DT);
-            Entrada { piso, aire, ..Default::default() }
-        }
         (Auto::Abajo, _) => Entrada { abajo: g.pulso(0.9, 0.6), ..Default::default() },
         (Auto::Derecha, _) => Entrada { derecha: g.pulso(0.8, 0.6), ..Default::default() },
         _ => Entrada::default(),
@@ -7617,13 +7915,6 @@ mod pruebas {
         let pista = cancion::sintetizar();
         assert!(pista.len() as f32 >= cancion::DURACION * cancion::FRECUENCIA as f32);
         assert!(pista.iter().all(|m| m.is_finite() && m.abs() <= 1.0));
-        let notas = cancion::notas();
-        assert!(notas.len() > 40);
-        for (t, _) in notas {
-            let corcheas = t / cancion::CORCHEA;
-            assert!((corcheas - corcheas.round()).abs() < 1e-3);
-            assert!(t >= 4.0, "las notas empiezan despues de la cuenta regresiva");
-        }
     }
 
     /// El dialogo muestra el texto de a poco, sin partir letras con tilde.
@@ -7637,21 +7928,6 @@ mod pruebas {
         assert_eq!(b, texto);
     }
 
-    /// Jugando perfecto, Saturno Ritmo da nota S y ningun fallo.
-    #[test]
-    fn jugar_perfecto_da_nota_s() {
-        let mut r = Ritmo::new();
-        r.empezar(ritmo::Dificultad::Dificil);
-        let notas = ritmo::notas_del_juego(r.dificultad);
-        let paso = 1.0 / 240.0;
-        let mut ahora = 0.0f32;
-        while ahora < cancion::DURACION + 1.0 {
-            let toca = |aire: bool| notas.iter().any(|&(tn, a)| a == aire && tn > ahora && tn <= ahora + paso);
-            r.actualizar(&Entrada { piso: toca(false), aire: toca(true), ..Default::default() }, paso);
-            ahora += paso;
-        }
-        assert!(r.ia().starts_with("Nota S"), "{}", r.ia());
-    }
 }
 
 #[cfg(test)]
@@ -7786,7 +8062,7 @@ mod estres {
     estres!(urano, Urano::new);
     estres!(vegetta, |s| Vegetta::new(s, None));
     estres!(jupiter, |s| Jupiter::new(s, 0));
-    estres!(ritmo, |_| Ritmo::new());
+    estres!(anillos, |_| Anillazo::new(5, 0));
     estres!(divorcio, Divorcio::new);
     estres!(mercurio, Mercurio::new);
     estres!(luna, Luna::new);

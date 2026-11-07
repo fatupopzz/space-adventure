@@ -19,6 +19,7 @@
 //! cuenta datos de Jupiter entre oleadas. Las lunas que se atrapan se guardan en
 //! la mochila (en el espacio dan turbo, escudo, iman y cometa).
 
+use crate::vida::{Tam, Tono, Vida};
 use crate::entrada::Entrada;
 use crate::matematica::{Mat4, Vec3};
 use crate::sonido::Efecto;
@@ -183,6 +184,8 @@ pub struct Jupiter {
     pub destello: f32,
     pub rojo: f32,
     pub cobrado: bool,
+    /// Los letreros gigantes, el confeti y las sacudidas (ver vida.rs).
+    pub vida: Vida,
     pub eventos: Vec<Efecto>,
 }
 
@@ -225,6 +228,7 @@ impl Jupiter {
             destello: 0.0,
             rojo: 0.0,
             cobrado: false,
+            vida: Vida::new("ASTEROIDES", "Júpiter. Dispare a todo menos a la ciencia.", Tono::Oro),
             eventos: Vec::new(),
         }
     }
@@ -298,8 +302,11 @@ impl Jupiter {
             let vida = 30 + self.oleada * 5;
             self.mancha = Some(Mancha { pos: Vec3::new(0.0, 2.0, -95.0), vida, vida_max: vida, t: 0.0, escupe: 2.0, golpe: 0.0 });
             self.decir(JEFE[0]);
+            self.vida.desastre("¡LA MANCHA ROJA!", "Se despertó, y viene enojada");
             self.eventos.push(Efecto::Alarma);
         } else if self.oleada > 1 {
+            let texto = format!("OLEADA {}", self.oleada);
+            self.vida.grito(&texto, Tono::Cian, Tam::Grande);
             let d = DATOS_JUPITER[self.dato % DATOS_JUPITER.len()];
             self.dato += 1;
             self.decir(d);
@@ -324,6 +331,10 @@ impl Jupiter {
         self.puntos += pts;
         self.combo += 1;
         self.desde_golpe = 0.0;
+        if self.combo % 5 == 0 && multi >= 2 {
+            let texto = format!("¡COMBO × {multi}!");
+            self.vida.grito(&texto, Tono::Oro, Tam::Medio);
+        }
         self.letreros.push(Letrero { pos: r.pos, texto: if multi > 1 { format!("+{pts} x{multi}") } else { format!("+{pts}") }, vida: 0.9 });
         let color = match r.clase {
             Clase::Roja => [1.0, 0.45, 0.1],
@@ -336,6 +347,8 @@ impl Jupiter {
         if r.clase == Clase::Dorada {
             self.dorados += 1;
             self.pide_dato = true;
+            self.vida.grito("¡ROCA DORADA!", Tono::Oro, Tam::Medio);
+            self.vida.confeti(25, Tono::Oro);
             self.eventos.push(Efecto::Sello);
         }
         if r.tam < 2 && r.clase != Clase::Dorada {
@@ -350,6 +363,8 @@ impl Jupiter {
         if r.clase == Clase::Roja {
             self.explotar(r.pos, 40, [1.0, 0.5, 0.1], 16.0);
             self.destello = self.destello.max(0.3);
+            self.vida.grito("¡BOOM!", Tono::Rojo, Tam::Grande);
+            self.vida.golpe(0.45, Tono::Rojo);
             self.eventos.push(Efecto::Fuego);
             let mut k = 0;
             while k < self.rocas.len() {
@@ -545,6 +560,7 @@ impl Jupiter {
                 self.destello = 1.0;
                 self.sacudida = 1.0;
                 self.decir(JEFE[1]);
+                self.vida.exito("¡TORMENTA CALMADA!", "+2500", Tono::Oro);
                 self.eventos.push(Efecto::Perfecto);
                 self.tiempo_oleada = OLEADA;
             }
@@ -563,6 +579,8 @@ impl Jupiter {
                 let pos = self.nave + Vec3::new(0.0, 1.5, -12.0);
                 self.letreros.push(Letrero { pos, texto: format!("¡{}! {}", LUNAS[cual].to_uppercase(), LUNAS_QUE_HACEN[cual]), vida: 1.8 });
                 self.destello = self.destello.max(0.25);
+                let luna = format!("¡{}!", LUNAS[cual].to_uppercase());
+                self.vida.grito(&luna, Tono::Cian, Tam::Grande);
                 self.eventos.push(Efecto::Sello);
             } else if self.lunas[l].pos.z > 5.0 {
                 self.lunas.remove(l);
@@ -589,9 +607,11 @@ impl Jupiter {
                     self.escudo -= GOLPE * if r.clase == Clase::Roja { 1.6 } else { 1.0 } * if r.tam == 2 { 0.6 } else { 1.0 };
                     self.sacudida = 1.0;
                     self.rojo = 1.0;
+                    self.vida.grito("¡AUCH!", Tono::Rojo, Tam::Medio);
                     self.eventos.push(Efecto::Choque);
                     if self.escudo <= 0.0 {
                         self.escudo = 0.0;
+                        self.vida.desastre("¡NAVE DESTRUIDA!", "La ciencia no perdona");
                         self.fase = Fase::Choque(0.0);
                         let pos = self.nave + Vec3::new(0.0, 0.0, -4.0);
                         self.explotar(pos, 90, [1.0, 0.5, 0.8], 20.0);

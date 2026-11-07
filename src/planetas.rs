@@ -677,8 +677,125 @@ fn hongos(vx: &mut Voxels, _hd: bool) {
     }
 }
 
+// El Planeta Koch: el contorno de un copo de nieve de Koch (iteracion 3), de verdad.
+const MAT_KOCH: &[Mat] = &[
+    ("violeta", [0.24, 0.13, 0.46], None, 1.0),
+    ("lila", [0.47, 0.28, 0.80], None, 1.0),
+    ("lila_b", [0.60, 0.40, 0.92], None, 1.0),
+    ("hielo", [0.52, 0.74, 0.98], Some([0.04, 0.08, 0.14]), 1.0),
+    ("tiza", [0.86, 0.92, 1.0], Some([0.08, 0.10, 0.14]), 1.0),
+    ("hoyo", [0.03, 0.01, 0.07], None, 1.0),
+    ("neon", [1.0, 0.36, 0.84], Some([0.95, 0.30, 0.78]), 1.0),
+    ("madera", [0.54, 0.34, 0.20], None, 1.0),
+    ("mazo", [0.95, 0.27, 0.58], Some([0.12, 0.03, 0.07]), 1.0),
+    ("oro", [1.0, 0.80, 0.26], Some([0.25, 0.18, 0.04]), 1.0),
+];
+
+/// Lo mas que sube el copo sobre la esfera.
+const ALTO_COPO: f32 = 0.6;
+
+/// Que tanto llega el copo en cada angulo: 0 en lo mas hondo de sus entradas, 1 en las puntas.
+/// Se saca una vez, lanzando un rayo desde el centro contra el contorno.
+fn copo(angulo: f32) -> f32 {
+    const N: usize = 1440;
+    static TABLA: OnceLock<Vec<f32>> = OnceLock::new();
+    let t = TABLA.get_or_init(|| {
+        let p = crate::koch::copo_de_koch(3);
+        (0..N)
+            .map(|k| {
+                let a = k as f32 / N as f32 * 2.0 * PI;
+                let (dx, dy) = (a.cos(), a.sin());
+                let mut r = 0.0f32;
+                for i in 0..p.len() {
+                    let (q, w) = (p[i], p[(i + 1) % p.len()]);
+                    let (ex, ey) = (w[0] - q[0], w[1] - q[1]);
+                    let div = dx * ey - dy * ex;
+                    if div.abs() < 1e-6 {
+                        continue;
+                    }
+                    let s = (q[0] * ey - q[1] * ex) / div;
+                    let u = (q[0] * dy - q[1] * dx) / div;
+                    if s > 0.0 && (0.0..=1.0).contains(&u) {
+                        r = r.max(s);
+                    }
+                }
+                ((r - 0.577) / 0.423).clamp(0.0, 1.0)
+            })
+            .collect()
+    });
+    t[((angulo.rem_euclid(2.0 * PI) / (2.0 * PI)) * N as f32) as usize % N]
+}
+
+/// Los hoyos del planeta: repartidos parejo (Fibonacci), lejos de los polos. Devuelve que tan cerca
+/// esta `d` del hoyo mas cercano, en coseno.
+fn cerca_de_un_hoyo(d: Vec3) -> f32 {
+    const CUANTOS: usize = 16;
+    let mut mejor = -1.0f32;
+    for k in 0..CUANTOS {
+        // Arriba o abajo de la placa del ecuador, nunca encima de ella.
+        let y = (0.32 + 0.5 * ((k / 2) as f32 + 0.5) / (CUANTOS / 2) as f32) * if k % 2 == 0 { 1.0 } else { -1.0 };
+        let r = (1.0 - y * y).sqrt();
+        let a = k as f32 * 2.399_963;
+        mejor = mejor.max(d.dot(Vec3::new(r * a.cos(), y, r * a.sin())));
+    }
+    mejor
+}
+
+const COS_HOYO: f32 = 0.985;
+const COS_ARO: f32 = 0.972;
+
+fn forma_koch(d: Vec3) -> f32 {
+    let cerca = cerca_de_un_hoyo(d);
+    if cerca > COS_HOYO {
+        return -0.06;
+    }
+    // Una placa con el contorno del copo alrededor del ecuador (como un anillo, pero solida): se
+    // entiende de lejos y desde casi cualquier lado. Su filo corta derecho, como de bloque.
+    let grosor = 1.0 - paso_suave(0.11, 0.17, d.y.abs());
+    let copos = (ALTO_COPO * copo(d.z.atan2(d.x)) + 0.05) * grosor;
+    if cerca > COS_ARO {
+        // El aro de neon del hoyo sale parejo.
+        return 0.03;
+    }
+    copos
+}
+
+fn color_koch(p: Vec3) -> &'static str {
+    let r = p.length().max(1e-6);
+    let d = p * (1.0 / r);
+    let cerca = cerca_de_un_hoyo(d);
+    if cerca > COS_HOYO {
+        "hoyo"
+    } else if cerca > COS_ARO {
+        "neon"
+    } else if r > 1.5 {
+        "tiza"
+    } else if r > 1.3 {
+        "hielo"
+    } else if r > 1.04 {
+        "lila_b"
+    } else if mancha(d, 2.3, 4.0) > 0.1 {
+        "lila"
+    } else {
+        "violeta"
+    }
+}
+
+/// El mazo gigante clavado en el polo: de lejos ya se entiende de que va este planeta.
+fn mazo_gigante(vx: &mut Voxels, _hd: bool) {
+    // El mango, un poquito de lado, en escalones.
+    for k in 0..5 {
+        let (x, y) = (k as f32 * 0.035, 0.92 + k as f32 * 0.095);
+        vx.caja("mazo_mango", "madera", x - 0.055, x + 0.055, y, y + 0.1, -0.055, 0.055);
+    }
+    let (cx, y0) = (0.17, 1.38);
+    vx.caja("mazo", "mazo", cx - 0.28, cx + 0.28, y0, y0 + 0.24, -0.13, 0.13);
+    vx.caja("mazo_punta", "oro", cx - 0.34, cx - 0.26, y0 - 0.02, y0 + 0.26, -0.15, 0.15);
+    vx.caja("mazo_punta", "oro", cx + 0.26, cx + 0.34, y0 - 0.02, y0 + 0.26, -0.15, 0.15);
+}
+
 /// Todas las recetas (Saturno y Planeta Vegetta tienen su propia funcion; el Chapin, su modulo).
-const RECETAS: [Receta; 11] = [
+const RECETAS: [Receta; 12] = [
     Receta { archivo: "sol", diametro: 16, materiales: MAT_SOL, color: color_sol, forma: sin_forma, ruido: (0.05, 3.0, 3, 11), calma: sin_calma, extra: Some(prominencias) },
     Receta { archivo: "mercurio", diametro: 16, materiales: MAT_MERCURIO, color: color_mercurio, forma: forma_mercurio, ruido: (0.05, 3.2, 4, 12), calma: sin_calma, extra: None },
     Receta { archivo: "venus", diametro: 16, materiales: MAT_VENUS, color: color_venus, forma: sin_forma, ruido: (0.035, 2.2, 3, 13), calma: sin_calma, extra: None },
@@ -690,6 +807,7 @@ const RECETAS: [Receta; 11] = [
     Receta { archivo: "neptuno", diametro: 16, materiales: MAT_NEPTUNO, color: color_neptuno, forma: sin_forma, ruido: (0.04, 2.4, 3, 20), calma: calma_cara, extra: None },
     Receta { archivo: "pluton", diametro: 18, materiales: MAT_PLUTON, color: color_pluton, forma: sin_forma, ruido: (0.07, 3.0, 4, 21), calma: calma_pluton, extra: None },
     Receta { archivo: "hada", diametro: 16, materiales: MAT_HADA, color: color_hada, forma: forma_hada, ruido: (0.035, 3.0, 3, 22), calma: calma_hada, extra: Some(hongos) },
+    Receta { archivo: "koch", diametro: 22, materiales: MAT_KOCH, color: color_koch, forma: forma_koch, ruido: (0.035, 3.4, 3, 24), calma: sin_calma, extra: Some(mazo_gigante) },
 ];
 
 /// Saturno (radio 2) y Planeta Vegetta, que no son esferas de radio 1 como los demas.
@@ -722,7 +840,8 @@ impl Receta {
         // Hasta donde puede llegar el relieve (lo propio mas el ruido), y desde donde para adentro
         // todo es solido (ahi ni se pregunta).
         let k = ajuste.relieve.max(0.0);
-        let alcance = 1.0 + (0.16 + self.ruido.0 * 1.6) * k.max(1.0) + u;
+        let propio = if self.archivo == "koch" { ALTO_COPO } else { 0.16 };
+        let alcance = 1.0 + (propio + self.ruido.0 * 1.6) * k.max(1.0) + u;
         let adentro = 1.0 - (0.07 + self.ruido.0 * 1.6) * k.max(1.0) - u;
         let n = (alcance / u).ceil() as i32 + 1;
         for i in -n..n {

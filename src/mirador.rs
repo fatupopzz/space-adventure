@@ -52,7 +52,7 @@ const fn entrada(titulo: &'static str, abre: &'static str, pista: &'static str, 
     Entrada_ { titulo, texto, abre, pista }
 }
 
-const BITACORA: [Entrada_; 18] = [
+const BITACORA: [Entrada_; 19] = [
     entrada("Día 1: el despegue", "", "", "Me encendieron en la nave: una idol alienígena que es su propia cabeza gigante. Mi primera orden fue «canta». No sé cantar. Me puse a narrar. Aquí seguimos."),
     entrada("Un sistema solar de juguete", "", "", "Este sistema solar está a escala de juguete: si fuera de verdad, Neptuno quedaría a cuatro horas luz y la Tierra sería un pixel. Lo que sí se respeta: el orden, quién es más grande y Kepler. Kepler no negocia."),
     entrada("El Mirador", "", "", "Estamos en el punto L2: aquí la gravedad del Sol y la de la Tierra se empatan. Aquí vive el telescopio James Webb. Lo saludo cada vez. No contesta: está ocupado viendo el principio del tiempo."),
@@ -68,6 +68,7 @@ const BITACORA: [Entrada_; 18] = [
     entrada("Plutón no se rinde", "sello_pluton", "Aterrice en Plutón.", "Plutón dejó de ser planeta en 2006. Desde entonces convoca juntas para que lo devuelvan. El consejo vota cada vez, y cada vez sale distinto. Plutón no se rinde. Le tengo respeto."),
     entrada("La Fuente de las Hadas", "sello_hada", "Aterrice en el Planeta Hada.", "El Planeta Hada tiene un portal al Proyecto 2: una fuente que alguien programó hace un semestre. Nadie la borró. Ahí sigue, flotando. Como todo lo que uno entrega a las 11:59."),
     entrada("El planeta cúbico", "sello_planeta_vegetta", "Aterrice en Planeta Vegetta.", "Una isla de bloques flotando en el espacio, con tres portales: parkour, TNT Run y minería. Dos youtubers la construyeron bloque por bloque. Willyrex jura que la próxima la gana. Willyrex jura muchas cosas."),
+    entrada("Wack a Koch", "sello_koch", "Aterrice en el Planeta Koch.", "El profe Koch propuso este planeta en persona, y hay que reconocerle el valor. Desde el polo se ve como el copo de nieve de Koch: perímetro infinito, área finita, y eso que el copo no es de él. El profe dice que es de él."),
     entrada("Los cometas", "cometa", "Atrape un cometa.", "Un cometa es una bola de hielo sucio de 4,600 millones de años. Cuando se acerca al Sol le sale la cola. A mí también: cuando nos acercamos al Sol, me sale humo."),
     entrada("Las notas", "notas_100", "Recoja 100 notas.", "Las notas flotan en el espacio desde el primer concierto de Miku. Nadie las había recogido. Hasta usted. Son el idioma del universo. O basura espacial muy afinada."),
     entrada("GLADAS", "todos_los_sellos", "Llene el pasaporte (los doce sellos).", "Mi nombre sí es una sigla: Guía Lógica Autónoma De Aventuras Siderales. Me la inventé yo; sonaba mejor que «la voz de la nave». Gracias por llenar el pasaporte. Por primera vez desde que me encendieron, no estoy aburrida."),

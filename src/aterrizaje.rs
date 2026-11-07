@@ -127,6 +127,7 @@ fn guion(planeta: usize) -> Guion {
         "neptuno" => g("NEPTUNO", "Noche de cartas. Vientos de 2,000 km/h.", [0.4, 0.6, 1.0], 0.7, 0.6),
         "pluton" => g("PLUTÓN", "Planeta. (En disputa.)", [0.95, 0.8, 0.65], -0.5, 0.4),
         "hada" => g("PLANETA HADA", "Proyecto 2: la Gran Fuente de las Hadas.", [1.0, 0.55, 0.9], 0.6, 0.7),
+        "koch" => g("PLANETA KOCH", "Idea del profe. Se califica.", [1.0, 0.45, 0.85], -0.4, 0.8),
         "chapin" => g("PLANETA CHAPÍN", "Terminal de buses. Destino: la capital. ¡Hay campo!", [0.55, 0.85, 1.0], 0.4, 0.6),
         _ => g("", "", [1.0, 0.6, 0.7], 0.5, 0.6),
     }
@@ -136,6 +137,7 @@ fn guion(planeta: usize) -> Guion {
 pub fn dato(planeta: usize) -> &'static str {
     match CUERPOS[planeta].archivo {
         "mercurio" => "Mercurio. Hay una carpa de tarot y la adivina es el planeta. Dice que está en retrógrado. Dice que siempre está en retrógrado.",
+        "koch" => "Planeta Koch. Desde el polo se ve como un copo de nieve fractal. Tiene hoyos, un mazo clavado y una máquina de arcade. El profe dice que todo fue idea suya. Detecto que es cierto.",
         "chapin" => "Planeta Chapín. Arena negra, ceibas, volcanes que echan lava y Tikal entre la selva. Huele a café y a shuco. El Volcán de Fuego saluda: lo hace cada quince minutos.",
         "venus" => "Venus, el planeta del amor. Por eso aquí está el juzgado de divorcios. Gira al revés, como los matrimonios. Saturno nos está esperando.",
         "tierra" => "La Tierra. Detectamos la UVG. Las luces parpadean. Se oye una regla. Nadie estudió.",

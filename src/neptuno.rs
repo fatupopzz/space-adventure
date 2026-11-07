@@ -22,6 +22,7 @@
 //! por la hipoteca; el Slayer se va y Canela juega sus cartas hasta que
 //! regresa. O Plutón llega rodando a pedir que lo dejen jugar.
 
+use crate::vida::{Tam, Tono, Vida};
 use crate::entrada::Entrada;
 use crate::matematica::{Mat4, Vec3};
 use crate::sonido::{Efecto, Voz};
@@ -288,7 +289,6 @@ pub struct Neptuno {
     /// El Comodin que se volteo al repartir: el primero en jugar escoge el color.
     color_libre: bool,
     /// El letrero grande de la jugada (+4, SALTA, etc.): texto, color y segundos que lleva.
-    anuncio: Option<(String, Color, f32)>,
     /// Apagarlo en pruebas: los bots nunca retan.
     pub bots_retan: bool,
     /// La carta comodin que Miku esta por jugar, mientras elige el color.
@@ -330,6 +330,8 @@ pub struct Neptuno {
     semilla: u32,
     /// Para las pruebas y las capturas: Miku juega sola, como un bot.
     pub miku_automatica: bool,
+    /// Los letreros gigantes, el confeti y las sacudidas (ver vida.rs).
+    pub vida: Vida,
     pub eventos: Vec<Efecto>,
 }
 
@@ -352,7 +354,6 @@ impl Neptuno {
             reto: None,
             cursor_reto: 0,
             color_libre: false,
-            anuncio: None,
             bots_retan: true,
             eligiendo: None,
             cursor_color: 0,
@@ -380,6 +381,7 @@ impl Neptuno {
             vuelos: Vec::new(),
             semilla: semilla | 1,
             miku_automatica: false,
+            vida: Vida::sin_cartel(),
             eventos: Vec::new(),
         };
         n.repartir();
@@ -426,7 +428,6 @@ impl Neptuno {
         self.robando = false;
         self.reto = None;
         self.color_libre = false;
-        self.anuncio = None;
         self.eligiendo = None;
         self.grito = false;
         self.pendiente = None;
@@ -471,7 +472,10 @@ impl Neptuno {
     }
 
     fn anunciar(&mut self, texto: impl Into<String>, color: Color) {
-        self.anuncio = Some((texto.into(), color, 0.0));
+        let texto = texto.into();
+        let tono = Tono::de_color(color);
+        self.vida.grito(&texto, tono, Tam::Grande);
+        self.vida.golpe(0.25, tono);
     }
 
     /// La mano de Miku ordenada por color y numero, para que sea facil de leer.
@@ -708,6 +712,8 @@ impl Neptuno {
 
     fn gritar(&mut self, j: usize) {
         self.desde_grito = 0.0;
+        self.vida.grito("¡NEPTUNO!", Tono::Cian, if j == MIKU { Tam::Enorme } else { Tam::Grande });
+        self.vida.golpe(if j == MIKU { 0.55 } else { 0.3 }, Tono::Cian);
         self.eventos.push(Efecto::Perfecto);
         let (que, voz) = match j {
             MIKU => ("¡NEPTUNO!", Voz::Miku),
@@ -737,6 +743,12 @@ impl Neptuno {
         self.pendiente = None;
         self.fase = Fase::Fin;
         self.t = 0.0;
+        if j == MIKU {
+            self.vida.exito("¡GANÓ MIKU!", "Tres héroes en la lona", Tono::Oro);
+        } else {
+            let texto = format!("¡GANÓ {}!", self.nombre(j).to_uppercase());
+            self.vida.desastre(&texto, "Hay revancha");
+        }
         self.eventos.push(if j == MIKU { Efecto::Fuego } else { Efecto::Fallo });
         let (quien, que, voz) = match j {
             MIKU => (NEPTUNO, "¡GANÓ MIKU! Le ganó a tres héroes de videojuego con cartas de colores. Esto va directo a mi noticiero.", Voz::Neptuno),
@@ -834,12 +846,6 @@ impl Neptuno {
             self.eventos.push(Efecto::Carta);
         }
         self.vuelos.retain(|v| v.t < v.dura);
-        if let Some(a) = &mut self.anuncio {
-            a.2 += dt;
-            if a.2 > 1.5 {
-                self.anuncio = None;
-            }
-        }
         // Si ya no le queda una sola (le tiraron un +2), ya no hay nada que gritar.
         if self.manos[MIKU].len() != 1 {
             self.pendiente = None;
@@ -1034,7 +1040,6 @@ impl Neptuno {
         self.turno = CLOUD;
         self.manos[CLOUD].insert(0, Carta { tinte: None, valor: Valor::Mas4 });
         self.jugar(CLOUD, 0, Some(Tinte::Azul));
-        self.anuncio = None;
     }
 
     /// Si en esta partida ya vinieron Canela y Pluton.
@@ -1374,14 +1379,6 @@ impl Neptuno {
         }
         if self.desde_rafaga < 1.6 {
             centrado(d, "¡RÁFAGA!", alto / 2 - 40, 64, Color::new(200, 235, 255, 255));
-        }
-        // El letrero de la jugada: entra grande y se va apagando.
-        if let Some((s, c, t)) = &self.anuncio {
-            let entra = (*t / 0.12).min(1.0);
-            let a = ((1.5 - *t) / 0.4).clamp(0.0, 1.0);
-            let tam = (64.0 + 44.0 * (1.0 - entra)) as i32;
-            let color = Color::new(c.r, c.g, c.b, (a * 255.0) as u8);
-            ui::titulo_de(d, s, (ancho - ui::medir_titulo(s, tam)) / 2, alto / 2 - 150, tam, color);
         }
         // El mazo y la mano de Miku, para contar.
         let cuenta = format!("MAZO {}   ·   TU MANO {}", self.mazo.len(), self.manos[MIKU].len());

@@ -89,6 +89,8 @@ pub struct Entrada {
     pub derecha: bool,
     /// Respuesta elegida con el teclado (1 a 4), contando desde 0.
     pub respuesta: Option<usize>,
+    /// Whack-a-Koch: el hoyo que se pego directo con el teclado (Q W E / A S D / Z X C).
+    pub celda: Option<usize>,
     /// Modo de dibujo o vista pedido con el teclado (1 a 7), contando desde 0.
     pub modo: Option<usize>,
     pub siguiente_modo: bool,
@@ -198,6 +200,7 @@ impl Entrada {
             izquierda: pulsada(KEY_LEFT),
             derecha: pulsada(KEY_RIGHT),
             respuesta: numero(&[KEY_ONE, KEY_TWO, KEY_THREE, KEY_FOUR]),
+            celda: numero(&[KEY_Q, KEY_W, KEY_E, KEY_A, KEY_S, KEY_D, KEY_Z, KEY_X, KEY_C]),
             modo: numero(&[KEY_ONE, KEY_TWO, KEY_THREE, KEY_FOUR, KEY_FIVE, KEY_SIX, KEY_SEVEN]),
             siguiente_modo: false,
             culling: pulsada(KEY_C),

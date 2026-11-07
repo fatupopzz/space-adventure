@@ -15,6 +15,7 @@
 //!
 //! Tercera persona. Los bloques miden 1: el bloque (x, y, z) ocupa de (x, y, z) a (x+1, y+1, z+1).
 
+use crate::vida::{Tam, Tono, Vida};
 use crate::entrada::Entrada;
 use crate::matematica::{Mat4, Vec3};
 use crate::obj::{Modelo, Textura};
@@ -776,7 +777,8 @@ pub struct Vegetta {
     pub ganadas: u32,
     camara: (Vec3, Vec3),
     mensaje: Option<(&'static str, String, Voz, f32)>,
-    letrero: Option<(String, f32)>,
+    /// Los letreros gigantes, el confeti y las sacudidas (ver vida.rs).
+    pub vida: Vida,
     pub eventos: Vec<Efecto>,
 }
 
@@ -823,7 +825,7 @@ impl Vegetta {
             ganadas: 0,
             camara: (pos + Vec3::new(0.0, 2.5, -4.5), pos),
             mensaje: None,
-            letrero: None,
+            vida: Vida::sin_cartel(),
             eventos: Vec::new(),
         };
         let (q, t, voz) = LLEGADA[0];
@@ -842,7 +844,8 @@ impl Vegetta {
     }
 
     fn anunciar(&mut self, s: &str) {
-        self.letrero = Some((s.to_string(), 0.0));
+        self.vida.grito(s, Tono::Oro, Tam::Grande);
+        self.vida.golpe(0.2, Tono::Oro);
     }
 
     fn cambiar(&mut self, f: Fase) {
@@ -928,12 +931,6 @@ impl Vegetta {
             m.3 -= dt;
             if m.3 <= 0.0 {
                 self.mensaje = None;
-            }
-        }
-        if let Some(l) = &mut self.letrero {
-            l.1 += dt;
-            if l.1 > 1.4 {
-                self.letrero = None;
             }
         }
         if e.aterrizar {
@@ -1022,6 +1019,7 @@ impl Vegetta {
                 Some(Bloque::Slime) => {
                     self.prota.vel.y = REBOTE;
                     self.prota.en_suelo = false;
+                    self.vida.grito_en("¡BOING!", "", Tono::Verde, Tam::Chico, 0.5, 0.4);
                     self.eventos.push(Efecto::Don);
                 }
                 Some(Bloque::Lava) => {
@@ -1054,6 +1052,8 @@ impl Vegetta {
                 let p = self.pista.diamantes[i];
                 self.jugo.estallar(p, [0.35, 1.0, 0.95], 24, 6.0);
                 self.jugo.onda(p, [0.35, 1.0, 0.95], 3.0);
+                self.vida.grito("¡DIAMANTE!", Tono::Cian, Tam::Medio);
+                self.vida.golpe(0.15, Tono::Cian);
                 self.eventos.push(Efecto::Nota3);
             }
         }
@@ -1064,6 +1064,8 @@ impl Vegetta {
         self.tiempo += CASTIGO;
         self.prota.pos = self.control + Vec3::new(0.0, 0.2, 0.0);
         self.prota.vel = Vec3::zero();
+        self.vida.grito("¡AL VACÍO!", Tono::Rojo, Tam::Grande);
+        self.vida.golpe(0.5, Tono::Rojo);
         self.eventos.push(Efecto::Fallo);
         if self.caidas % 3 == 1 {
             self.decir(WILLY, "¡Jajaja! ¡Al vacío! Así no se juega, guapi.", Voz::Erizo);
@@ -1086,7 +1088,7 @@ impl Vegetta {
         if gano {
             self.ganadas += 1;
             self.marcador[k].0 += 1;
-            self.anunciar("¡GANASTE!");
+            self.vida.exito("¡GANASTE!", "Willy te debe una casa", Tono::Oro);
             let p = self.prota.pos + Vec3::new(0.0, 1.0, 0.0);
             self.jugo.estallar(p, [1.0, 0.84, 0.25], 70, 11.0);
             self.jugo.estallar(p, [1.0, 0.36, 0.7], 40, 9.0);
@@ -1100,7 +1102,7 @@ impl Vegetta {
             self.decir(VEGETTA, frase, Voz::Neptuno);
         } else {
             self.marcador[k].1 += 1;
-            self.anunciar("¡GANÓ WILLY!");
+            self.vida.desastre("¡GANÓ WILLY!", "Dice que ya lo sabía");
             self.eventos.push(Efecto::Fallo);
             let frase = match self.modo {
                 Modo::Parkour => "¡Te gané! Me debes una casa. Con piscina. De lava. Bueno, de agua.",
@@ -1137,6 +1139,7 @@ impl Vegetta {
             self.willy_llego = Some(self.tiempo);
             if self.fase == Fase::Jugando {
                 self.decir(WILLY, "¡Llegué! ¡Primero! ¿Dónde estás, guapi?", Voz::Erizo);
+                self.vida.grito("¡LLEGÓ WILLY!", Tono::Rojo, Tam::Medio);
                 self.eventos.push(Efecto::Alarma);
             }
         }
@@ -1737,11 +1740,6 @@ impl Vegetta {
                 let tam = (h * 0.22) as i32;
                 ui::titulo_de(d, &s, (ancho - ui::medir_titulo(&s, tam)) / 2, (h * 0.32) as i32, tam, Color::new(255, 230, 90, 255));
             }
-        }
-        if let Some((s, t)) = &self.letrero {
-            let a = ((1.0 - ((t - 1.0) / 0.4).clamp(0.0, 1.0)) * 255.0) as u8;
-            let tam = (h * 0.075) as i32;
-            ui::titulo_de(d, s, (ancho - ui::medir_titulo(s, tam)) / 2, (h * 0.36) as i32, tam, Color::new(255, 240, 140, a));
         }
         // Las ayudas de abajo, segun donde se este.
         let mover = if e.hay_control { "stick" } else { "W / A / S / D" };

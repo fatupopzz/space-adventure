@@ -91,6 +91,10 @@ pub enum Pista {
     Marimba,
     /// La cinematica de inicio: la cancion local si esta, o el piano triste original.
     Prologo,
+    /// Whack-a-Koch: un chiptune de feria a 150 BPM.
+    Koch,
+    /// ¡Anillazo!: dance a 140 BPM, que se acelera con cada nivel.
+    Anillos,
 }
 
 /// La cancion opcional de la cinematica de inicio. No va en el repositorio (tiene derechos): si no
@@ -101,7 +105,7 @@ pub fn hay_cancion_del_prologo() -> bool {
     std::path::Path::new(CANCION_DEL_PROLOGO).exists()
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Efecto {
     Acierto,
     Perfecto,
@@ -172,6 +176,30 @@ pub enum Efecto {
     Teseracto,
     /// Al entrar al agujero de gusano: un soplido que baja.
     Gusano,
+    /// Whack-a-Koch: el mazo pegandole a algo.
+    Mazazo,
+    /// El mazo pegandole al aire.
+    Aire,
+    /// Un Koch que sale del hoyo: un toquecito que sube.
+    KochSale,
+    /// ¡RECURSION!: un arpegio que se dispara.
+    Recursion,
+    /// ¡WACK!: la palabra, dicha por la maquina, en tres tonos.
+    Wack,
+    Wack2,
+    Wack3,
+    /// El mazo contra el tablero, cuando se pega al aire.
+    Tablero,
+    /// El mini Koch: ¡ay!
+    KochAy,
+    /// El mini Koch burlandose: je-je.
+    KochRisa,
+    /// ¡Anillazo!: un anillo que pasa, un roce, y el disco que se raya al chocar.
+    Pase,
+    Roce,
+    Scratch,
+    /// ¡A-NI-LLA-ZO!: la palabra, dicha al chocar.
+    GritoAnillazo,
 }
 
 /// Empaqueta muestras en [-1, 1] como un `.wav` mono de 16 bits.
@@ -199,6 +227,39 @@ fn wav(muestras: &[f32]) -> Vec<u8> {
 /// Genera `largo` segundos con `f(t)`.
 fn generar(largo: f32, mut f: impl FnMut(f32) -> f32) -> Vec<f32> {
     (0..(largo * FRECUENCIA as f32) as usize).map(|k| f(k as f32 / FRECUENCIA as f32)).collect()
+}
+
+/// Una voz sintetica de caricatura: una onda de sierra (la cuerda vocal) que pasa por dos filtros
+/// resonantes (la boca). `formantes` dice a que frecuencias resuena en cada momento: eso es lo que
+/// hace que suene a una vocal. La voz dura `sonando` segundos dentro de un sonido de `largo`.
+fn voz_formantes(largo: f32, sonando: f32, tono_base: f32, baja: f32, formantes: impl Fn(f32) -> (f32, f32), volumen: f32) -> Vec<f32> {
+    let dt = 1.0 / FRECUENCIA as f32;
+    let mut fase = 0.0f32;
+    // Dos resonadores de segundo orden, con sus dos muestras pasadas.
+    let (mut a1, mut a2, mut b1, mut b2) = (0.0f32, 0.0f32, 0.0f32, 0.0f32);
+    let mut salida: Vec<f32> = generar(largo, |t| {
+        let f0 = tono_base + baja * t;
+        fase = (fase + f0 * dt).fract();
+        let fuente = if t < sonando { 2.0 * fase - 1.0 } else { 0.0 };
+        let (f1, f2) = formantes(t);
+        let resonar = |x: f32, f: f32, y1: &mut f32, y2: &mut f32| {
+            let r = 0.965f32;
+            let c = 2.0 * r * (TAU * f * dt).cos();
+            let y = (1.0 - r) * 2.0 * x + c * *y1 - r * r * *y2;
+            *y2 = *y1;
+            *y1 = y;
+            y
+        };
+        let v1 = resonar(fuente, f1, &mut a1, &mut a2);
+        let v2 = resonar(fuente, f2, &mut b1, &mut b2);
+        let sale = ((sonando - t) / 0.012).clamp(0.0, 1.0) * (t / 0.006).min(1.0);
+        (v1 + 0.6 * v2) * sale
+    });
+    let pico = salida.iter().fold(0.0f32, |m, x| m.max(x.abs())).max(1e-6);
+    for m in &mut salida {
+        *m = *m / pico * volumen;
+    }
+    salida
 }
 
 /// Un blip de voz: una notita cortita con el timbre de cada personaje.
@@ -361,6 +422,93 @@ fn efecto(e: Efecto) -> Vec<f32> {
                 0.22 * (1.0 - t / 0.09) * (lp + 0.15 * tono(900.0 + 400.0 * t, t))
             })
         }
+        // ¡WACK!: se arma como una voz de caricatura. Una cuerda que vibra pasa por dos resonancias
+        // (como la boca): arranca en "u" y se abre a "a" (eso es la W), y corta seco en una K.
+        Efecto::Wack | Efecto::Wack2 | Efecto::Wack3 => {
+            let tono_base = match e {
+                Efecto::Wack => 235.0,
+                Efecto::Wack2 => 200.0,
+                _ => 275.0,
+            };
+            voz_formantes(0.27, 0.205, tono_base, -150.0, |t| {
+                let abre = (t / 0.05).min(1.0);
+                (320.0 + 480.0 * abre, 750.0 + 620.0 * abre)
+            }, 0.8)
+                .into_iter()
+                .enumerate()
+                .map(|(i, m)| {
+                    let t = i as f32 / FRECUENCIA as f32;
+                    // La K: un chasquido corto al final.
+                    let k = if (0.215..0.25).contains(&t) { 0.5 * ruido() * (-(t - 0.215) * 110.0).exp() } else { 0.0 };
+                    m + k
+                })
+                .collect()
+        }
+        // ¡A-NI-LLA-ZO!: la boca va de vocal en vocal, con la Z de soplido. Tono de locutor de feria.
+        Efecto::GritoAnillazo => {
+            const VOCALES: [(f32, f32, f32); 6] = [(0.0, 820.0, 1250.0), (0.1, 300.0, 1500.0), (0.15, 320.0, 2300.0), (0.24, 320.0, 2100.0), (0.3, 820.0, 1250.0), (0.46, 470.0, 860.0)];
+            let boca = |t: f32| {
+                let k = VOCALES.iter().rposition(|v| v.0 <= t).unwrap_or(0);
+                let (a, b) = (VOCALES[k], VOCALES[(k + 1).min(5)]);
+                let m = if b.0 > a.0 { ((t - a.0) / (b.0 - a.0)).clamp(0.0, 1.0) } else { 1.0 };
+                let m = (m * 2.5).min(1.0);
+                (a.1 + (b.1 - a.1) * m, a.2 + (b.2 - a.2) * m)
+            };
+            voz_formantes(0.7, 0.66, 210.0, -70.0, boca, 0.62)
+                .into_iter()
+                .enumerate()
+                .map(|(i, m)| {
+                    let t = i as f32 / FRECUENCIA as f32;
+                    // La Z: un silbido antes de la O.
+                    let z = if (0.4..0.47).contains(&t) { 0.16 * ruido() } else { 0.0 };
+                    m + z
+                })
+                .collect()
+        }
+        // Un anillo que pasa zumbando: un soplo cortito.
+        Efecto::Pase => generar(0.09, |t| 0.13 * (t / 0.09 * std::f32::consts::PI).sin() * (0.6 * ruido() + 0.4 * tono(190.0 + 900.0 * t, t))),
+        // Un roce: chispazo agudo que baja, como metal contra metal.
+        Efecto::Roce => generar(0.2, |t| (-t * 13.0).exp() * (0.3 * ruido() * (t * 300.0).sin().abs() + 0.26 * tono(2300.0 - 5000.0 * t, t))),
+        // El disco que se raya: el chirrido va y viene, como la mano de un DJ.
+        Efecto::Scratch => {
+            let mut fase = 0.0f32;
+            generar(0.42, |t| {
+                let mano = 900.0 + 800.0 * (t * 31.0).sin() * if t < 0.2 { 1.0 } else { 0.5 };
+                fase = (fase + mano.abs() / FRECUENCIA as f32).fract();
+                let sierra = 2.0 * fase - 1.0;
+                (1.0 - t / 0.42) * (0.26 * sierra + 0.24 * ruido())
+            })
+        }
+        // El mazo contra la madera: un toc hueco.
+        Efecto::Tablero => generar(0.12, |t| 0.5 * (-t * 38.0).exp() * (tono(190.0 - 300.0 * t, t) + 0.5 * tono(410.0, t)) + if t < 0.005 { 0.3 * ruido() } else { 0.0 }),
+        // ¡Ay!: de "a" a "i", agudito y subiendo (es chiquito).
+        Efecto::KochAy => voz_formantes(0.2, 0.18, 430.0, 380.0, |t| {
+            let k = (t / 0.16).min(1.0);
+            (820.0 - 450.0 * k, 1250.0 + 1050.0 * k)
+        }, 0.34),
+        // Je-je: dos golpecitos de "e", burlones.
+        Efecto::KochRisa => {
+            let mut v = voz_formantes(0.11, 0.09, 380.0, -120.0, |_| (480.0, 1800.0), 0.3);
+            v.extend(std::iter::repeat_n(0.0, (0.03 * FRECUENCIA as f32) as usize));
+            v.extend(voz_formantes(0.11, 0.09, 430.0, -150.0, |_| (480.0, 1800.0), 0.3));
+            v
+        }
+        // El mazazo: un golpe grave que baja, el chasquido de la goma y un toque de madera.
+        Efecto::Mazazo => generar(0.17, |t| {
+            let chasquido = if t < 0.008 { ruido() * (1.0 - t / 0.008) } else { 0.0 };
+            0.55 * chasquido + 0.75 * (-t * 26.0).exp() * tono(165.0 - 620.0 * t, t) + 0.22 * (-t * 60.0).exp() * tono(520.0, t)
+        }),
+        // Al aire: un soplido corto.
+        Efecto::Aire => generar(0.13, |t| 0.22 * (t / 0.13 * std::f32::consts::PI).sin() * ruido()),
+        Efecto::KochSale => generar(0.07, |t| 0.16 * (1.0 - t / 0.07) * tono(420.0 + 5200.0 * t, t)),
+        // ¡RECURSION!: un arpegio que se repite cada vez mas agudo, y un barrido.
+        Efecto::Recursion => generar(0.95, |t| {
+            let paso = (t / 0.055) as i32;
+            let nota = [0, 4, 7, 12][paso.rem_euclid(4) as usize] + paso / 4 * 12;
+            let f = 330.0 * 2f32.powf(nota as f32 / 12.0);
+            let cuadrada = if tono(f, t) > 0.0 { 1.0 } else { -1.0 };
+            (1.0 - t / 0.95) * (0.2 * cuadrada + 0.14 * ruido() * (t / 0.95))
+        }),
         // El globo que revienta: un chasquido seco y un "pop" que baja de tono.
         Efecto::Pop => generar(0.16, |t| {
             let chasquido = if t < 0.012 { ruido() * (1.0 - t / 0.012) } else { 0.0 };
@@ -627,12 +775,12 @@ impl<'a> Sonidos<'a> {
             .into_iter()
             .map(|v| (v, if v == Voz::Ia { &escala_ia } else { &escala }.iter().filter_map(|&s| cargar(blip(v, s))).collect()))
             .collect();
-        let efectos = [Efecto::Acierto, Efecto::Perfecto, Efecto::Fallo, Efecto::Salto, Efecto::Choque, Efecto::Aterrizaje, Efecto::Fuego, Efecto::Alarma, Efecto::Cumpleanos, Efecto::Carta, Efecto::Don, Efecto::Ka, Efecto::OcarinaA, Efecto::OcarinaAbajo, Efecto::OcarinaDerecha, Efecto::OcarinaIzquierda, Efecto::OcarinaArriba, Efecto::Rebobinar, Efecto::Protesto, Efecto::Mazo, Efecto::Claqueta, Efecto::Nota0, Efecto::Nota1, Efecto::Nota2, Efecto::Nota3, Efecto::Nota4, Efecto::Nota5, Efecto::Nota6, Efecto::Nota7, Efecto::Cometa, Efecto::Sello, Efecto::Reglazo, Efecto::Latido, Efecto::Trueno, Efecto::Puerta, Efecto::Whatsapp, Efecto::Teclas, Efecto::Chorro, Efecto::Pop, Efecto::Rocky, Efecto::Monolito, Efecto::Teseracto, Efecto::Gusano]
+        let efectos = [Efecto::Acierto, Efecto::Perfecto, Efecto::Fallo, Efecto::Salto, Efecto::Choque, Efecto::Aterrizaje, Efecto::Fuego, Efecto::Alarma, Efecto::Cumpleanos, Efecto::Carta, Efecto::Don, Efecto::Ka, Efecto::OcarinaA, Efecto::OcarinaAbajo, Efecto::OcarinaDerecha, Efecto::OcarinaIzquierda, Efecto::OcarinaArriba, Efecto::Rebobinar, Efecto::Protesto, Efecto::Mazo, Efecto::Claqueta, Efecto::Nota0, Efecto::Nota1, Efecto::Nota2, Efecto::Nota3, Efecto::Nota4, Efecto::Nota5, Efecto::Nota6, Efecto::Nota7, Efecto::Cometa, Efecto::Sello, Efecto::Reglazo, Efecto::Latido, Efecto::Trueno, Efecto::Puerta, Efecto::Whatsapp, Efecto::Teclas, Efecto::Chorro, Efecto::Pop, Efecto::Rocky, Efecto::Monolito, Efecto::Teseracto, Efecto::Gusano, Efecto::Mazazo, Efecto::Aire, Efecto::KochSale, Efecto::Recursion, Efecto::Wack, Efecto::Wack2, Efecto::Wack3, Efecto::Tablero, Efecto::KochAy, Efecto::KochRisa, Efecto::Pase, Efecto::Roce, Efecto::Scratch, Efecto::GritoAnillazo]
             .into_iter()
             .filter_map(|e| cargar(efecto(e)))
             .collect();
         let primera_pista = banco.borrow().len();
-        let mut pistas: Vec<(Pista, Canal<'a>, Cell<f32>)> = [(Pista::Cancion, cancion::sintetizar()), (Pista::Espacio, cancion::sintetizar_espacio()), (Pista::Fuente, cancion::sintetizar_fuente()), (Pista::Tarot, cancion::sintetizar_tarot()), (Pista::TarotReves, cancion::sintetizar_tarot().into_iter().rev().collect()), (Pista::Juicio, cancion::sintetizar_juicio()), (Pista::Arcade, cancion::sintetizar_arcade()), (Pista::Lofi, cancion::sintetizar_lofi()), (Pista::Marimba, cancion::sintetizar_marimba())]
+        let mut pistas: Vec<(Pista, Canal<'a>, Cell<f32>)> = [(Pista::Cancion, cancion::sintetizar()), (Pista::Espacio, cancion::sintetizar_espacio()), (Pista::Fuente, cancion::sintetizar_fuente()), (Pista::Tarot, cancion::sintetizar_tarot()), (Pista::TarotReves, cancion::sintetizar_tarot().into_iter().rev().collect()), (Pista::Juicio, cancion::sintetizar_juicio()), (Pista::Arcade, cancion::sintetizar_arcade()), (Pista::Lofi, cancion::sintetizar_lofi()), (Pista::Marimba, cancion::sintetizar_marimba()), (Pista::Koch, cancion::sintetizar_koch()), (Pista::Anillos, cancion::sintetizar_anillos())]
             .into_iter()
             .filter_map(|(p, muestras)| cargar(muestras).map(|s| (p, s, Cell::new(0.0))))
             .collect();
@@ -834,5 +982,49 @@ impl Dialogo {
         self.sonadas = visibles;
         let fin = self.texto.char_indices().nth(visibles).map_or(self.texto.len(), |(i, _)| i);
         &self.texto[..crate::ui::sin_partir_botones(&self.texto, fin)]
+    }
+}
+
+#[cfg(test)]
+mod pruebas_del_wack {
+    use super::*;
+
+    #[test]
+    fn el_wack_y_compania_suenan_y_no_se_salen() {
+        for e in [Efecto::Wack, Efecto::Wack2, Efecto::Wack3, Efecto::Mazazo, Efecto::Aire, Efecto::Tablero, Efecto::KochAy, Efecto::KochRisa, Efecto::KochSale, Efecto::Recursion, Efecto::Pase, Efecto::Roce, Efecto::Scratch, Efecto::GritoAnillazo] {
+            let m = efecto(e);
+            assert!(!m.is_empty(), "{e:?} esta vacio");
+            let pico = m.iter().fold(0.0f32, |p, x| p.max(x.abs()));
+            assert!(m.iter().all(|x| x.is_finite()), "{e:?} tiene basura");
+            assert!(pico > 0.1, "{e:?} no se oye: pico {pico}");
+            assert!(pico < 1.6, "{e:?} satura: pico {pico}");
+        }
+    }
+
+    /// La K del WACK: la voz se corta y hay un chasquido al final; la W: arranca oscura y se abre.
+    #[test]
+    fn el_wack_tiene_su_w_y_su_k() {
+        let m = efecto(Efecto::Wack);
+        let f = FRECUENCIA as f32;
+        let energia = |a: f32, b: f32| {
+            let t = &m[(a * f) as usize..(b * f) as usize];
+            t.iter().map(|x| x * x).sum::<f32>() / t.len() as f32
+        };
+        assert!(energia(0.05, 0.18) > energia(0.207, 0.214) * 4.0, "antes de la K debe callarse");
+        assert!(energia(0.215, 0.225) > energia(0.207, 0.214), "la K debe chasquear");
+        // La W: al principio la boca esta cerrada ("u": suena grave) y luego se abre ("a": suben
+        // las resonancias). Se mide cuanto suena en los agudos contra los graves.
+        let banda = |a: f32, b: f32, hz: f32| {
+            let t = &m[(a * f) as usize..(b * f) as usize];
+            let (mut re, mut im) = (0.0f32, 0.0f32);
+            for (i, x) in t.iter().enumerate() {
+                let w = TAU * hz * i as f32 / f;
+                re += x * w.cos();
+                im += x * w.sin();
+            }
+            (re * re + im * im).sqrt() / t.len() as f32
+        };
+        let brillo = |a: f32, b: f32| (banda(a, b, 800.0) + banda(a, b, 1370.0)) / (banda(a, b, 320.0) + banda(a, b, 480.0)).max(1e-5);
+        assert!(brillo(0.09, 0.17) > brillo(0.006, 0.03), "la W debe abrirse a la A: {} contra {}", brillo(0.09, 0.17), brillo(0.006, 0.03));
     }
 }
