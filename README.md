@@ -23,7 +23,7 @@ puede explicar todo lo que se entrega. Los recursos externos (fuentes, sprites d
 iconos de controles) están en [Créditos](#créditos); todos los modelos 3D son
 propios (scripts de `herramientas/`).
 
-**Video:** <https://youtu.be/ScMwNl6MUDI>
+**Video:** <https://youtu.be/UKNys1dL2ws>
 
 **Para repetir el recorrido:** `cargo run --release -- --demo` hace el recorrido solo (unos 35
 segundos), con piloto automático y un rótulo en cada parte: vuelo espacial a velocidad de crucero,
