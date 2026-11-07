@@ -97,9 +97,9 @@ pub enum Pista {
     Anillos,
 }
 
-/// La cancion opcional de la cinematica de inicio. No va en el repositorio (tiene derechos): si no
-/// esta, suena el piano original de `cancion::sintetizar_prologo`.
-const CANCION_DEL_PROLOGO: &str = "assets/musica/prologo.mp3";
+/// El sonido de la intro dibujada a mano (la voz de Pluton y el piano del juego; ver
+/// `intro_video.rs`). Si no esta, suena el piano original de `cancion::sintetizar_prologo`.
+const CANCION_DEL_PROLOGO: &str = "assets/intro/intro.mp3";
 
 pub fn hay_cancion_del_prologo() -> bool {
     std::path::Path::new(CANCION_DEL_PROLOGO).exists()

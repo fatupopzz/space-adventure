@@ -66,6 +66,7 @@ mod progreso;
 mod grabacion;
 mod anillos;
 mod vida;
+mod intro_video;
 mod salto;
 mod sonido;
 mod tienda;
@@ -4718,9 +4719,21 @@ struct Prologo {
     lluvia: [Vec<f32>; 2],
     ancho_lluvia: usize,
     con_cancion: bool,
+    /// La intro dibujada a mano, si esta (si no, la cinematica en vivo de siempre).
+    video: Option<intro_video::IntroVideo>,
 }
 
 impl Prologo {
+    /// Al abrir el juego: la intro dibujada a mano si se puede, y si no, la cinematica en vivo.
+    fn al_abrir() -> Self {
+        let mut p = Prologo::nuevo(false);
+        p.video = intro_video::IntroVideo::abrir();
+        if p.video.is_none() {
+            p.con_cancion = sonido::hay_cancion_del_prologo();
+        }
+        p
+    }
+
     fn nuevo(con_cancion: bool) -> Self {
         let mut azar = 12345u32;
         let mut sig = move || {
@@ -4740,7 +4753,7 @@ impl Prologo {
             c
         };
         let lluvia = [capa(310, 37, 0.24), capa(700, 14, 0.13)];
-        Prologo { t: 0.0, i: 0, toma: TomaCine::nueva(PROLOGO[0].3), lluvia, ancho_lluvia: w, con_cancion }
+        Prologo { t: 0.0, i: 0, toma: TomaCine::nueva(PROLOGO[0].3), lluvia, ancho_lluvia: w, con_cancion, video: None }
     }
 
     /// Para las capturas: se pone en el segundo `t`.
@@ -4756,6 +4769,9 @@ impl Prologo {
     /// Devuelve si ya se acabo.
     fn actualizar(&mut self, dt: f32) -> bool {
         self.t += dt;
+        if let Some(v) = &mut self.video {
+            return v.actualizar(dt);
+        }
         if self.i + 1 < PROLOGO.len() && self.t >= PROLOGO[self.i + 1].0 {
             self.i += 1;
             self.toma = TomaCine::nueva(PROLOGO[self.i].3);
@@ -4765,6 +4781,15 @@ impl Prologo {
     }
 
     fn dibujar(&self, fb: &mut Framebuffer, post: &mut Post, rec: &Recursos) -> Estadisticas {
+        if let Some(v) = &self.video {
+            let (w, h) = (fb.ancho, fb.alto);
+            for y in 0..h {
+                for x in 0..w {
+                    fb.pintar(y * w + x, v.pixel(x, y, w, h), 1.0);
+                }
+            }
+            return Estadisticas::default();
+        }
         let st = dibujar_escena_sin_trazo(fb, post, rec, &self.toma.juego, &self.toma.escena);
         self.tratar(fb);
         st
@@ -4831,6 +4856,11 @@ impl Prologo {
     }
 
     fn dibujar_ui(&self, d: &mut RaylibDrawHandle, e: &Entrada, ancho: i32, alto: i32) {
+        if self.video.is_some() {
+            // La intro ya trae todo: solo se avisa como saltarla.
+            ui::ayudas(d, &[(e.nombre("aceptar"), "Saltar")], ancho, alto);
+            return;
+        }
         let t = self.t;
         let tam = (alto as f32 * 0.04).clamp(18.0, 36.0) as i32;
         for (a, z, texto) in PROLOGO_FRASES {
@@ -5602,7 +5632,7 @@ fn main() {
     // El juego arranca en el menu principal (las fotos de la interfaz, en la escena que se pidio).
     // (El `--demo` va directo al recorrido: es lo que se graba para la entrega.)
     if foto.is_none() && demo.is_none() {
-        escena = Escena::Prologo(Box::new(Prologo::nuevo(sonido::hay_cancion_del_prologo())));
+        escena = Escena::Prologo(Box::new(Prologo::al_abrir()));
     }
     let mut hud = true;
     // TAB: la info del pipeline y los controles.

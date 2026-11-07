@@ -74,13 +74,16 @@ la tabla `CUERPOS` de [src/escena.rs](src/escena.rs) y la gravedad en `GRAVEDAD`
 
 ## Cinemática de inicio
 
-Al abrir el juego se cuenta la historia de Plutón, el planeta al que le quitaron el título en 2006,
-y se puede saltar con el botón de aceptar, ESC o un clic. No es un video: `Prologo` en
-[src/main.rs](src/main.rs) corre las tomas en vivo con el mismo rasterizador (sus cámaras son `TomaCine`,
-las mismas de `--cine`) y encima hace el look de cinta vieja: sin color, azul, lluvia y ruido.
+Al abrir el juego sale una intro de 30 segundos dibujada a mano: los planetas, Plutón y los
+tripulantes son dibujos de Fátima, y la narra Plutón (voz hecha con IA). Cuenta cómo lo dejaron de
+considerar planeta en 2006 y termina con todos juntos. Se salta con el botón de aceptar, ESC o un clic.
 
-La música es un piano triste original (`sintetizar_prologo` en [src/cancion.rs](src/cancion.rs)). Si
-existe `assets/musica/prologo.mp3` (no está en el repositorio), suena ese archivo en su lugar.
+El juego no trae reproductor de video: [src/intro_video.rs](src/intro_video.rs) le pide a ffmpeg
+los cuadros de `assets/intro/intro.mp4` por una tubería y los pinta en el framebuffer al ritmo del
+reloj; el sonido es `assets/intro/intro.mp3`. Si no hay ffmpeg o falta el video, sale la cinemática
+de siempre, en vivo: `Prologo` en [src/main.rs](src/main.rs) corre las tomas con el mismo rasterizador
+(sus cámaras son `TomaCine`, las de `--cine`), con el look de cinta vieja y el piano original
+(`sintetizar_prologo` en [src/cancion.rs](src/cancion.rs)).
 
 ## Personajes y pase espacial
 
