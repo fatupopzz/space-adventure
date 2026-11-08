@@ -1,4 +1,4 @@
-//! La intro dibujada a mano (los dibujos de Fatima y la voz de Pluton) como video de inicio.
+//! La intro "76 años", dibujada y editada por Fatima, como video de inicio.
 //!
 //! El juego no trae un reproductor de video: le pide a ffmpeg que decodifique
 //! `assets/intro/intro.mp4` y le mande los cuadros en crudo por una tuberia; un hilo los va
@@ -16,7 +16,7 @@ pub const ANCHO: usize = 1920;
 pub const ALTO: usize = 1080;
 const CUADROS_POR_SEGUNDO: f32 = 30.0;
 /// Lo que dura la intro, en segundos.
-pub const DURACION: f32 = 32.4;
+pub const DURACION: f32 = 34.0;
 
 pub struct IntroVideo {
     proceso: Child,

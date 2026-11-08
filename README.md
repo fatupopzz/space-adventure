@@ -74,8 +74,8 @@ la tabla `CUERPOS` de [src/escena.rs](src/escena.rs) y la gravedad en `GRAVEDAD`
 
 ## Cinemática de inicio
 
-Al abrir el juego sale una intro de 30 segundos dibujada a mano: los planetas, Plutón y los
-tripulantes son dibujos de Fátima, y la narra Plutón (voz hecha con IA). Cuenta cómo lo dejaron de
+Al abrir el juego sale «76 años», una intro de 34 segundos dibujada y editada a mano por Fátima:
+los planetas y Plutón son dibujos suyos, y la narra Plutón (voz hecha con IA). Cuenta cómo lo dejaron de
 considerar planeta en 2006 y termina con todos juntos. Se salta con el botón de aceptar, ESC o un clic.
 
 El juego no trae reproductor de video: [src/intro_video.rs](src/intro_video.rs) le pide a ffmpeg
