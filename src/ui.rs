@@ -936,7 +936,15 @@ pub fn medir_tecla(boton: &str, tam: i32) -> i32 {
 
 /// Ayudas al pie: grupos de icono + accion, con salto de linea si la ventana es angosta.
 pub fn ayudas(d: &mut RaylibDrawHandle, acciones: &[(&str, &str)], ancho: i32, alto: i32) {
-    if acciones.is_empty() { return; }
+    ayudas_con_raton(d, acciones, ancho, alto, None);
+}
+
+/// Las mismas ayudas, pero se les puede hacer clic: la que tiene el raton encima sale resaltada, y
+/// se devuelve cual es (su lugar en `acciones`).
+pub fn ayudas_con_raton(d: &mut RaylibDrawHandle, acciones: &[(&str, &str)], ancho: i32, alto: i32, puntero: Option<(f32, f32)>) -> Option<usize> {
+    if acciones.is_empty() { return None; }
+    let mut encima = None;
+    let mut cual = 0;
     let margen = (ancho / 30).clamp(16, 40);
     let disponible = ancho - margen * 2;
     let tam = if ancho < 800 { 13 } else { 15 };
@@ -954,10 +962,17 @@ pub fn ayudas(d: &mut RaylibDrawHandle, acciones: &[(&str, &str)], ancho: i32, a
         for &(boton, descripcion, w) in acciones {
             let max_texto = (disponible - medir_tecla(boton, tam) - 8).max(20);
             let texto = recortado(descripcion, tam, max_texto);
-            accion(d, boton, &texto, x, y, tam, false);
+            // Un poco de margen alrededor: que no haya que atinarle a la letra.
+            let dentro = puntero.is_some_and(|(px, py)| px >= (x - 10) as f32 && px <= (x + w + 10) as f32 && py >= (y - 8) as f32 && py <= (y + paso - 6) as f32);
+            if dentro {
+                encima = Some(cual);
+            }
+            accion(d, boton, &texto, x, y, tam, dentro);
             x += w + separacion;
+            cual += 1;
         }
     }
+    encima
 }
 
 /// Las ayudas acomodadas en filas (las que no caben pasan a la siguiente), con su ancho.

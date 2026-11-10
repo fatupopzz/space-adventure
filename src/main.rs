@@ -397,7 +397,7 @@ impl Recursos {
         let profe = cargar("modelos/profe.obj");
         let koch_tintes = {
             let mini = &elenco[personajes::indice("koch")].de_pie;
-            [koch::tenido(mini, [1.0, 0.2, 0.2], 0.3, 0.12), koch::tenido(mini, [1.0, 0.78, 0.2], 0.62, 0.3), koch::tenido(mini, [0.72, 0.45, 1.0], 0.32, 0.1), koch::tenido(mini, [1.0, 1.0, 1.0], 1.0, 1.0)]
+            [koch::tenido(mini, [1.0, 0.2, 0.2], 0.3, 0.12), koch::tenido(mini, [1.0, 0.78, 0.2], 0.62, 0.3), koch::tenido(mini, [0.72, 0.45, 1.0], 0.32, 0.1), koch::tenido(mini, [1.0, 1.0, 1.0], 0.5, 0.3)]
         };
         // Ningun planeta viene de un `.obj`: el juego los arma al arrancar, con voxels y su
         // deformacion con ruido (el Chapin en chapin.rs; los demas en planetas.rs), en paralelo.
@@ -3759,9 +3759,10 @@ fn dibujar_koch(fb: &mut Framebuffer, post: &mut Post, rec: &Recursos, c: &Koch,
     let fiebre = c.en_recursion();
     let cielo = if fiebre {
         let h = (c.total * 1.6).sin() * 0.5 + 0.5;
-        [[0.75 + 0.2 * h, 0.2, 0.62 - 0.2 * h], [0.34, 0.08 + 0.1 * h, 0.5], [0.08, 0.03, 0.2]]
+        [[0.58 + 0.08 * h, 0.21, 0.70 - 0.05 * h], [0.28, 0.09 + 0.04 * h, 0.50], [0.06, 0.03, 0.19]]
     } else {
-        [[0.42, 0.20, 0.62], [0.17, 0.09, 0.38], [0.04, 0.03, 0.14]]
+        // De rosa viejo en el horizonte a azul noche arriba.
+        [[0.50, 0.24, 0.64], [0.19, 0.10, 0.42], [0.03, 0.03, 0.13]]
     };
     cielo_degradado(fb, (mira - ojo).normalize(), fov, cielo);
     fb.limpiar_profundidad();
@@ -3774,6 +3775,9 @@ fn dibujar_koch(fb: &mut Framebuffer, post: &mut Post, rec: &Recursos, c: &Koch,
     let en = |p: Vec3| Mat4::translation(p);
     let brinco = Mat4::translation(Vec3::new(0.0, -c.brinco * c.brinco * 0.05, 0.0));
     let mut llamadas = vec![llamada(&m.suelo, base), llamada(&m.torres, base), llamada(&m.mueble, Uniforms { modelo: brinco, ..base }), llamada(&m.letrero_fondo, base), llamada(&m.foquitos[(c.total / koch::CORCHEA) as usize % 2], base)];
+    // El copo de Koch gigante, en el piso: crece una iteracion por parcial.
+    let (iteracion, modelo) = c.copo_gigante();
+    llamadas.push(llamada(&m.copo_gigante[iteracion], Uniforms { modelo, ..base }));
     // El titulo gigante: cada letra brinca y se enciende con la musica.
     for (k, (modelo, color)) in c.titulo().into_iter().enumerate() {
         llamadas.push(llamada(&m.letras[k][color], Uniforms { modelo, ..base }));
@@ -3785,8 +3789,9 @@ fn dibujar_koch(fb: &mut Framebuffer, post: &mut Post, rec: &Recursos, c: &Koch,
     for k in 0..12 {
         let s = k as f32 * 2.399;
         let x = (s * 1.7).sin() * 13.0 + if k % 2 == 0 { 7.0 } else { -7.0 };
-        let p = Vec3::new(x, 1.5 + (s * 0.9).cos().abs() * 7.0 + (c.total * 0.6 + s).sin() * 0.3, -9.0 + (s * 2.3).cos() * 6.0);
-        let modelo = en(p) * Mat4::rotation_y(c.total * 0.5 + s) * Mat4::rotation_z(c.total * 0.3 + s) * Mat4::scale(0.5 + (s * 3.1).sin().abs() * 0.5);
+        // Flotan despacio: son el fondo, no tienen que llamar la atencion.
+        let p = Vec3::new(x, 1.5 + (s * 0.9).cos().abs() * 7.0 + (c.total * 0.35 + s).sin() * 0.3, -9.0 + (s * 2.3).cos() * 6.0);
+        let modelo = en(p) * Mat4::rotation_y(c.total * 0.18 + s) * Mat4::rotation_z(c.total * 0.11 + s) * Mat4::scale(0.5 + (s * 3.1).sin().abs() * 0.5);
         llamadas.push(llamada(&m.copo_suelto, Uniforms { modelo, ..base }));
     }
     // Los aros: el del color de quien esta adentro, y uno fino que se cierra con su tiempo.
@@ -3888,7 +3893,7 @@ fn dibujar_koch(fb: &mut Framebuffer, post: &mut Post, rec: &Recursos, c: &Koch,
     post::niebla(fb, cerca, lejos, 22.0, 62.0, [cielo[0][0] * 0.9, cielo[0][1] * 0.9, cielo[0][2] * 0.9], true);
     post.bloom(fb, BLOOM * (0.42 + c.pulso * 0.2 + if fiebre { 0.3 } else { 0.0 }));
     post::gradacion(fb, 1.14, 0.12, [0.006, 0.0, 0.02], [0.012, 0.004, 0.0]);
-    let (tinte, fuerza) = if c.rojo > 0.0 { ([1.0, 0.08, 0.1], c.rojo * 1.3) } else if fiebre { ([1.0, 0.25, 0.8], 0.42) } else { ([0.5, 0.2, 0.9], 0.08) };
+    let (tinte, fuerza) = if c.rojo > 0.0 { ([1.0, 0.08, 0.1], c.rojo * 1.3) } else if fiebre { ([1.0, 0.3, 0.8], 0.26) } else { ([0.5, 0.2, 0.9], 0.08) };
     post::terminar(fb, tinte, fuerza, c.destello);
     st
 }
@@ -5940,6 +5945,7 @@ fn main() {
             let m = rl.get_mouse_position();
             e.puntero = Some((m.x, m.y));
             e.clic = rl.is_mouse_button_pressed(MouseButton::MOUSE_BUTTON_LEFT);
+            e.clic_derecho = rl.is_mouse_button_pressed(MouseButton::MOUSE_BUTTON_RIGHT);
             e.raton_apretado = rl.is_mouse_button_down(MouseButton::MOUSE_BUTTON_LEFT);
             e.picar |= e.raton_apretado;
         }

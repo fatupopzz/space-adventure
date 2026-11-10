@@ -74,6 +74,8 @@ pub struct Entrada {
     /// Donde esta el raton en la ventana (si esta suelto) y si se hizo clic este cuadro.
     pub puntero: Option<(f32, f32)>,
     pub clic: bool,
+    /// El boton derecho del raton, este cuadro (en Wack a Koch tambien pega).
+    pub clic_derecho: bool,
     /// Si el boton izquierdo del raton se esta manteniendo (para echar agua en rafaga en Urano).
     pub raton_apretado: bool,
     /// Lo que se movio el raton atrapado este cuadro, ya en radianes (girar, cabecear): se suma
@@ -188,6 +190,7 @@ impl Entrada {
             raton: (0.0, 0.0),
             puntero: None,
             clic: false,
+            clic_derecho: false,
             raton_apretado: false,
             horizontal: (eje(KEY_RIGHT, KEY_LEFT) + eje(KEY_D, KEY_A)).clamp(-1.0, 1.0),
             turbo: tecla(KEY_LEFT_SHIFT),

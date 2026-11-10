@@ -178,6 +178,9 @@ pub enum Efecto {
     Gusano,
     /// Whack-a-Koch: el mazo pegandole a algo.
     Mazazo,
+    /// El mismo mazazo cuando el golpe fue ¡PERFECTO! (o al dorado): suena con mas cuerpo y, en el
+    /// control, se siente mas fuerte y mas largo.
+    MazazoFuerte,
     /// El mazo pegandole al aire.
     Aire,
     /// Un Koch que sale del hoyo: un toquecito que sube.
@@ -498,6 +501,11 @@ fn efecto(e: Efecto) -> Vec<f32> {
             let chasquido = if t < 0.008 { ruido() * (1.0 - t / 0.008) } else { 0.0 };
             0.55 * chasquido + 0.75 * (-t * 26.0).exp() * tono(165.0 - 620.0 * t, t) + 0.22 * (-t * 60.0).exp() * tono(520.0, t)
         }),
+        // El perfecto: el mismo golpe, con un grave que dura mas y una campanita encima.
+        Efecto::MazazoFuerte => generar(0.24, |t| {
+            let chasquido = if t < 0.008 { ruido() * (1.0 - t / 0.008) } else { 0.0 };
+            0.55 * chasquido + 0.8 * (-t * 19.0).exp() * tono(150.0 - 420.0 * t, t) + 0.2 * (-t * 60.0).exp() * tono(520.0, t) + 0.1 * (-t * 22.0).exp() * tono(1040.0, t)
+        }),
         // Al aire: un soplido corto.
         Efecto::Aire => generar(0.13, |t| 0.22 * (t / 0.13 * std::f32::consts::PI).sin() * ruido()),
         Efecto::KochSale => generar(0.07, |t| 0.16 * (1.0 - t / 0.07) * tono(420.0 + 5200.0 * t, t)),
@@ -775,7 +783,7 @@ impl<'a> Sonidos<'a> {
             .into_iter()
             .map(|v| (v, if v == Voz::Ia { &escala_ia } else { &escala }.iter().filter_map(|&s| cargar(blip(v, s))).collect()))
             .collect();
-        let efectos = [Efecto::Acierto, Efecto::Perfecto, Efecto::Fallo, Efecto::Salto, Efecto::Choque, Efecto::Aterrizaje, Efecto::Fuego, Efecto::Alarma, Efecto::Cumpleanos, Efecto::Carta, Efecto::Don, Efecto::Ka, Efecto::OcarinaA, Efecto::OcarinaAbajo, Efecto::OcarinaDerecha, Efecto::OcarinaIzquierda, Efecto::OcarinaArriba, Efecto::Rebobinar, Efecto::Protesto, Efecto::Mazo, Efecto::Claqueta, Efecto::Nota0, Efecto::Nota1, Efecto::Nota2, Efecto::Nota3, Efecto::Nota4, Efecto::Nota5, Efecto::Nota6, Efecto::Nota7, Efecto::Cometa, Efecto::Sello, Efecto::Reglazo, Efecto::Latido, Efecto::Trueno, Efecto::Puerta, Efecto::Whatsapp, Efecto::Teclas, Efecto::Chorro, Efecto::Pop, Efecto::Rocky, Efecto::Monolito, Efecto::Teseracto, Efecto::Gusano, Efecto::Mazazo, Efecto::Aire, Efecto::KochSale, Efecto::Recursion, Efecto::Wack, Efecto::Wack2, Efecto::Wack3, Efecto::Tablero, Efecto::KochAy, Efecto::KochRisa, Efecto::Pase, Efecto::Roce, Efecto::Scratch, Efecto::GritoAnillazo]
+        let efectos = [Efecto::Acierto, Efecto::Perfecto, Efecto::Fallo, Efecto::Salto, Efecto::Choque, Efecto::Aterrizaje, Efecto::Fuego, Efecto::Alarma, Efecto::Cumpleanos, Efecto::Carta, Efecto::Don, Efecto::Ka, Efecto::OcarinaA, Efecto::OcarinaAbajo, Efecto::OcarinaDerecha, Efecto::OcarinaIzquierda, Efecto::OcarinaArriba, Efecto::Rebobinar, Efecto::Protesto, Efecto::Mazo, Efecto::Claqueta, Efecto::Nota0, Efecto::Nota1, Efecto::Nota2, Efecto::Nota3, Efecto::Nota4, Efecto::Nota5, Efecto::Nota6, Efecto::Nota7, Efecto::Cometa, Efecto::Sello, Efecto::Reglazo, Efecto::Latido, Efecto::Trueno, Efecto::Puerta, Efecto::Whatsapp, Efecto::Teclas, Efecto::Chorro, Efecto::Pop, Efecto::Rocky, Efecto::Monolito, Efecto::Teseracto, Efecto::Gusano, Efecto::Mazazo, Efecto::MazazoFuerte, Efecto::Aire, Efecto::KochSale, Efecto::Recursion, Efecto::Wack, Efecto::Wack2, Efecto::Wack3, Efecto::Tablero, Efecto::KochAy, Efecto::KochRisa, Efecto::Pase, Efecto::Roce, Efecto::Scratch, Efecto::GritoAnillazo]
             .into_iter()
             .filter_map(|e| cargar(efecto(e)))
             .collect();
@@ -991,7 +999,7 @@ mod pruebas_del_wack {
 
     #[test]
     fn el_wack_y_compania_suenan_y_no_se_salen() {
-        for e in [Efecto::Wack, Efecto::Wack2, Efecto::Wack3, Efecto::Mazazo, Efecto::Aire, Efecto::Tablero, Efecto::KochAy, Efecto::KochRisa, Efecto::KochSale, Efecto::Recursion, Efecto::Pase, Efecto::Roce, Efecto::Scratch, Efecto::GritoAnillazo] {
+        for e in [Efecto::Wack, Efecto::Wack2, Efecto::Wack3, Efecto::Mazazo, Efecto::MazazoFuerte, Efecto::Aire, Efecto::Tablero, Efecto::KochAy, Efecto::KochRisa, Efecto::KochSale, Efecto::Recursion, Efecto::Pase, Efecto::Roce, Efecto::Scratch, Efecto::GritoAnillazo] {
             let m = efecto(e);
             assert!(!m.is_empty(), "{e:?} esta vacio");
             let pico = m.iter().fold(0.0f32, |p, x| p.max(x.abs()));

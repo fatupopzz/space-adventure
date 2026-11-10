@@ -30,7 +30,7 @@ use std::f32::consts::PI;
 
 pub const FOV: f32 = 50.0;
 pub const OJO: Vec3 = Vec3::new(0.0, 6.7, 7.9);
-pub const MIRA: Vec3 = Vec3::new(0.0, 0.85, -0.7);
+pub const MIRA: Vec3 = Vec3::new(0.0, 1.3, -0.7);
 pub const HOYOS: usize = 9;
 pub const BPM: f32 = 150.0;
 /// Segundos por corchea: el reloj de todo el juego.
@@ -55,9 +55,14 @@ const UMBRAL_X: f32 = 0.35;
 const UMBRAL_Y: f32 = 0.19;
 const MEMORIA_STICK: f32 = 0.09;
 const MAZO_ALTO: f32 = 1.78;
+/// En reposo, la muneca va a la derecha del hoyo y el mango girado hacia el.
+const APARTE: f32 = 1.25;
+const APARTE_GIRO: f32 = 0.45;
 const DURA_RECURSION: f32 = 6.0;
 /// Con estos puntos se gana la parte de la nota que da el puntaje.
 const META_PUNTOS: u32 = 26000;
+/// Las iteraciones del copo gigante del piso: del triangulo (0) al copo fino (4).
+pub const ITERACIONES_COPO: usize = 5;
 
 /// Donde esta cada hoyo: de atras hacia el frente y de izquierda a derecha (como Q W E / A S D / Z X C).
 pub fn hoyo(k: usize) -> Vec3 {
@@ -328,6 +333,17 @@ pub enum AccionKoch {
     Despegar,
 }
 
+/// Lo que se puede escoger con un clic en las ayudas del pie.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum Ayuda {
+    Seguir,
+    Despegar,
+}
+
+/// Cuanto sigue el mazo al raton (0: pegado al hoyo; 1: suelto del todo). Con algo de iman se ve a
+/// que hoyo le va a pegar sin dejar de sentirse en la mano.
+const SUELTO: f32 = 0.6;
+
 /// El final: lo que falta por salir.
 struct Jefe {
     vidas_grande: u32,
@@ -382,6 +398,8 @@ pub struct Koch {
     enfriar: f32,
     pendiente: Option<usize>,
     raton_antes: Option<(f32, f32)>,
+    /// Donde cae el raton sobre el tablero: el mazo lo sigue libre, jalado por el hoyo mas cercano.
+    raton_mundo: Option<Vec3>,
     /// Hace cuanto se solto el stick, y si el gatillo ya venia apretado.
     stick_quieto: f32,
     gatillo_antes: bool,
@@ -429,6 +447,8 @@ pub struct Koch {
     pub record: u32,
     /// Donde quedo la imagen en la ventana (para el raton; se usa el cuadro siguiente).
     imagen: Cell<(f32, f32, f32, f32)>,
+    /// La ayuda del pie que tiene el raton encima (se dibuja resaltada y se le puede hacer clic).
+    sobre_ayuda: Cell<Option<Ayuda>>,
 }
 
 impl Koch {
@@ -465,6 +485,7 @@ impl Koch {
             enfriar: 0.0,
             pendiente: None,
             raton_antes: None,
+            raton_mundo: None,
             stick_quieto: 9.0,
             gatillo_antes: false,
             con_raton: false,
@@ -502,6 +523,7 @@ impl Koch {
             limpia: true,
             record,
             imagen: Cell::new((0.0, 0.0, 0.0, 0.0)),
+            sobre_ayuda: Cell::new(None),
         }
     }
 
@@ -532,7 +554,7 @@ impl Koch {
     }
 
     /// Donde va cada letra del titulo y de que color: brincan y se encienden de una en una con la
-    /// musica; en la recursion corren en arcoiris; al pegar, todo el titulo da un salto.
+    /// musica; en la recursion lo recorre ademas una ola celeste; al pegar, todo el titulo da un salto.
     pub fn titulo(&self) -> Vec<(Mat4, usize)> {
         let reloj = self.total / CORCHEA;
         let ola = reloj as usize % (TITULO.len() + 3);
@@ -543,8 +565,10 @@ impl Koch {
             .enumerate()
             .map(|(k, &(_, x, y, u))| {
                 let brinca = if ola == k { 0.14 * (1.0 - reloj.fract()) } else { 0.0 };
-                let color = if self.fiebre > 0.0 {
-                    (reloj as usize + k) % 3
+                let color = if self.fiebre > 0.0 && reloj as usize % TITULO.len() == k {
+                    // En la recursion el titulo sigue con sus colores (el arcoiris letra por letra
+                    // no lo dejaba leer): lo recorre una ola celeste, sin pausa entre vueltas.
+                    2
                 } else if ola == k {
                     3
                 } else if k < 5 {
@@ -556,6 +580,22 @@ impl Koch {
                 (m, color)
             })
             .collect()
+    }
+
+    /// El copo de Koch gigante dibujado en el piso, alrededor de la maquina: que iteracion va y
+    /// donde. Crece una iteracion por parcial (triangulo, estrella, copo) y en el final ya es el
+    /// fractal entero; en la llegada las va pasando todas, despacio, para que se vea como se arma.
+    pub fn copo_gigante(&self) -> (usize, Mat4) {
+        let de_parcial = |n: usize| if n >= FINAL { ITERACIONES_COPO - 1 } else { n };
+        let (iteracion, brote) = match self.fase {
+            Fase::Llegada => ((self.total / 1.6) as usize % ITERACIONES_COPO, 1.0 - (self.total / 1.6).fract().min(0.2) / 0.2),
+            Fase::Cartel(n) => (de_parcial(n), 1.0 - (self.t / 0.35).min(1.0)),
+            Fase::Jugando => (de_parcial(self.parcial), 0.0),
+            Fase::Resultado => (if self.aprobo_final { ITERACIONES_COPO - 1 } else { de_parcial(self.parcial) }, 0.0),
+        };
+        // Un brinquito al cambiar de iteracion, y late apenas con la musica. Gira muy despacio.
+        let escala = 12.0 * (1.0 + 0.06 * brote * brote + self.pulso * self.pulso * 0.01);
+        (iteracion, Mat4::translation(Vec3::new(0.0, -2.93, -1.2)) * Mat4::rotation_y(self.total * 0.02) * Mat4::scale(escala))
     }
 
     /// Los brillos: estrellas que se prenden y apagan sobre las letras (donde y de que tamano).
@@ -655,7 +695,8 @@ impl Koch {
         let (lado, altura) = (x.abs() > UMBRAL_X, y.abs() > UMBRAL_Y);
         let mueve = lado || altura;
         if let Some(p) = e.puntero {
-            if self.raton_antes.is_some_and(|a| (a.0 - p.0).abs() + (a.1 - p.1).abs() > 1.0) {
+            // Moverlo o hacer clic: desde ahi manda el raton (hasta que se toque el stick o una tecla).
+            if e.clic || e.clic_derecho || self.raton_antes.is_some_and(|a| (a.0 - p.0).abs() + (a.1 - p.1).abs() > 1.0) {
                 self.con_raton = true;
             }
             self.raton_antes = Some(p);
@@ -663,11 +704,15 @@ impl Koch {
                 if let Some(k) = self.hoyo_del_raton(p) {
                     self.cursor = k;
                 }
+                self.raton_mundo = desproyectar(p, self.imagen.get(), 0.6);
             }
         }
         if mueve {
             self.con_raton = false;
             self.stick_quieto = 0.0;
+        }
+        if !self.con_raton {
+            self.raton_mundo = None;
         }
         // Al soltar el stick, el hoyo se recuerda un momentito: empujar y apretar casi juntos
         // cuenta para donde se empujo, no para el centro. Con el teclado, el mazo se queda donde pego.
@@ -681,12 +726,26 @@ impl Koch {
         self.gatillo_antes = e.gatillo;
         if let Some(k) = e.celda {
             self.con_raton = false;
+            self.raton_mundo = None;
             return Some(k);
         }
         // En el control pega cualquier boton (cruz, circulo, triangulo, cuadrado, L1, R1 y R2): asi
         // se pueden alternar dedos como en un tambor, cuando vienen seguidos.
         let boton = e.hay_control && (e.pestana_izq || e.pestana_der || e.barrel || e.orbitar || e.aterrizar || gatillo);
-        (e.aceptar || e.clic || boton).then_some(self.cursor)
+        // Con el raton pegan los dos botones: se alternan los dedos, igual que en el control.
+        (e.aceptar || e.clic || e.clic_derecho || boton).then_some(self.cursor)
+    }
+
+    /// Donde quiere estar el mazo: encima de su hoyo, o siguiendo al raton por el tablero.
+    fn meta_del_mazo(&self) -> Vec3 {
+        let h = hoyo(self.cursor);
+        match self.raton_mundo {
+            Some(p) => {
+                let p = Vec3::new(p.x.clamp(-3.3, 3.3), 0.0, p.z.clamp(-2.9, 2.7));
+                h.lerp(p, SUELTO)
+            }
+            None => h,
+        }
     }
 
     /// Para las capturas, los videos y las pruebas: juega solo (no le pega a los companeros).
@@ -744,16 +803,20 @@ impl Koch {
         }
         self.mover_mazo(dt);
         self.mover_efectos(dt);
+        // Con el raton: un clic en "Despegar" despega; en cualquier otro lado, sigue.
+        let en_despegar = e.clic && self.sobre_ayuda.get() == Some(Ayuda::Despegar);
+        let despegar = e.aterrizar || en_despegar;
+        let seguir = e.aceptar || (e.clic && !en_despegar);
 
         match self.fase {
             Fase::Llegada => {
                 if self.t < dt * 1.5 {
                     self.decir("¿Me va a pegar? Bien. Fue idea mía. Pero se califica.", 4.5);
                 }
-                if e.aterrizar {
+                if despegar {
                     return AccionKoch::Despegar;
                 }
-                if (e.aceptar || e.clic) && self.t > 0.3 {
+                if seguir && self.t > 0.3 {
                     self.eventos.push(Efecto::Acierto);
                     self.mensaje = None;
                     self.fase = Fase::Cartel(0);
@@ -764,10 +827,10 @@ impl Koch {
                 if self.t < dt * 1.5 {
                     self.eventos.push(Efecto::Sello);
                 }
-                if e.aterrizar && self.t > 0.5 {
+                if despegar && self.t > 0.5 {
                     return AccionKoch::Despegar;
                 }
-                if (e.aceptar || e.clic) && self.t > 0.7 || self.t > 3.4 {
+                if seguir && self.t > 0.7 || self.t > 3.4 {
                     self.arrancar(n);
                 }
             }
@@ -778,11 +841,11 @@ impl Koch {
                 if self.t > 0.3 && self.t < 1.2 && ((self.t - 0.3) / 0.06).floor() as i32 != antes {
                     self.eventos.push(Efecto::Teclas);
                 }
-                if self.t > ESPERA_RESULTADO && (e.aceptar || e.clic) {
+                if self.t > ESPERA_RESULTADO && despegar {
+                    return AccionKoch::Despegar;
+                } else if self.t > ESPERA_RESULTADO && seguir {
                     self.eventos.push(Efecto::Acierto);
                     self.reiniciar_partida();
-                } else if self.t > ESPERA_RESULTADO && e.aterrizar {
-                    return AccionKoch::Despegar;
                 }
             }
         }
@@ -1212,10 +1275,11 @@ impl Koch {
         if self.azar() < 0.55 || a.tipo != Tipo::Normal {
             self.eventos.push(Efecto::KochAy);
         }
-        // El mazazo al final: en el control, la ultima vibracion es la que se siente.
-        self.eventos.push(Efecto::Mazazo);
+        // El mazazo al final: en el control, la ultima vibracion es la que se siente. El perfecto
+        // y el dorado pegan mas fuerte en las manos.
+        self.eventos.push(if perfecto || a.tipo == Tipo::Dorado { Efecto::MazazoFuerte } else { Efecto::Mazazo });
         let color_chispa = if a.tipo == Tipo::Dorado { 3 } else { 0 };
-        self.polvo(arriba, if perfecto { 18 } else { 12 }, color_chispa, 1.0);
+        self.polvo(arriba, if perfecto { 13 } else { 8 }, color_chispa, 1.0);
         let lado = self.azar() * 3.0 - 1.5;
         self.vuelan.push(Vuela { cual: 0, pos: arriba - Vec3::new(0.0, 0.2, -0.2), vel: Vec3::new(lado, 5.0, 1.8), gira: 0.0, vida: 0.9 });
         let texto = if perfecto { format!("¡PERFECTO! +{ganados}") } else { format!("+{ganados}") };
@@ -1339,7 +1403,7 @@ impl Koch {
 
     fn polvo(&mut self, pos: Vec3, n: usize, color: usize, fuerza: f32) {
         for _ in 0..n {
-            if self.chispas.len() >= 140 {
+            if self.chispas.len() >= 90 {
                 break;
             }
             let (a, b, c, d) = (self.azar(), self.azar(), self.azar(), self.azar());
@@ -1358,7 +1422,7 @@ impl Koch {
 
     /// El mazo: resortes con poco freno, para que rebote despues de pegar y se quede vibrando.
     fn mover_mazo(&mut self, dt: f32) {
-        let meta = hoyo(self.cursor);
+        let meta = self.meta_del_mazo();
         let antes = self.mazo_pos.x;
         if let Some((_, t)) = &mut self.giro {
             // Cae acelerando: despacito arriba, de golpe abajo.
@@ -1425,7 +1489,7 @@ impl Koch {
     pub fn camara(&self) -> (Vec3, Vec3, Vec3) {
         let s = self.sacudida * self.sacudida * 0.34;
         let (a, b) = ((self.total * 71.0).sin(), (self.total * 93.0).cos());
-        let empuje = if self.fiebre > 0.0 { Vec3::new((self.total * 0.9).sin() * 0.35, -0.45, -0.7) } else { Vec3::zero() };
+        let empuje = if self.fiebre > 0.0 { Vec3::new((self.total * 0.9).sin() * 0.3, -0.2, -0.25) } else { Vec3::zero() };
         // Un golpecito de zoom con cada tiempo: la camara tambien va con la musica.
         let late = (MIRA - OJO).normalize() * (self.pulso * self.pulso * 0.09);
         let arriba = if self.fiebre > 0.0 { Vec3::new((self.total * 1.3).sin() * 0.05, 1.0, 0.0) } else { Vec3::new(a * s * 0.05, 1.0, 0.0) };
@@ -1441,20 +1505,22 @@ impl Koch {
     fn mazo_en(&self, angulo: f32) -> (Mat4, Mat4) {
         // Descansa hacia la camara, para no tapar los hoyos de atras; al girar llega justo encima.
         // Viene un poco de lado (como un brazo de verdad), y si pega al aire, la muneca baja al tablero.
-        let (hacia, baja, lado) = match self.giro {
+        // Descansa a la derecha del hoyo, con el mango de lado (como en la mano derecha): asi no le
+        // tapa la cara al que salga. Al pegar entra desde ahi y cae justo encima.
+        let (hacia, baja, aparta) = match self.giro {
             Some((_, t)) => {
                 let k = (t / GIRO).min(1.0);
-                (0.75 * (1.0 - k), if self.dio { 0.0 } else { 1.05 * k * k }, 0.6 * (1.0 - k * k))
+                (0.75 * (1.0 - k), if self.dio { 0.0 } else { 1.05 * k * k }, 1.0 - k * k)
             }
-            None => (
-                0.75 * ((self.desde_golpe - 0.03) / 0.16).clamp(0.0, 1.0),
-                if self.dio { 0.0 } else { 1.05 * (1.0 - (self.desde_golpe / 0.16).min(1.0)).powi(2) },
-                0.0,
-            ),
+            None => {
+                let r = ((self.desde_golpe - 0.03) / 0.16).clamp(0.0, 1.0);
+                (0.75 * r, if self.dio { 0.0 } else { 1.05 * (1.0 - (self.desde_golpe / 0.16).min(1.0)).powi(2) }, r * r * (3.0 - 2.0 * r))
+            }
         };
+        let lado = -APARTE_GIRO * aparta;
         // Mas arriba para el grande, mas abajo para los chicos: el mazo cae justo en la cabeza.
         let sube = if self.dio { self.alto_golpe - ALTO * ESCALA * ASOMA } else { 0.0 };
-        let mano = Mat4::translation(self.mazo_pos + Vec3::new(0.0, MAZO_ALTO - baja + sube, 1.75 * MAZO + hacia)) * Mat4::rotation_y(-lado) * Mat4::rotation_z(self.ladeo + lado * 0.5) * Mat4::rotation_x(angulo) * Mat4::scale(MAZO);
+        let mano = Mat4::translation(self.mazo_pos + Vec3::new(APARTE * aparta, MAZO_ALTO - baja + sube, 1.75 * MAZO + hacia)) * Mat4::rotation_y(-lado) * Mat4::rotation_z(self.ladeo + lado * 0.5) * Mat4::rotation_x(angulo) * Mat4::scale(MAZO);
         let cabeza = mano * Mat4::translation(Vec3::new(0.0, 0.0, -1.75)) * Mat4::rotation_x(self.cabeza_ang * 0.35) * Mat4::rotation_z(self.ladeo * 1.6);
         (mano, cabeza)
     }
@@ -1510,8 +1576,9 @@ impl Koch {
         let mut v = [(0usize, 0.0f32); HOYOS];
         for k in 0..HOYOS {
             if self.fiebre > 0.0 {
-                // En la recursion, los aros corren en arcoiris con la musica.
-                v[k].0 = 1 + ((self.total / CORCHEA) as usize + k) % 6;
+                // En la recursion, los aros corren en una ola rosa y celeste, por diagonales, con
+                // cada tiempo (los seis colores a la vez se confundian con los de cada Koch).
+                v[k].0 = if ((self.total / CORCHEA * 0.5) as usize + k % 3 + k / 3) % 2 == 0 { 6 } else { 5 };
             }
             if let Some(a) = &self.hoyos[k] {
                 if a.golpeable() {
@@ -1544,6 +1611,7 @@ impl Koch {
     pub fn dibujar_ui(&self, d: &mut RaylibDrawHandle, e: &Entrada, texto: &str, imagen: Rectangle, ancho: i32, alto: i32) {
         let rect = (imagen.x, imagen.y, imagen.width, imagen.height);
         self.imagen.set(rect);
+        self.sobre_ayuda.set(None);
         match self.fase {
             Fase::Llegada => self.ui_llegada(d, e, texto, ancho, alto),
             Fase::Cartel(n) => {
@@ -1551,11 +1619,12 @@ impl Koch {
                 self.ui_cartel(d, e, n, ancho, alto);
             }
             Fase::Jugando => {
-                self.ui_guia(d, e, rect, ancho, alto);
+                self.ui_guia(d, e, ancho, alto);
                 self.ui_marcador(d, ancho);
                 self.ui_letreros(d, rect);
-                self.ui_comentario(d, texto, ancho, alto);
+                self.ui_comentario(d, texto, rect);
                 self.ui_recursion(d, e, ancho, alto);
+                self.ui_mira(d, e);
             }
             Fase::Resultado => {
                 self.ui_letreros(d, rect);
@@ -1564,14 +1633,37 @@ impl Koch {
         }
     }
 
-    fn ui_comentario(&self, d: &mut RaylibDrawHandle, texto: &str, ancho: i32, alto: i32) {
+    fn ui_comentario(&self, d: &mut RaylibDrawHandle, texto: &str, (x, y, w, h): (f32, f32, f32, f32)) {
         if texto.is_empty() {
             return;
         }
-        // Abajo a la izquierda, chiquito: que no tape los hoyos.
-        let w = 440.min(ancho - 40);
-        let h = ui::alto_dialogo("PROFE KOCH", texto, w);
-        ui::caja_dialogo(d, "PROFE KOCH", Color::new(255, 150, 200, 255), texto, 20, alto - h - 64, w);
+        // A la izquierda de la maquina, angosto: abajo tapaba el hoyo de la esquina.
+        let ancho_caja = ((w * 0.235) as i32).clamp(210, 330);
+        ui::caja_dialogo(d, "PROFE KOCH", Color::new(255, 150, 200, 255), texto, x as i32 + 18, (y + h * 0.5) as i32, ancho_caja);
+    }
+
+    /// Las ayudas del pie de las pantallas quietas. Con el raton se les puede hacer clic (la que
+    /// tiene encima sale resaltada); sin control, lo que sigue se escoge con un clic donde sea.
+    fn ui_pie(&self, d: &mut RaylibDrawHandle, e: &Entrada, seguir: &str, ancho: i32, alto: i32) {
+        let boton = if e.hay_control { e.nombre("aceptar") } else { e.nombre("gatillo") };
+        let encima = ui::ayudas_con_raton(d, &[(boton, seguir), (e.nombre("aterrizar"), "Despegar")], ancho, alto, e.puntero);
+        self.sobre_ayuda.set(encima.map(|k| if k == 0 { Ayuda::Seguir } else { Ayuda::Despegar }));
+    }
+
+    /// El puntero mientras se juega con el raton (el del sistema va escondido): una estrellita de
+    /// Koch, la primera iteracion del copo, que late con la musica.
+    fn ui_mira(&self, d: &mut RaylibDrawHandle, e: &Entrada) {
+        let (true, Some((mx, my))) = (self.con_raton, e.puntero) else { return };
+        let golpe = (1.0 - (self.desde_golpe / 0.12).min(1.0)) * if self.dio { 5.0 } else { 2.0 };
+        let r = 11.0 + self.pulso * self.pulso * 2.0 + golpe;
+        let p = copo_de_koch(1);
+        let en = |q: [f32; 2], dx: f32, dy: f32| Vector2::new(mx + q[0] * r + dx, my - q[1] * r + dy);
+        for (dx, dy, grosor, color) in [(1.5, 2.0, 4.0, Color::new(30, 10, 60, 170)), (0.0, 0.0, 2.0, Color::new(255, 245, 255, 255))] {
+            for i in 0..p.len() {
+                d.draw_line_ex(en(p[i], dx, dy), en(p[(i + 1) % p.len()], dx, dy), grosor, color);
+            }
+        }
+        d.draw_circle(mx as i32, my as i32, 2.0, Color::new(255, 150, 230, 255));
     }
 
     fn ui_llegada(&self, d: &mut RaylibDrawHandle, e: &Entrada, texto: &str, ancho: i32, alto: i32) {
@@ -1606,11 +1698,11 @@ impl Koch {
         }
         // Como se juega, segun lo que este conectado.
         let (como, y_como) = (
-            if e.hay_control { "Stick o cruceta: apuntar  ·  Cualquier botón: pegar" } else { "Q W E · A S D · Z X C: pegar directo  ·  Ratón: apuntar y clic" },
+            if e.hay_control { "Stick o cruceta: apuntar  ·  Cualquier botón: pegar" } else { "Ratón: mueva el mazo  ·  Clic izquierdo o derecho: pegar" },
             py + ph + 8,
         );
         ui::subtitulo(d, como, (ancho - ui::medir(como, 20)).max(20) / 2, y_como, 20, Color::new(170, 235, 255, 255));
-        ui::ayudas(d, &[(e.nombre("aceptar"), "Empezar"), (e.nombre("aterrizar"), "Despegar")], ancho, alto);
+        self.ui_pie(d, e, "Empezar", ancho, alto);
     }
 
     fn ui_cartel(&self, d: &mut RaylibDrawHandle, e: &Entrada, n: usize, ancho: i32, alto: i32) {
@@ -1640,7 +1732,7 @@ impl Koch {
         };
         let ancho_dato = ui::medir(dato, 18);
         ui::subtitulo(d, dato, ((ancho - ancho_dato) / 2).max(10), (h * 0.74) as i32, 18, ui::TENUE);
-        ui::ayudas(d, &[(e.nombre("aceptar"), "¡Ya!"), (e.nombre("aterrizar"), "Despegar")], ancho, alto);
+        self.ui_pie(d, e, "¡Ya!", ancho, alto);
     }
 
     /// El marcador: arriba, y que no tape el tablero.
@@ -1700,21 +1792,14 @@ impl Koch {
         }
     }
 
-    /// Las letras de cada hoyo en el primer parcial (con teclado), y como apuntar con el control.
-    fn ui_guia(&self, d: &mut RaylibDrawHandle, e: &Entrada, rect: (f32, f32, f32, f32), ancho: i32, alto: i32) {
-        const LETRAS: [&str; 9] = ["Q", "W", "E", "A", "S", "D", "Z", "X", "C"];
-        if !e.hay_control && (self.parcial == 0 || self.reloj < 4.0) && !self.con_raton {
-            for (k, l) in LETRAS.iter().enumerate() {
-                if let Some((x, y)) = proyectar(hoyo(k) + Vec3::new(0.0, 0.0, 0.92), rect) {
-                    ui::tecla(d, l, x as i32 - 10, y as i32 - 12, 18, self.cursor == k && self.desde_golpe < 0.1);
-                }
-            }
-        }
+    /// Como se juega, los primeros segundos: con el control o con el raton (las teclas Q W E /
+    /// A S D / Z X C siguen pegando directo en su hoyo, pero ya no se anuncian).
+    fn ui_guia(&self, d: &mut RaylibDrawHandle, e: &Entrada, ancho: i32, alto: i32) {
         if self.parcial == 0 && self.reloj < 7.0 {
             let acciones: Vec<(&str, &str)> = if e.hay_control {
                 vec![(e.nombre("apuntar"), "Apuntar"), (e.nombre("aceptar"), "Pegar (o cualquier botón)"), (e.nombre("pausa"), "Pausa o despegar")]
             } else {
-                vec![("Q W E · A S D · Z X C", "Pegar en ese hoyo"), ("ratón", "Apuntar y clic"), (e.nombre("pausa"), "Pausa o despegar")]
+                vec![(e.nombre("apuntar"), "Mover el mazo"), (e.nombre("gatillo"), "Pegar (cualquiera de los dos)"), (e.nombre("pausa"), "Pausa o despegar")]
             };
             ui::ayudas(d, &acciones, ancho, alto);
         }
@@ -1759,10 +1844,11 @@ impl Koch {
                     d.draw_rectangle(x + b * ww, y, ww - 1, 16, c);
                 }
             }
-            let s = "¡¡RECURSIÓN!!  × 3";
-            let tam = (alto as f32 * 0.075) as i32;
-            let brinco = ((self.total * BPM / 30.0 * PI).sin().abs() * 6.0) as i32;
-            ui::titulo_de(d, s, (ancho - ui::medir_titulo(s, tam)) / 2, y - tam - 14 - brinco, tam, Color::new(255, 120, 220, 255));
+            let s = "¡¡RECURSIÓN!!  X3";
+            // Cabe en el frente del mueble: mas grande tapaba la fila de abajo.
+            let tam = (alto as f32 * 0.05) as i32;
+            let brinco = ((self.total * BPM / 30.0 * PI).sin().abs() * 3.0) as i32;
+            ui::titulo_de(d, s, (ancho - ui::medir_titulo(s, tam)) / 2, y - tam - 9 - brinco, tam, Color::new(255, 120, 220, 255));
         } else {
             d.draw_rectangle(x, y, (w as f32 * self.recursion) as i32, 16, Color::new(190, 120, 255, 255));
             let s = "RECURSIÓN";
@@ -1816,7 +1902,7 @@ impl Koch {
             let w = 640.min(ancho - 40);
             ui::caja_dialogo(d, "PROFE KOCH", Color::new(255, 150, 200, 255), texto, (ancho - w) / 2, (h * 0.74) as i32, w);
         }
-        ui::ayudas(d, &[(e.nombre("aceptar"), "Otra vez"), (e.nombre("aterrizar"), "Despegar")], ancho, alto);
+        self.ui_pie(d, e, "Otra vez", ancho, alto);
     }
 
     /// Para las capturas: `koch` (la llegada), `koch_cartel`, `koch_juego`, `koch_recursion`,
@@ -1916,6 +2002,21 @@ fn proyectar(p: Vec3, (x, y, w, h): (f32, f32, f32, f32)) -> Option<(f32, f32)> 
     (c.w > 0.01).then(|| (x + (c.x / c.w + 1.0) * 0.5 * w, y + (1.0 - c.y / c.w) * 0.5 * h))
 }
 
+/// Al reves: el punto del plano `y = altura` que queda debajo de un punto de la ventana.
+fn desproyectar((mx, my): (f32, f32), (x, y, w, h): (f32, f32, f32, f32), altura: f32) -> Option<Vec3> {
+    if w <= 0.0 || h <= 0.0 {
+        return None;
+    }
+    let adelante = (MIRA - OJO).normalize();
+    let derecha = adelante.cross(Vec3::new(0.0, 1.0, 0.0)).normalize();
+    let arriba = derecha.cross(adelante);
+    let t = (FOV.to_radians() * 0.5).tan();
+    let (nx, ny) = ((mx - x) / w * 2.0 - 1.0, 1.0 - (my - y) / h * 2.0);
+    let rayo = adelante + derecha * (nx * t * 16.0 / 9.0) + arriba * (ny * t);
+    // Hacia arriba no toca el tablero.
+    (rayo.y < -1e-3).then(|| OJO + rayo * ((altura - OJO.y) / rayo.y))
+}
+
 // ---------------------------------------------------------------------------------------------
 // El copo de nieve de Koch
 // ---------------------------------------------------------------------------------------------
@@ -1970,6 +2071,8 @@ pub struct Modelos {
     pub birrete: Modelo,
     pub lentes: Modelo,
     pub copo_suelto: Modelo,
+    /// El copo gigante del piso, en cada iteracion.
+    pub copo_gigante: Vec<Modelo>,
     pub torres: Modelo,
     pub suelo: Modelo,
 }
@@ -2023,7 +2126,10 @@ pub fn paleta(o: &mut Obra) {
     o.material("foco", [0.6, 0.5, 0.3], [1.0, 0.82, 0.45], 0.0, 1.0);
     o.material("suelo", [0.20, 0.13, 0.38], [0.012, 0.006, 0.03], 0.0, 1.0);
     o.material("suelo_b", [0.27, 0.17, 0.48], [0.016, 0.008, 0.04], 0.0, 1.0);
-    o.material("cristal", [0.55, 0.45, 0.85], [0.08, 0.05, 0.16], 0.0, 1.0);
+    // Las torres del fondo, apagadas: lo que brilla es la maquina.
+    o.material("torre_a", [0.30, 0.22, 0.56], [0.02, 0.012, 0.05], 0.0, 1.0);
+    o.material("torre_b", [0.23, 0.15, 0.46], [0.014, 0.008, 0.04], 0.0, 1.0);
+    o.material("torre_c", [0.50, 0.24, 0.62], [0.10, 0.03, 0.13], 0.0, 1.0);
     o.material("vidrio", [0.75, 0.9, 1.0], [0.3, 0.42, 0.5], 0.0, 1.0);
 }
 
@@ -2047,6 +2153,25 @@ fn copo_suelto() -> Modelo {
         // Un abanico desde el centro, por los dos lados.
         o.quad("vidrio", [v(0.0, 0.0, 0.0), v(a[0], a[1], 0.0), v(b[0], b[1], 0.0), v(0.0, 0.0, 0.0)], v(0.0, 0.0, 1.0));
         o.quad("vidrio", [v(0.0, 0.0, 0.0), v(b[0], b[1], 0.0), v(a[0], a[1], 0.0), v(0.0, 0.0, 0.0)], v(0.0, 0.0, -1.0));
+    }
+    o.modelo()
+}
+
+/// El copo gigante del piso en la iteracion `n`, de radio 1 y acostado: solo el filo de neon (el
+/// contorno es lo que crece 4/3 en cada iteracion).
+fn copo_gigante(n: usize) -> Modelo {
+    let mut o = Obra::new();
+    paleta(&mut o);
+    // Solo brillan (no reflejan): asi no cambian con la luz que late.
+    o.material("copo_filo", [0.0, 0.0, 0.0], [0.70, 0.56, 1.0], 0.0, 1.0);
+    let p = copo_de_koch(n);
+    let adentro = 0.972;
+    let arriba = v(0.0, 1.0, 0.0);
+    // La punta del triangulo va hacia el fondo (atras del letrero).
+    let en = |q: [f32; 2], k: f32, y: f32| v(q[0] * k, y, -q[1] * k);
+    for i in 0..p.len() {
+        let (a, b) = (p[i], p[(i + 1) % p.len()]);
+        o.quad("copo_filo", [en(a, adentro, 0.004), en(a, 1.0, 0.004), en(b, 1.0, 0.004), en(b, adentro, 0.004)], arriba);
     }
     o.modelo()
 }
@@ -2264,7 +2389,7 @@ fn lentes() -> Modelo {
 
 /// Un cubo con cubos pegados en sus caras, y esos con los suyos: la superficie cuadratica de Koch.
 fn cubo_fractal(o: &mut Obra, c: Vec3, r: f32, nivel: u32, venia: Option<Vec3>) {
-    let mat = if nivel == 0 { "n6" } else if nivel == 1 { "suelo_b" } else { "cristal" };
+    let mat = if nivel == 0 { "torre_c" } else if nivel == 1 { "torre_b" } else { "torre_a" };
     o.caja(mat, c - Vec3::new(r, r, r), c + Vec3::new(r, r, r));
     if nivel == 0 {
         return;
@@ -2328,6 +2453,7 @@ pub fn modelos() -> Modelos {
         birrete: birrete(),
         lentes: lentes(),
         copo_suelto: copo_suelto(),
+        copo_gigante: (0..ITERACIONES_COPO).map(copo_gigante).collect(),
         torres: torres(),
         suelo: suelo(),
     }
@@ -2667,7 +2793,7 @@ mod pruebas {
         assert_eq!(k.aciertos, 1);
         assert_eq!(k.perfectos, 1, "recien salido es perfecto");
         assert!(k.pausa > 0.03 && k.pausa <= 0.1, "congelada de {} s", k.pausa);
-        assert!(k.eventos.contains(&Efecto::Mazazo));
+        assert!(k.eventos.contains(&Efecto::MazazoFuerte), "el perfecto pega con el mazazo fuerte");
         assert!(k.eventos.contains(&Efecto::Aire), "el soplido del giro");
         assert!(k.eventos.iter().any(|e| matches!(e, Efecto::Wack | Efecto::Wack2 | Efecto::Wack3)), "¡WACK!");
         assert_eq!(k.puntos, 150);
@@ -2861,12 +2987,133 @@ mod pruebas {
         let mut k = Koch::new(5, 0);
         k.arrancar(0);
         k.hoyos[2] = Some(Asomado::nuevo(Tipo::Normal, 1.0));
+        // Uno que ya lleva rato afuera: el golpe normal.
+        k.hoyos[2].as_mut().unwrap().edad = 0.8;
         pegar(&mut k, 2);
         let ultima = k.eventos.iter().rev().find_map(|&e| crate::vibracion::de_efecto(e));
         assert_eq!(ultima, crate::vibracion::de_efecto(Efecto::Mazazo));
         assert!(crate::vibracion::de_efecto(Efecto::Mazazo).is_some_and(|(grave, _, _)| grave > 0.5));
+        // Recien salido es ¡PERFECTO!: se siente mas fuerte y mas largo que el normal.
+        let mut k = Koch::new(5, 0);
+        k.arrancar(0);
+        k.hoyos[2] = Some(Asomado::nuevo(Tipo::Normal, 1.0));
+        pegar(&mut k, 2);
+        assert_eq!(k.perfectos, 1);
+        let ultima = k.eventos.iter().rev().find_map(|&e| crate::vibracion::de_efecto(e));
+        assert_eq!(ultima, crate::vibracion::de_efecto(Efecto::MazazoFuerte));
+        let ((g0, _, ms0), (g1, _, ms1)) = (crate::vibracion::de_efecto(Efecto::Mazazo).unwrap(), crate::vibracion::de_efecto(Efecto::MazazoFuerte).unwrap());
+        assert!(g1 > g0 && ms1 > ms0, "el perfecto tiene que notarse en las manos");
         assert!(crate::vibracion::de_efecto(Efecto::Reglazo).is_some());
         assert!(crate::vibracion::de_efecto(Efecto::Recursion).is_some());
+    }
+
+    /// La ventana de las pruebas del raton: la imagen ocupa todo, a 1280 x 720.
+    const VENTANA: (f32, f32, f32, f32) = (0.0, 0.0, 1280.0, 720.0);
+
+    /// Donde se ve en la ventana el Koch que sale del hoyo `k`.
+    fn en_pantalla(k: usize) -> (f32, f32) {
+        proyectar(hoyo(k) + Vec3::new(0.0, 0.6, 0.0), VENTANA).unwrap()
+    }
+
+    /// Lleva el raton hasta ahi (hay que moverlo para que mande el).
+    fn mover_raton(k: &mut Koch, p: (f32, f32)) {
+        k.imagen.set(VENTANA);
+        k.leer_golpe(&Entrada { puntero: Some((p.0 - 30.0, p.1 - 30.0)), ..Default::default() });
+        k.leer_golpe(&Entrada { puntero: Some(p), ..Default::default() });
+    }
+
+    #[test]
+    fn el_raton_apunta_al_hoyo_que_tiene_debajo() {
+        let mut k = Koch::new(5, 0);
+        k.arrancar(0);
+        for h in 0..HOYOS {
+            let p = en_pantalla(h);
+            mover_raton(&mut k, p);
+            assert!(k.con_raton);
+            assert_eq!(k.cursor, h, "el raton sobre el hoyo {h}");
+            assert_eq!(k.leer_golpe(&Entrada { puntero: Some(p), clic: true, ..Default::default() }), Some(h), "clic en el hoyo {h}");
+        }
+    }
+
+    /// Como en el control (cualquier boton): el derecho tambien pega, para alternar dedos.
+    #[test]
+    fn con_el_raton_pegan_los_dos_botones() {
+        let mut k = Koch::new(5, 0);
+        k.arrancar(0);
+        let p = en_pantalla(6);
+        mover_raton(&mut k, p);
+        assert_eq!(k.leer_golpe(&Entrada { puntero: Some(p), clic: true, ..Default::default() }), Some(6));
+        assert_eq!(k.leer_golpe(&Entrada { puntero: Some(p), clic_derecho: true, ..Default::default() }), Some(6));
+        assert_eq!(k.leer_golpe(&Entrada { puntero: Some(p), ..Default::default() }), None, "sin clic no pega");
+    }
+
+    /// Un clic sin haber movido el raton tambien cuenta para donde esta el puntero, no para donde
+    /// habia quedado el mazo.
+    #[test]
+    fn un_clic_sin_mover_el_raton_pega_donde_esta_el_puntero() {
+        let mut k = Koch::new(5, 0);
+        k.arrancar(0);
+        k.imagen.set(VENTANA);
+        assert_eq!(k.cursor, 4);
+        assert_eq!(k.leer_golpe(&Entrada { puntero: Some(en_pantalla(2)), clic: true, ..Default::default() }), Some(2));
+    }
+
+    #[test]
+    fn el_mazo_sigue_al_raton_sin_soltarse_de_su_hoyo() {
+        // Ida y vuelta: lo que se proyecta a la ventana regresa al mismo punto del tablero.
+        for h in 0..HOYOS {
+            let q = desproyectar(en_pantalla(h), VENTANA, 0.6).unwrap();
+            assert!((q - (hoyo(h) + Vec3::new(0.0, 0.6, 0.0))).length() < 0.01, "hoyo {h}: {q:?}");
+        }
+        let mut k = Koch::new(5, 0);
+        k.arrancar(0);
+        // El raton entre el hoyo del centro y el de la derecha, mas cerca del centro.
+        let (a, b) = (en_pantalla(4), en_pantalla(5));
+        mover_raton(&mut k, (a.0 + (b.0 - a.0) * 0.4, a.1));
+        assert_eq!(k.cursor, 4);
+        let meta = k.meta_del_mazo();
+        assert!(meta.x > hoyo(4).x + 0.2, "el mazo se va con el raton ({})", meta.x);
+        assert!((meta - hoyo(4)).length() < (meta - hoyo(5)).length(), "pero queda mas cerca de su hoyo");
+        // Al tocar el stick manda el control otra vez, y el mazo regresa a su hoyo.
+        k.leer_golpe(&Entrada { horizontal: -1.0, hay_control: true, ..Default::default() });
+        assert!(!k.con_raton);
+        assert_eq!(k.meta_del_mazo().x, hoyo(k.cursor).x);
+        // Las teclas siguen pegando directo en su hoyo, aunque ya no se anuncien.
+        mover_raton(&mut k, en_pantalla(0));
+        assert_eq!(k.leer_golpe(&Entrada { celda: Some(8), puntero: Some(en_pantalla(0)), ..Default::default() }), Some(8));
+    }
+
+    /// Todo el recorrido con el raton: clic para empezar, y clic en "Despegar" para irse.
+    #[test]
+    fn con_el_raton_se_empieza_y_se_despega() {
+        let clic = Entrada { puntero: Some((640.0, 300.0)), clic: true, ..Default::default() };
+        let mut k = Koch::new(5, 0);
+        for _ in 0..30 {
+            k.actualizar(&Entrada::default(), 1.0 / 60.0);
+        }
+        assert!(matches!(k.actualizar(&clic, 1.0 / 60.0), AccionKoch::Nada));
+        assert_eq!(k.fase, Fase::Cartel(0), "un clic donde sea empieza");
+        // Con el raton sobre "Despegar" (lo anota la pantalla al dibujarse), el clic despega.
+        let mut k = Koch::new(5, 0);
+        for _ in 0..30 {
+            k.actualizar(&Entrada::default(), 1.0 / 60.0);
+        }
+        k.sobre_ayuda.set(Some(Ayuda::Despegar));
+        assert!(matches!(k.actualizar(&clic, 1.0 / 60.0), AccionKoch::Despegar));
+        // Y en la nota final: "Otra vez" con un clic donde sea, o "Despegar" en su boton.
+        let mut k = Koch::new(5, 0);
+        k.arrancar(1);
+        for _ in 0..3 {
+            k.dar_reglazo(0);
+        }
+        for _ in 0..120 {
+            k.actualizar(&Entrada::default(), 1.0 / 60.0);
+        }
+        k.sobre_ayuda.set(Some(Ayuda::Despegar));
+        assert!(matches!(k.actualizar(&clic, 1.0 / 60.0), AccionKoch::Despegar));
+        k.sobre_ayuda.set(None);
+        assert!(matches!(k.actualizar(&clic, 1.0 / 60.0), AccionKoch::Nada));
+        assert_eq!(k.fase, Fase::Cartel(0));
     }
 
     /// Todo lo que sale en pantalla para el control tiene nombre de boton de verdad.

@@ -361,6 +361,8 @@ pub fn de_efecto(e: crate::sonido::Efecto) -> Option<(f32, f32, u32)> {
         Pop => (0.2, 0.5, 70),
         // El mazo se siente en las manos; pegarle al aire, apenas.
         Mazazo => (0.75, 0.55, 70),
+        // El ¡PERFECTO! (y el dorado): a fondo y casi el doble de largo, para que se note sin ver.
+        MazazoFuerte => (1.0, 0.85, 120),
         // El soplido del giro, apenitas: avisa en las manos que ya viene el golpe.
         Aire => (0.0, 0.14, 40),
         Tablero => (0.45, 0.2, 60),
