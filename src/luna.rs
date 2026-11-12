@@ -595,6 +595,33 @@ impl Luna {
                 }
             }
         }
+        // El polvo de cada brinco del astronauta: los granitos salen en arco y caen despacio, sin
+        // hacer nube (no hay aire que los detenga ni los levante). Colgado de los cables, no pisa.
+        if !self.cables {
+            let periodo = PI / 1.3;
+            let desde = (self.total / periodo).fract() * periodo;
+            let pies = self.astronauta().transform_point(Vec3::zero());
+            let suelo = Vec3::new(pies.x, 0.02, pies.z);
+            let vuelta = (self.total / periodo).floor();
+            for k in 0..18 {
+                let s = k as f32 * 2.399 + vuelta * 1.7;
+                let (rumbo, fuerza) = (s * 3.1, 0.45 + 0.4 * (s * 5.3).sin().abs());
+                let (vx, vy, vz) = (rumbo.cos() * fuerza, 0.7 + 0.5 * (s * 7.1).cos().abs(), rumbo.sin() * fuerza);
+                // La gravedad de la Luna: 1.62 m/s².
+                let alto = vy * desde - 0.81 * desde * desde;
+                if alto < 0.0 {
+                    continue;
+                }
+                let p = suelo + Vec3::new(vx * desde, alto, vz * desde);
+                // Brillan con la luz del Sol (el polvo lunar es clarito); el tamano sale de lo que
+                // mide un granito de 4 cm a esa distancia.
+                let brillo = 0.9 * (1.0 - desde / periodo).sqrt();
+                if let (Some(a), Some(b)) = (proyectar(p, vista_proyeccion, fb), proyectar(p + Vec3::new(0.0, 0.04, 0.0), vista_proyeccion, fb)) {
+                    let radio = ((a.1 - b.1).abs() * (0.7 + 0.6 * (s * 9.7).sin().abs())).clamp(1.2, 9.0);
+                    crate::post::halo(fb, (a.0, a.1), radio, [brillo, brillo, brillo * 1.05], 1.6);
+                }
+            }
+        }
         if self.reflector() {
             if let Some((x, y, _)) = proyectar(REFLECTOR_LUZ, vista_proyeccion, fb) {
                 crate::post::halo(fb, (x, y), 110.0, [0.6, 0.58, 0.5], 1.4);
@@ -608,7 +635,41 @@ impl Luna {
         }
     }
 
-    pub fn dibujar_ui(&self, d: &mut RaylibDrawHandle, e: &Entrada, texto: &str, ancho: i32, alto: i32) {
+    /// El visor de la camara de cine, encima de la imagen: las esquinas del cuadro, la cruz del
+    /// centro, el REC que parpadea (se apaga cuando gritan ¡CORTE!) y el contador de la cinta.
+    fn ui_visor(&self, d: &mut RaylibDrawHandle, imagen: Rectangle) {
+        if self.fase == Fase::Llegada {
+            return;
+        }
+        let (x0, y0, x1, y1) = (imagen.x + imagen.width * 0.035, imagen.y + imagen.height * 0.06, imagen.x + imagen.width * 0.965, imagen.y + imagen.height * 0.94);
+        let largo = imagen.height * 0.07;
+        let blanco = Color::new(240, 240, 250, 150);
+        for (x, y, dx, dy) in [(x0, y0, 1.0, 1.0), (x1, y0, -1.0, 1.0), (x0, y1, 1.0, -1.0), (x1, y1, -1.0, -1.0)] {
+            d.draw_line_ex(Vector2::new(x, y), Vector2::new(x + largo * dx, y), 3.0, blanco);
+            d.draw_line_ex(Vector2::new(x, y), Vector2::new(x, y + largo * dy), 3.0, blanco);
+        }
+        let (cx, cy) = (imagen.x + imagen.width * 0.5, imagen.y + imagen.height * 0.5);
+        let tenue = Color::new(240, 240, 250, 70);
+        d.draw_line_ex(Vector2::new(cx - 9.0, cy), Vector2::new(cx + 9.0, cy), 2.0, tenue);
+        d.draw_line_ex(Vector2::new(cx, cy - 9.0), Vector2::new(cx, cy + 9.0), 2.0, tenue);
+        // Arriba a la derecha: REC y el contador (horas:minutos:segundos:cuadros, a 24 por segundo).
+        let corte = matches!(self.fase, Fase::Respuesta(i, 0) if !self.respuestas[i]);
+        let (tx, ty) = (x1 as i32 - 150, y0 as i32 + 10);
+        if corte {
+            ui::texto(d, "CORTE", tx + 26, ty, 22, Color::new(200, 200, 215, 230));
+        } else {
+            if (self.total * 1.6) as i32 % 2 == 0 {
+                d.draw_circle(tx + 10, ty + 11, 8.0, Color::new(255, 60, 70, 255));
+            }
+            ui::texto(d, "REC", tx + 26, ty, 22, Color::new(255, 110, 120, 255));
+        }
+        let cuadros = (self.total * 24.0) as u32;
+        let cinta = format!("00:{:02}:{:02}:{:02}", cuadros / 1440 % 60, cuadros / 24 % 60, cuadros % 24);
+        ui::texto(d, &cinta, tx, ty + 30, 16, Color::new(230, 230, 240, 200));
+    }
+
+    pub fn dibujar_ui(&self, d: &mut RaylibDrawHandle, e: &Entrada, texto: &str, imagen: Rectangle, ancho: i32, alto: i32) {
+        self.ui_visor(d, imagen);
         let (aceptar, salir) = (&ui::boton(e.nombre("aceptar")), &ui::boton(e.nombre("aterrizar")));
         let centrado = |d: &mut RaylibDrawHandle, s: &str, y: i32, tam: i32, color: Color| ui::centrado(d, s, ancho, y, tam, color);
         if self.fase == Fase::Llegada {

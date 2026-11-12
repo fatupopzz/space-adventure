@@ -560,7 +560,7 @@ impl Recursos {
             },
             fans,
             cielo: Cielo::new(),
-            polvo: Polvo::new(220),
+            polvo: Polvo::new(320),
         }
     }
 }
@@ -1598,7 +1598,7 @@ fn dibujar_espacio(fb: &mut Framebuffer, post: &mut Post, rec: &Recursos, juego:
         st.triangulos += st_portal.triangulos;
         st.dibujados += st_portal.dibujados;
     }
-    rec.polvo.dibujar(fb, &vista_proyeccion, ojo, juego.nave.vel);
+    rec.polvo.dibujar(fb, &vista_proyeccion, ojo, juego.nave.vel, juego.turbo_encendido());
     if intro.is_none() {
         juego.coleccion.dibujar_luces(fb, &vista_proyeccion, ojo, juego.reloj);
         juego.jugo.dibujar(fb, &vista_proyeccion, ojo);
@@ -2561,14 +2561,17 @@ fn dibujar_anillos(fb: &mut Framebuffer, post: &mut Post, rec: &Recursos, a: &An
             ..llamada(rec.piloto(), Uniforms { modelo: saturno * concierto::miku_en(t, rec.asiento_luna), ..base })
         },
     ];
-    // El letrero gigante, con sus foquitos de feria y sus brillos.
-    llamadas.push(llamada(&m.letrero_fondo, base));
-    llamadas.push(llamada(&m.foquitos[(a.total / anillos::CORCHEA) as usize % 2], base));
-    for (k, (modelo, color)) in a.titulo().into_iter().enumerate() {
-        llamadas.push(llamada(&m.letras[k][color], Uniforms { modelo, ..base }));
-    }
-    for (p, tam) in a.brillos() {
-        llamadas.push(llamada(&m.brillo, Uniforms { modelo: Mat4::translation(p) * Mat4::scale(tam), ..base }));
+    // El letrero gigante, con sus foquitos de feria y sus brillos. Al chocar se apaga: encima cae el
+    // ¡ANILLAZO! de sello con el tiempo, y los dos letreros juntos se encimaban.
+    if a.jugando() {
+        llamadas.push(llamada(&m.letrero_fondo, base));
+        llamadas.push(llamada(&m.foquitos[(a.total / anillos::CORCHEA) as usize % 2], base));
+        for (k, (modelo, color)) in a.titulo().into_iter().enumerate() {
+            llamadas.push(llamada(&m.letras[k][color], Uniforms { modelo, ..base }));
+        }
+        for (p, tam) in a.brillos() {
+            llamadas.push(llamada(&m.brillo, Uniforms { modelo: Mat4::translation(p) * Mat4::scale(tam), ..base }));
+        }
     }
     // El tunel: aros que pasan, girando con el mundo.
     for (modelo, color) in a.aros_tunel() {
@@ -3531,7 +3534,26 @@ fn dibujar_jupiter(fb: &mut Framebuffer, post: &mut Post, rec: &Recursos, j: &Ju
     for c in &j.chispas {
         if let Some((x, y, _)) = proyectar(c.pos, &vp, fb) {
             let d = (c.pos - ojo).length().max(1.0);
-            post::halo(fb, (x, y), (2.0 + 4.0 * c.vida) * 30.0 / d, c.color.map(|v| v * c.vida.min(1.0)), 1.5);
+            post::halo(fb, (x, y), (2.6 + 5.2 * c.vida) * 30.0 / d, c.color.map(|v| v * c.vida.min(1.0)), 1.5);
+        }
+    }
+    // La onda de cada explosion: el fogonazo del centro y un anillo de luz que se abre.
+    for o in &j.ondas {
+        let Some((x, y, _)) = proyectar(o.pos, &vp, fb) else { continue };
+        let d = (o.pos - ojo).length().max(1.0);
+        let u = o.edad / jupiter::DURA_ONDA;
+        let apaga = (1.0 - u) * (1.0 - u);
+        // Lo que mide en pantalla una unidad del mundo a esa distancia.
+        let px = h * 0.7 / d;
+        let fogonazo = (1.0 - u * 2.5).max(0.0);
+        if fogonazo > 0.0 {
+            post::halo(fb, (x, y), o.tam * 7.0 * px, [fogonazo, fogonazo * 0.92, fogonazo * 0.75], 1.4);
+        }
+        let radio = o.tam * (1.5 + 9.0 * u.sqrt()) * px;
+        let grano = (o.tam * 1.3 * px).clamp(1.5, 26.0);
+        for k in 0..20 {
+            let a = k as f32 / 20.0 * std::f32::consts::TAU + o.tam * 3.0;
+            post::halo(fb, (x + a.cos() * radio, y + a.sin() * radio), grano, o.color.map(|v| v * apaga * 0.8), 1.5);
         }
     }
     // El brillo de las lunas y de las rocas rojas y doradas (para verlas venir).
@@ -3577,6 +3599,16 @@ fn dibujar_jupiter(fb: &mut Framebuffer, post: &mut Post, rec: &Recursos, j: &Ju
     let st_cab = pipeline::render(fb, &cabina, opciones);
     st.triangulos += st_cab.triangulos;
     st.dibujados += st_cab.dibujados;
+    // Las luces de alerta: un resplandor rojo en las esquinas de las pantallas del tablero (con un
+    // golpe a la nave, o con el escudo por acabarse).
+    let alerta = j.alerta();
+    if alerta > 0.0 {
+        for esquina in rec.pantallas_cabina.iter().flatten() {
+            if let Some((x, y, _)) = proyectar(cab.transform_point(*esquina), &vp, fb) {
+                post::halo(fb, (x, y), h * 0.045, [alerta * 0.9, alerta * 0.08, alerta * 0.1], 1.5);
+            }
+        }
+    }
     // Reflejos en el vidrio de la burbuja: dos rayas diagonales muy tenues.
     let (w, h) = (fb.ancho as f32, fb.alto as f32);
     for (x0, ancho) in [(0.12, 0.05), (0.22, 0.02)] {
@@ -3994,6 +4026,10 @@ fn dibujar_divorcio(fb: &mut Framebuffer, post: &mut Post, rec: &Recursos, dv: &
     for (ex, m, expresion) in dv.exes() {
         llamadas.push(DrawCall { expresion, ..llamada(&rec.exes[ex], Uniforms { modelo: m, ..base }) });
     }
+    // El publico: gansitos en las bancas (parientes del juez, se supone).
+    for m in dv.publico() {
+        llamadas.push(llamada(&rec.ganso, Uniforms { modelo: m, ..base }));
+    }
     // Los anillos que se robo el ganso, de collar: Saturno sin el planeta ni los otros anillos.
     let collares = dv.collares();
     let solo_anillo: Vec<Vec<&str>> =
@@ -4107,6 +4143,16 @@ fn preparar(t: f32, resto: &[String]) -> (Juego, Escena) {
             for _ in 0..60 {
                 juego.actualizar(&nada, 1.0 / 60.0);
             }
+        }
+        Some("turbo") | Some("crucero") => {
+            // Volando derecho `t` segundos (con `turbo`, con el turbo puesto): para ver el polvo.
+            let turbo = resto.iter().any(|s| s == "turbo");
+            let mut ahora = 0.0;
+            while ahora < t {
+                juego.actualizar(&Entrada { empuje: 1.0, turbo, ..Default::default() }, 1.0 / 60.0);
+                ahora += 1.0 / 60.0;
+            }
+            juego.mensaje = None;
         }
         Some("rescate") => {
             // A media estrella de rescate (Mario Galaxy), afuera del sistema.
@@ -6914,7 +6960,7 @@ fn main() {
             Escena::Luna(l) => {
                 let (texto, voz) = l.hablante().map_or(("", Voz::Ia), |(_, t, v)| (t, v));
                 let visible = dialogo_ia.mostrar(texto, voz, dt, son);
-                l.dibujar_ui(&mut d, &e, visible, ancho, alto);
+                l.dibujar_ui(&mut d, &e, visible, imagen, ancho, alto);
             }
             Escena::Jupiter(j) => {
                 // Los letreros de puntos van donde paso (se proyectan igual que la escena).
@@ -7028,7 +7074,11 @@ fn main() {
                 }
                 if let (Some((texto, _)), None) = (&juego.mensaje, &cine) {
                     let visible = dialogo_ia.mostrar(texto, Voz::Ia, dt, son);
-                    let derecha = if hud { ancho - ANCHO_TABLERO - 40 } else { ancho - 20 };
+                    // A la izquierda de la nave (que va abajo al centro): centrada, la caja la tapaba.
+                    // Si la imagen deja franja negra abajo (la caja cae ahi) o la ventana es tan
+                    // angosta que no cabe a un lado, va como antes.
+                    let tapa_la_nave = alto - 160 < (imagen.y + imagen.height) as i32;
+                    let derecha = if tapa_la_nave && ancho / 2 - 90 >= 440 { ancho / 2 - 90 } else if hud { ancho - ANCHO_TABLERO - 40 } else { ancho - 20 };
                     ui::mensaje_ia_entre(&mut d, visible, 20, derecha, alto);
                 }
                 // La demo: el rotulo de la parte del recorrido, arriba al centro (en las tomas en crudo, no).
@@ -7265,6 +7315,23 @@ fn barra_de_acciones(d: &mut RaylibDrawHandle, juego: &Juego, e: &Entrada, hud: 
     while tam > 14 && medida(&acciones, tam) > disponible {
         tam -= 2;
     }
+    // Con la ventana angosta no caben ni achicadas: van en columna a la derecha, debajo de "Controles".
+    if medida(&acciones[..acciones.len().min(3)], tam) > disponible && !acciones.is_empty() {
+        let tam = 14;
+        let medir = |b: &str, q: &str| if b.is_empty() { ui::medir(q, tam) } else { ui::medir_accion(b, q, tam) };
+        let mas_ancha = acciones.iter().map(|(b, q, _)| medir(b, q)).max().unwrap_or(0);
+        let renglon = tam * 2 + 4;
+        ui::velo(d, ancho - mas_ancha - 140, 48, mas_ancha + 140, renglon * acciones.len() as i32 + 16, ui::Hacia::Izquierda);
+        for (k, (boton, que, resaltada)) in acciones.iter().enumerate() {
+            let (x, y) = ((ancho - 20 - medir(boton, que)).max(10), 56 + k as i32 * renglon);
+            if boton.is_empty() {
+                ui::subtitulo(d, que, x, y + tam / 4, tam, Color::new(150, 220, 255, 255));
+            } else {
+                ui::accion(d, boton, que, x, y, tam, *resaltada && (juego.t * 3.0).sin() > 0.0);
+            }
+        }
+        return;
+    }
     if medida(&acciones, tam) > disponible && acciones.len() > 2 {
         acciones.pop();
     }
@@ -7305,6 +7372,13 @@ fn marcadores(d: &mut RaylibDrawHandle, juego: &Juego, imagen: Rectangle, ancho:
     // Las etiquetas ya puestas (para no encimar una sobre otra). El destino va primero: siempre se ve.
     marcas.sort_by_key(|m| !m.2);
     let mut ocupados: Vec<Rectangle> = Vec::new();
+    // Donde ya hay letras del HUD (donde estas y los encargos, el tablero de la nave, el boton de
+    // controles): ahi no se escribe el nombre de un planeta, y el del destino se corre a un lado.
+    let zonas = [
+        Rectangle::new(0.0, 0.0, 356.0, 300.0),
+        Rectangle::new((ancho - ANCHO_TABLERO - 30) as f32, (alto - 150) as f32, (ANCHO_TABLERO + 30) as f32, 150.0),
+        Rectangle::new((ancho - 220) as f32, 0.0, 220.0, 52.0),
+    ];
     for (p, nombre, escogido, radio) in marcas {
         let distancia = (p - juego.nave.pos).length();
         // De cerca ya se ve solo: no hace falta marca (salvo el destino).
@@ -7321,12 +7395,23 @@ fn marcadores(d: &mut RaylibDrawHandle, juego: &Juego, imagen: Rectangle, ancho:
                     let tam = if escogido { 18 } else { 14 };
                     let s = if escogido { format!("{}  {km}", nombre.to_uppercase()) } else { format!("{nombre}  {km}") };
                     let w = ui::medir(&s, tam);
-                    let tx = x as i32 - w / 2;
-                    let caja = Rectangle::new(tx as f32 - 2.0, y - tam as f32 * 0.6, w as f32 + 4.0, tam as f32 * 1.2);
-                    if escogido || !ocupados.iter().any(|o| o.check_collision_recs(&caja)) {
+                    let mut caja = Rectangle::new(x - w as f32 * 0.5 - 2.0, y - tam as f32 * 0.6, w as f32 + 4.0, tam as f32 * 1.2);
+                    let mut tapada = false;
+                    for z in zonas {
+                        if !z.check_collision_recs(&caja) {
+                            continue;
+                        }
+                        if escogido {
+                            caja = fuera_de(caja, z, ancho as f32, alto as f32);
+                        } else {
+                            tapada = true;
+                        }
+                    }
+                    if escogido || !(tapada || ocupados.iter().any(|o| o.check_collision_recs(&caja))) {
                         ocupados.push(caja);
-                        ui::texto(d, &s, tx + 1, y as i32 - tam / 2 + 1, tam, Color::new(0, 0, 0, 200));
-                        ui::texto(d, &s, tx, y as i32 - tam / 2, tam, color);
+                        let (tx, ty) = (caja.x as i32 + 2, (caja.y + tam as f32 * 0.1) as i32);
+                        ui::texto(d, &s, tx + 1, ty + 1, tam, Color::new(0, 0, 0, 200));
+                        ui::texto(d, &s, tx, ty, tam, color);
                     }
                 }
             }
@@ -7353,6 +7438,24 @@ fn marcadores(d: &mut RaylibDrawHandle, juego: &Juego, imagen: Rectangle, ancho:
             None => {}
         }
     }
+}
+
+/// `caja` corrida lo menos posible para que ya no toque `zona` (sin salirse de la ventana).
+fn fuera_de(caja: Rectangle, zona: Rectangle, ancho: f32, alto: f32) -> Rectangle {
+    let m = 8.0;
+    // Hacia cada lado: cuanto hay que moverla, y si despues todavia cabe en la ventana.
+    let lados = [
+        (zona.x + zona.width + m - caja.x, 0.0),
+        (zona.x - m - caja.width - caja.x, 0.0),
+        (0.0, zona.y + zona.height + m - caja.y),
+        (0.0, zona.y - m - caja.height - caja.y),
+    ];
+    let cabe = |&(dx, dy): &(f32, f32)| {
+        let (x, y) = (caja.x + dx, caja.y + dy);
+        x >= m && y >= m && x + caja.width <= ancho - m && y + caja.height <= alto - m
+    };
+    let (dx, dy) = lados.iter().filter(|l| cabe(l)).min_by(|a, b| (a.0.abs() + a.1.abs()).total_cmp(&(b.0.abs() + b.1.abs()))).copied().unwrap_or((0.0, 0.0));
+    Rectangle::new(caja.x + dx, caja.y + dy, caja.width, caja.height)
 }
 
 /// Un globito de dialogo con colita hacia abajo a la izquierda.
@@ -7613,7 +7716,11 @@ fn hud_espacio(d: &mut RaylibDrawHandle, juego: &Juego, e: &Entrada, st: &Estadi
         if let (None, Some((_, a))) = (juego.orbita, juego.gravedad) {
             if a > 0.05 {
                 let s = format!("jalón {a:.1} m/s²");
-                ui::subtitulo(d, &s, x + w - 18 - ui::medir(&s, 15), y + 14, 15, Color::new(150, 230, 255, 255));
+                // Solo si cabe al lado del estado (junto al Planeta Chapín, el nombre se lleva el renglon).
+                let xs = x + w - 18 - ui::medir(&s, 15);
+                if x + 18 + ui::medir(&estado, tam) + 12 <= xs {
+                    ui::subtitulo(d, &s, xs, y + 14, 15, Color::new(150, 230, 255, 255));
+                }
             }
         }
     }
@@ -7712,6 +7819,22 @@ fn hud_espacio(d: &mut RaylibDrawHandle, juego: &Juego, e: &Entrada, st: &Estadi
 #[cfg(test)]
 mod pruebas {
     use super::*;
+
+    /// El nombre del destino no se escribe encima del HUD: se corre lo justo para librarlo.
+    #[test]
+    fn la_etiqueta_del_destino_se_sale_del_hud() {
+        let hud = Rectangle::new(0.0, 0.0, 356.0, 300.0);
+        // Pegada a la orilla derecha del panel: sale por la derecha, a la misma altura.
+        let a = fuera_de(Rectangle::new(300.0, 100.0, 120.0, 20.0), hud, 1280.0, 720.0);
+        assert!(!hud.check_collision_recs(&a) && a.y == 100.0 && a.x > 356.0, "{a:?}");
+        // Abajo del panel: sale por abajo, sin moverse de lado.
+        let b = fuera_de(Rectangle::new(60.0, 290.0, 120.0, 20.0), hud, 1280.0, 720.0);
+        assert!(!hud.check_collision_recs(&b) && b.x == 60.0 && b.y > 300.0, "{b:?}");
+        // Sobre el tablero de abajo a la derecha: no se sale de la ventana por huirle.
+        let tablero = Rectangle::new(950.0, 570.0, 330.0, 150.0);
+        let c = fuera_de(Rectangle::new(1150.0, 690.0, 120.0, 20.0), tablero, 1280.0, 720.0);
+        assert!(!tablero.check_collision_recs(&c) && c.x >= 0.0 && c.y >= 0.0 && c.x + c.width <= 1280.0 && c.y + c.height <= 720.0, "{c:?}");
+    }
 
     /// La demo hace el recorrido completo con el juego de verdad (gravedad, sincronia y orbita).
     #[test]

@@ -127,6 +127,19 @@ pub struct Letrero {
     pub vida: f32,
 }
 
+/// La onda de una explosion: un anillo de luz que se abre desde donde revento la roca, y el
+/// fogonazo del centro.
+pub struct Onda {
+    pub pos: Vec3,
+    pub edad: f32,
+    pub color: [f32; 3],
+    /// Que tan grande (las rocas grandes y las rojas revientan mas).
+    pub tam: f32,
+}
+
+/// Lo que dura la onda de una explosion.
+pub const DURA_ONDA: f32 = 0.42;
+
 pub struct Mancha {
     pub pos: Vec3,
     pub vida: u32,
@@ -160,6 +173,7 @@ pub struct Jupiter {
     pub balas: Vec<Bala>,
     pub lunas: Vec<LunaSuelta>,
     pub chispas: Vec<Chispa>,
+    pub ondas: Vec<Onda>,
     pub letreros: Vec<Letrero>,
     pub mancha: Option<Mancha>,
     pub oleada: u32,
@@ -183,6 +197,8 @@ pub struct Jupiter {
     cabezon: [f32; 4],
     pub destello: f32,
     pub rojo: f32,
+    /// La alarma del tablero: se prende con cada golpe a la nave y se apaga sola.
+    alarma: f32,
     pub cobrado: bool,
     /// Los letreros gigantes, el confeti y las sacudidas (ver vida.rs).
     pub vida: Vida,
@@ -206,6 +222,7 @@ impl Jupiter {
             balas: Vec::new(),
             lunas: Vec::new(),
             chispas: Vec::new(),
+            ondas: Vec::new(),
             letreros: Vec::new(),
             mancha: None,
             oleada: 0,
@@ -227,6 +244,7 @@ impl Jupiter {
             cabezon: [0.0; 4],
             destello: 0.0,
             rojo: 0.0,
+            alarma: 0.0,
             cobrado: false,
             vida: Vida::new("ASTEROIDES", "Júpiter. Dispare a todo menos a la ciencia.", Tono::Oro),
             eventos: Vec::new(),
@@ -342,6 +360,8 @@ impl Jupiter {
             Clase::Gris => [0.85, 0.8, 0.75],
         };
         self.explotar(r.pos, 14 + 10 * (2 - r.tam), color, 9.0);
+        let tam = [1.7, 1.1, 0.7][r.tam] * if r.clase == Clase::Roja { 1.9 } else { 1.0 };
+        self.ondas.push(Onda { pos: r.pos, edad: 0.0, color, tam });
         self.sacudida = self.sacudida.max(0.08 + 0.08 * (2 - r.tam) as f32);
         self.eventos.push(if r.tam == 0 { Efecto::Choque } else { Efecto::Don });
         if r.clase == Clase::Dorada {
@@ -417,6 +437,7 @@ impl Jupiter {
         }
         self.destello = (self.destello - dt * 2.0).max(0.0);
         self.rojo = (self.rojo - dt * 2.5).max(0.0);
+        self.alarma = (self.alarma - dt * 1.1).max(0.0);
         if let Some((_, quedan)) = &mut self.bill {
             *quedan -= dt;
             if *quedan <= 0.0 {
@@ -607,6 +628,7 @@ impl Jupiter {
                     self.escudo -= GOLPE * if r.clase == Clase::Roja { 1.6 } else { 1.0 } * if r.tam == 2 { 0.6 } else { 1.0 };
                     self.sacudida = 1.0;
                     self.rojo = 1.0;
+                    self.alarma = 1.0;
                     self.vida.grito("¡AUCH!", Tono::Rojo, Tam::Medio);
                     self.eventos.push(Efecto::Choque);
                     if self.escudo <= 0.0 {
@@ -647,6 +669,11 @@ impl Jupiter {
             c.vida -= dt;
         }
         self.chispas.retain(|c| c.vida > 0.0);
+        for o in &mut self.ondas {
+            o.pos = o.pos + vel_fondo * 0.5 * dt;
+            o.edad += dt;
+        }
+        self.ondas.retain(|o| o.edad < DURA_ONDA);
         if self.chispas.len() > 1200 {
             let sobran = self.chispas.len() - 1200;
             self.chispas.drain(0..sobran);
@@ -681,6 +708,19 @@ impl Jupiter {
         let derecha = adelante.cross(arriba).normalize();
         let arriba = derecha.cross(adelante);
         Mat4::translation(ojo) * Mat4::from_basis(derecha, arriba, adelante * -1.0)
+    }
+
+    /// Las luces de alerta del tablero, de 0 (apagadas) a 1: parpadean rapido cuando le pegan a la
+    /// nave y laten despacio mientras el escudo esta por acabarse.
+    pub fn alerta(&self) -> f32 {
+        if self.alarma > 0.0 {
+            let prendida = (self.total * 16.0).sin() > 0.0;
+            self.alarma.sqrt() * if prendida { 1.0 } else { 0.35 }
+        } else if self.jugando() && self.escudo <= 0.25 {
+            0.3 + 0.25 * (self.total * 6.0).sin()
+        } else {
+            0.0
+        }
     }
 
     /// La palanca de mando: (de lado, hacia el piloto), con el viraje.
@@ -848,6 +888,19 @@ impl Jupiter {
         if let Some(p) = vidrio(0) {
             self.pantalla_escudo(d, &p);
         }
+        // La alerta: el marco de las tres pantallas se prende en rojo.
+        let alerta = self.alerta();
+        if alerta > 0.0 {
+            let rojo = Color::new(255, 60, 70, (alerta * 230.0) as u8);
+            for k in 0..3 {
+                if let Some(p) = vidrio(k) {
+                    let grueso = (p.alto() * 0.035).max(2.0);
+                    for (a, b) in [((0.0, 0.0), (1.0, 0.0)), ((1.0, 0.0), (1.0, 1.0)), ((1.0, 1.0), (0.0, 1.0)), ((0.0, 1.0), (0.0, 0.0))] {
+                        p.linea(d, a, b, grueso, rojo);
+                    }
+                }
+            }
+        }
         if let Some(p) = vidrio(1) {
             self.pantalla_radar(d, &p);
         }
@@ -953,6 +1006,48 @@ mod pruebas {
         j.rocas.push(Roca { vel: Vec3::zero(), ..r });
         j.actualizar(&Entrada::default(), 0.016);
         assert!(j.escudo < 1.0);
+    }
+
+    /// Un golpe a la nave prende las luces de alerta del tablero un ratito; con el escudo por
+    /// acabarse, se quedan latiendo.
+    #[test]
+    fn el_tablero_avisa_cuando_le_pegan_a_la_nave() {
+        let mut j = Jupiter::new(3, 0);
+        j.fase = Fase::Jugando;
+        j.proxima = 99.0;
+        assert_eq!(j.alerta(), 0.0, "sin golpes, apagadas");
+        let r = j.roca(Vec3::new(0.0, 0.0, -0.5), 1, Clase::Gris);
+        j.rocas.push(Roca { vel: Vec3::zero(), ..r });
+        j.actualizar(&Entrada::default(), 0.016);
+        assert!(j.alerta() > 0.2, "recien golpeada: {}", j.alerta());
+        for _ in 0..90 {
+            j.proxima = 99.0;
+            j.actualizar(&Entrada::default(), 0.016);
+        }
+        assert_eq!(j.alerta(), 0.0, "se apagan solas");
+        j.escudo = 0.2;
+        assert!(j.alerta() > 0.0, "con poco escudo se quedan latiendo");
+    }
+
+    #[test]
+    fn cada_roca_que_revienta_deja_su_onda() {
+        let mut j = Jupiter::new(9, 0);
+        j.fase = Fase::Jugando;
+        j.proxima = 99.0;
+        let grande = j.roca(Vec3::new(0.0, 0.0, -50.0), 0, Clase::Gris);
+        let roja = j.roca(Vec3::new(30.0, 0.0, -90.0), 2, Clase::Roja);
+        j.rocas.push(grande);
+        j.romper(0);
+        assert_eq!(j.ondas.len(), 1);
+        j.rocas.push(roja);
+        let i = j.rocas.len() - 1;
+        j.romper(i);
+        assert!(j.ondas[1].tam > [1.7, 1.1, 0.7][2], "las rojas revientan mas grande");
+        for _ in 0..40 {
+            j.proxima = 99.0;
+            j.mover_cosas(0.016);
+        }
+        assert!(j.ondas.is_empty(), "la onda se apaga en menos de medio segundo");
     }
 
     #[test]

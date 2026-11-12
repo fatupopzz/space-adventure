@@ -354,6 +354,13 @@ const PHOENIX_EN: Vec3 = Vec3::new(-3.1, 0.0, 0.25);
 const TESTIGO_EN: Vec3 = Vec3::new(0.0, 0.0, 1.3);
 pub const JUEZ_EN: Vec3 = Vec3::new(0.0, 1.3, 3.55);
 const PUBLICO: [Vec3; 3] = [Vec3::new(-2.2, 0.0, -2.15), Vec3::new(2.2, 0.0, -2.15), Vec3::new(-3.4, 0.0, -2.15)];
+/// El resto del publico: gansitos sentados en las bancas (x, z). La fila de atras y dos colados adelante.
+const GANSITOS: [(f32, f32); 7] = [(-3.7, -3.45), (-2.5, -3.45), (-1.3, -3.45), (1.4, -3.45), (2.7, -3.45), (3.8, -3.45), (3.6, -2.45)];
+/// Los chismosos: gansitos que se asoman desde afuera por las ventanas (lado, z). Las ventanas van de
+/// z -3.2 a -1.4 y de 0.6 a 2.4, con el borde de abajo en y = 1.6.
+const CHISMOSOS: [(f32, f32); 5] = [(1.0, 1.1), (1.0, 1.9), (-1.0, 1.5), (-1.0, -2.0), (1.0, -2.6)];
+/// Las motas de polvo que flotan en la luz de las ventanas.
+const MOTAS: usize = 60;
 
 /// Segundos de las animaciones.
 const PROTESTO: f32 = 1.3;
@@ -836,6 +843,55 @@ impl Divorcio {
             .collect()
     }
 
+    /// El publico: gansitos en las bancas y asomados a las ventanas, viendo a quien habla. Brincan con
+    /// el ¡PROTESTO! y con la fiesta del veredicto, y agachan la cabeza cuando el juez se enoja.
+    pub fn publico(&self) -> Vec<Mat4> {
+        let foco = match self.hablante().map(|h| h.0) {
+            Some(Quien::Miku) => MIKU_EN,
+            Some(Quien::Phoenix) => PHOENIX_EN,
+            Some(Quien::Saturno) => SATURNO_EN,
+            Some(Quien::Ex(_)) => TESTIGO_EN,
+            _ => JUEZ_EN,
+        };
+        // Los de la ventana se asoman por turnos. Con el ¡PROTESTO! se asoman todos de un brinco, y
+        // cuando el juez se enoja, se esconden.
+        let asomados = CHISMOSOS.iter().enumerate().map(|(i, &(lado, z))| {
+            let f = i as f32;
+            let x = lado * 5.4;
+            let asoma = match self.fase {
+                Fase::Protesto | Fase::Acierto(_) | Fase::Veredicto(_) | Fase::Libre => 1.0,
+                Fase::Error(1) | Fase::Perdido(_) => 0.0,
+                _ => suave(0.5 + 1.4 * (self.total * 0.33 + f * 2.3).sin()),
+            };
+            let brinco = if self.fase == Fase::Protesto { 0.12 * (self.t * 11.0 + f).sin().abs() * (1.0 - self.t / PROTESTO).max(0.0) } else { 0.0 };
+            let hacia = ((foco.z - z) / 6.0).clamp(-0.6, 0.6) * lado;
+            Mat4::translation(Vec3::new(x, 0.72 + 0.5 * asoma + brinco, z)) * Mat4::rotation_y(lado * PI * 0.5 + hacia + 0.08 * (self.total * 0.7 + f).sin()) * Mat4::scale(0.75)
+        });
+        GANSITOS
+            .iter()
+            .enumerate()
+            .map(|(i, &(x, z))| {
+                let f = i as f32;
+                let hacia = (foco.x - x).atan2(foco.z - z);
+                let brinco = match self.fase {
+                    Fase::Protesto => 0.22 * (self.t * 11.0 + f).sin().abs() * (1.0 - self.t / PROTESTO).max(0.0),
+                    Fase::Acierto(4) | Fase::Veredicto(3) => 0.1 * (self.total * 7.0 + f * 1.7).sin().abs(),
+                    // Ya libres, se quedan bailando la cancion.
+                    Fase::Libre => 0.05 * (self.total * 6.0 + f * 1.7).sin().abs(),
+                    _ => 0.0,
+                };
+                let agachado = if matches!(self.fase, Fase::Error(1) | Fase::Perdido(_)) { 0.3 } else { 0.0 };
+                let respira = 0.012 * (self.total * 1.4 + f * 2.1).sin();
+                let curioso = 0.1 * (self.total * 0.5 + f * 1.9).sin();
+                Mat4::translation(Vec3::new(x, 0.5 + brinco + respira, z))
+                    * Mat4::rotation_y(PI + hacia * 0.7 + curioso)
+                    * Mat4::rotation_x(agachado)
+                    * Mat4::scale(0.5 + 0.05 * (i % 3) as f32)
+            })
+            .chain(asomados)
+            .collect()
+    }
+
     /// Si el Sinluz esta en el banquillo (para su luz de gracia).
     fn sinluz_testifica(&self) -> bool {
         self.ex() == 2 && !self.terminado() && !matches!(self.fase, Fase::Llegada | Fase::Apertura(_))
@@ -888,6 +944,25 @@ impl Divorcio {
         for (_, m) in self.collares() {
             if let Some((x, y, _)) = proyectar(m.transform_point(Vec3::zero()), vista_proyeccion, fb) {
                 crate::post::halo(fb, (x, y), 40.0, [0.4, 0.35, 0.2], 1.6);
+            }
+        }
+        // Las motas de polvo en la luz de las ventanas: bajan despacito, se mecen y titilan.
+        let ojo = self.camara().0;
+        for k in 0..MOTAS {
+            let f = k as f32;
+            let azar = |n: f32| (((f + 1.0) * n).sin() * 43_758.547).fract().abs();
+            let p = Vec3::new(
+                -4.6 + 9.2 * azar(12.9898) + 0.25 * (self.total * 0.21 + f).sin(),
+                3.5 - (self.total * (0.035 + 0.03 * azar(4.1)) + 3.3 * azar(78.233)) % 3.3,
+                -4.2 + 7.4 * azar(37.719) + 0.2 * (self.total * 0.17 + f * 1.3).cos(),
+            );
+            let Some((x, y, z)) = proyectar(p, vista_proyeccion, fb) else { continue };
+            let b = 0.26 + 0.18 * (self.total * (0.8 + azar(9.7)) + f).sin();
+            let color = [b, b * 0.85, b * 0.5];
+            // De cerca se ven de dos pixeles; de lejos, de uno.
+            let ancho = if (p - ojo).length() < 4.5 { 1.0 } else { 0.0 };
+            for dx in 0..=ancho as i32 {
+                fb.linea_de_luz((x + dx as f32, y, z), (x + dx as f32, y + ancho, z), color, color);
             }
         }
     }
@@ -1193,6 +1268,23 @@ fn voz(q: Quien) -> Voz {
 #[cfg(test)]
 mod pruebas {
     use super::*;
+
+    /// El publico esta vivo: con el ¡PROTESTO! todos los chismosos se asoman a la ventana, y cuando
+    /// el juez se enoja (protesta mala) se esconden abajo del marco.
+    #[test]
+    fn el_publico_reacciona_al_juicio() {
+        let altura = |d: &Divorcio| d.publico()[GANSITOS.len()..].iter().map(|m| m.m[1][3]).fold(f32::MAX, f32::min);
+        let mut d = Divorcio::new(7);
+        assert_eq!(d.publico().len(), GANSITOS.len() + CHISMOSOS.len());
+        d.jugar_hasta("Protesto");
+        assert!(altura(&d) > 1.2, "en el protesto no se asomaron: {}", altura(&d));
+        let mut mal = Divorcio::new(7);
+        mal.jugar_hasta("Error_mal");
+        mal.fase = Fase::Error(1);
+        let escondido = mal.publico()[GANSITOS.len()..].iter().map(|m| m.m[1][3]).fold(f32::MIN, f32::max);
+        // El marco de la ventana empieza en y = 1.6, y el gansito mide 0.75.
+        assert!(escondido + 0.75 < 1.6, "siguen asomados: {escondido}");
+    }
 
     /// Protestando siempre en la mentira, Saturno se queda con sus tres anillos y hay veredicto.
     #[test]

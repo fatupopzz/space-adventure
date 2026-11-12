@@ -160,7 +160,7 @@ impl Concierto {
         ui::texto(d, "SATURNO RITMO", 36, 30, 28, ui::TEXTO);
         let vivo = if (self.t * 2.0) as i32 % 2 == 0 { ui::ROJO } else { ui::TENUE };
         ui::texto(d, "EN VIVO", 36, 64, 18, vivo);
-        ui::texto(d, &format!("{}: jugar     {}: despegar", ui::boton(e.nombre("aceptar")), ui::boton(e.nombre("aterrizar"))), 260, 64, 18, ui::LILA);
+        ui::texto(d, &format!("{}: ¡Anillazo!     {}: despegar", ui::boton(e.nombre("aceptar")), ui::boton(e.nombre("aterrizar"))), 260, 64, 18, ui::LILA);
         if !ia.is_empty() {
             ui::mensaje_ia(d, ia, ancho, alto);
         }

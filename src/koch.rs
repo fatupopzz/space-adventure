@@ -1694,7 +1694,9 @@ impl Koch {
         }
         if self.record > 0 {
             let r = format!("Récord: {}", self.record);
-            ui::subtitulo(d, &r, ancho - ui::medir(&r, 20) - 24, y_credito + 2, 20, Color::new(255, 225, 120, 255));
+            // En una ventana angosta no cabe junto al credito: sube un renglon.
+            let cabe = (ancho + ui::medir(t2, 22)) / 2 + 16 < ancho - ui::medir(&r, 20) - 24;
+            ui::subtitulo(d, &r, ancho - ui::medir(&r, 20) - 24, y_credito + if cabe { 2 } else { -30 }, 20, Color::new(255, 225, 120, 255));
         }
         // Como se juega, segun lo que este conectado.
         let (como, y_como) = (
